@@ -1,3 +1,13 @@
+/** Options for constructing a RegexSet. */
+export type Options = {
+  /**
+   * Only match whole words. Wraps each pattern
+   * with `\b...\b`.
+   * @default false
+   */
+  wholeWords?: boolean;
+};
+
 /** A single match result. */
 export type Match = {
   /** Index of the pattern that matched. */
@@ -18,7 +28,7 @@ export type Match = {
  * backtracking. Uses Rust regex syntax.
  */
 export declare class RegexSet {
-  constructor(patterns: string[]);
+  constructor(patterns: string[], options?: Options);
 
   /** Number of patterns. */
   get patternCount(): number;

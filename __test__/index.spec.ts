@@ -154,6 +154,52 @@ describe("RegexSet", () => {
   });
 });
 
+// ─── wholeWords ───────────────────────────────
+
+describe("wholeWords", () => {
+  test("basic whole word filtering", () => {
+    const rs = new RegexSet(["\\d+"], {
+      wholeWords: true,
+    });
+    // "123" inside "abc123def" is NOT a whole word
+    expect(rs.findIter("abc123def").length).toBe(0);
+    // "123" surrounded by spaces IS
+    expect(rs.findIter("abc 123 def").length).toBe(
+      1,
+    );
+  });
+
+  test("regex pattern with wholeWords", () => {
+    const rs = new RegexSet(
+      ["\\d{2}\\.\\d{2}\\.\\d{4}"],
+      { wholeWords: true },
+    );
+    const matches = rs.findIter(
+      "date 15.03.1990 ok",
+    );
+    expect(matches).toHaveLength(1);
+    expect(matches[0]!.text).toBe("15.03.1990");
+
+    // Not a whole word if glued to text
+    expect(
+      rs.findIter("date15.03.1990ok").length,
+    ).toBe(0);
+  });
+
+  test("wholeWords with literal patterns", () => {
+    const rs = new RegexSet(["test"], {
+      wholeWords: true,
+    });
+    expect(rs.findIter("testing").length).toBe(0);
+    expect(rs.findIter("a test b").length).toBe(1);
+  });
+
+  test("without wholeWords (default)", () => {
+    const rs = new RegexSet(["\\d+"]);
+    expect(rs.findIter("abc123def").length).toBe(1);
+  });
+});
+
 // ─── Unicode offsets ──────────────────────────
 
 describe("unicode offsets", () => {

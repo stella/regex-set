@@ -2,6 +2,14 @@ use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use regex_automata::meta::Regex;
 
+/// Options for constructing a `RegexSet`.
+#[napi(object)]
+pub struct Options {
+  /// Only match whole words. Default: `false`.
+  /// Wraps each pattern with `\b...\b`.
+  pub whole_words: Option<bool>,
+}
+
 /// A single match returned by search methods.
 #[napi(object)]
 pub struct Match {
@@ -61,10 +69,26 @@ impl RegexSet {
   #[napi(constructor)]
   pub fn new(
     patterns: Vec<String>,
+    options: Option<Options>,
   ) -> Result<Self> {
+    let whole_words = options
+      .and_then(|o| o.whole_words)
+      .unwrap_or(false);
+
     let pattern_count = patterns.len() as u32;
+
+    // wholeWords: wrap each pattern with \b
+    let wrapped: Vec<String> = if whole_words {
+      patterns
+        .iter()
+        .map(|p| format!("\\b(?:{p})\\b"))
+        .collect()
+    } else {
+      patterns
+    };
+
     let refs: Vec<&str> =
-      patterns.iter().map(|s| s.as_str()).collect();
+      wrapped.iter().map(|s| s.as_str()).collect();
     let inner =
       Regex::new_many(&refs).map_err(|e| {
         Error::from_reason(format!(

@@ -24,8 +24,11 @@ function unpack(packed, haystack) {
 }
 
 class RegexSet {
-  constructor(patterns) {
-    this._inner = new NativeRegexSet(patterns);
+  constructor(patterns, options) {
+    this._inner = new NativeRegexSet(
+      patterns,
+      options,
+    );
   }
 
   get patternCount() {

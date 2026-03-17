@@ -16,7 +16,7 @@ export declare class RegexSet {
    * Patterns use Rust regex syntax (similar to
    * PCRE but no backreferences or lookaround).
    */
-  constructor(patterns: Array<string>)
+  constructor(patterns: Array<string>, options?: Options | undefined | null)
   /** Number of patterns. */
   get patternCount(): number
   /** Returns `true` if any pattern matches. */
@@ -48,4 +48,13 @@ export interface Match {
   start: number
   /** End offset (exclusive, UTF-16 code units). */
   end: number
+}
+
+/** Options for constructing a `RegexSet`. */
+export interface Options {
+  /**
+   * Only match whole words. Default: `false`.
+   * Wraps each pattern with `\b...\b`.
+   */
+  wholeWords?: boolean
 }
