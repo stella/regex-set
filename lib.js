@@ -24,26 +24,57 @@ function unpack(packed, haystack) {
 }
 
 /**
+ * Replace unescaped `\b` and `\B` with their
+ * ASCII-only equivalents `(?-u:\b)` / `(?-u:\B)`.
+ * Skips character classes `[...]` (where `\b` means
+ * backspace) and escaped backslashes `\\b`.
+ */
+function asciiBoundaries(src) {
+  let result = "";
+  let inClass = false;
+  let i = 0;
+  while (i < src.length) {
+    if (src[i] === "\\" && i + 1 < src.length) {
+      const next = src[i + 1];
+      if (
+        !inClass &&
+        (next === "b" || next === "B")
+      ) {
+        result += `(?-u:\\${next})`;
+        i += 2;
+      } else {
+        // escaped char (including \\) — emit as-is
+        result += src[i] + src[i + 1];
+        i += 2;
+      }
+    } else {
+      if (src[i] === "[") inClass = true;
+      if (src[i] === "]") inClass = false;
+      result += src[i];
+      i++;
+    }
+  }
+  return result;
+}
+
+/**
  * Convert a pattern (string or RegExp) to a Rust
  * regex string. Extracts .source from RegExp and
  * converts JS flags to Rust inline flags.
  *
- * Replaces `\b` with `(?-u:\b)` so Rust uses
- * ASCII-only word boundaries (matching JS semantics)
- * instead of expensive Unicode word boundaries.
+ * Replaces `\b`/`\B` with `(?-u:\b)`/`(?-u:\B)`
+ * so Rust uses ASCII-only word boundaries (matching
+ * JS semantics) instead of expensive Unicode ones.
  */
 function toRustPattern(p) {
   if (typeof p === "string")
-    return p.replaceAll("\\b", "(?-u:\\b)");
+    return asciiBoundaries(p);
   if (p instanceof RegExp) {
     let prefix = "";
     if (p.flags.includes("i")) prefix += "i";
     if (p.flags.includes("m")) prefix += "m";
     if (p.flags.includes("s")) prefix += "s";
-    const src = p.source.replaceAll(
-      "\\b",
-      "(?-u:\\b)",
-    );
+    const src = asciiBoundaries(p.source);
     return prefix ? `(?${prefix})${src}` : src;
   }
   throw new TypeError(
