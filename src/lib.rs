@@ -74,26 +74,86 @@ struct InlineCheck {
 }
 
 /// A single character assertion.
+/// Fast character classifier — avoids regex
+/// dispatch overhead by using native Rust functions.
+enum CharClass {
+  /// `\d` or `[0-9]`
+  Digit,
+  /// `\w` or `[a-zA-Z0-9_]`
+  WordChar,
+  /// `\s` or `[\t\n\r ]`
+  Whitespace,
+  /// `\p{L}` or `\p{Alphabetic}`
+  Alpha,
+  /// `\p{N}` or `\p{Numeric}`
+  Numeric,
+  /// Fallback: compiled regex for unknown classes
+  Regex(regex::Regex),
+}
+
+impl CharClass {
+  fn matches_char(&self, ch: char) -> bool {
+    match self {
+      CharClass::Digit => ch.is_ascii_digit(),
+      CharClass::WordChar => {
+        ch.is_alphanumeric() || ch == '_'
+      }
+      CharClass::Whitespace => ch.is_whitespace(),
+      CharClass::Alpha => ch.is_alphabetic(),
+      CharClass::Numeric => ch.is_numeric(),
+      CharClass::Regex(re) => {
+        let mut buf = [0u8; 4];
+        re.is_match(ch.encode_utf8(&mut buf))
+      }
+    }
+  }
+
+  /// Parse a char class from the assertion content.
+  fn from_str(
+    s: &str,
+  ) -> std::result::Result<Self, String> {
+    match s {
+      "\\d" | "[0-9]" => Ok(CharClass::Digit),
+      "\\w" | "[a-zA-Z0-9_]" => {
+        Ok(CharClass::WordChar)
+      }
+      "\\s" | "[\\t\\n\\r ]" => {
+        Ok(CharClass::Whitespace)
+      }
+      "\\p{L}" | "\\p{Alphabetic}"
+      | "\\p{Letter}" => Ok(CharClass::Alpha),
+      "\\p{N}" | "\\p{Numeric}"
+      | "\\p{Number}" => Ok(CharClass::Numeric),
+      _ => {
+        let re = regex::Regex::new(s)
+          .map_err(|e| format!("{e}"))?;
+        Ok(CharClass::Regex(re))
+      }
+    }
+  }
+}
+
 struct CharCheck {
-  /// The compiled char-class regex (fast, from
-  /// the `regex` crate, not fancy-regex).
-  class: regex::Regex,
-  /// True = char must NOT match (negative
-  /// lookaround). False = must match (positive).
+  class: CharClass,
   negated: bool,
 }
 
 impl CharCheck {
-  fn test(&self, haystack: &str, pos: usize) -> bool {
-    let ch = if pos >= haystack.len() {
-      // End of string: negative assertions pass,
-      // positive assertions fail.
+  fn test(
+    &self,
+    haystack: &str,
+    pos: usize,
+  ) -> bool {
+    if pos >= haystack.len() {
       return self.negated;
+    }
+    let ch = haystack[pos..].chars().next().unwrap();
+    let matches = self.class.matches_char(ch);
+    if self.negated {
+      !matches
     } else {
-      &haystack[pos..pos + char_len_at(haystack, pos)]
-    };
-    let matches = self.class.is_match(ch);
-    if self.negated { !matches } else { matches }
+      matches
+    }
   }
 
   fn test_before(
@@ -104,12 +164,14 @@ impl CharCheck {
     if pos == 0 {
       return self.negated;
     }
-    // Find prev char start.
-    let prev_start = prev_char_start(haystack, pos);
     let ch =
-      &haystack[prev_start..pos];
-    let matches = self.class.is_match(ch);
-    if self.negated { !matches } else { matches }
+      haystack[..pos].chars().next_back().unwrap();
+    let matches = self.class.matches_char(ch);
+    if self.negated {
+      !matches
+    } else {
+      matches
+    }
   }
 }
 
@@ -194,15 +256,13 @@ fn extract_trailing_lookahead(
 /// means: no quantifiers, no alternation, no
 /// groups.
 fn is_simple_char_class(content: &str) -> bool {
-  // No quantifiers or multi-char constructs
   !content.contains('*')
     && !content.contains('+')
     && !content.contains('?')
     && !content.contains('{')
     && !content.contains('|')
     && !content.contains('(')
-    // Must compile with regex crate
-    && regex::Regex::new(content).is_ok()
+    && CharClass::from_str(content).is_ok()
 }
 
 /// Build a Verifier from a pattern's lookaround.
@@ -226,7 +286,7 @@ fn build_verifier(
     extract_leading_lookbehind(&core)
   {
     if is_simple_char_class(&content) {
-      let class = regex::Regex::new(&content)
+      let class = CharClass::from_str(&content)
         .map_err(|e| format!("{e}"))?;
       pre = Some(CharCheck {
         class,
@@ -241,7 +301,7 @@ fn build_verifier(
     extract_trailing_lookahead(&core)
   {
     if is_simple_char_class(&content) {
-      let class = regex::Regex::new(&content)
+      let class = CharClass::from_str(&content)
         .map_err(|e| format!("{e}"))?;
       post = Some(CharCheck {
         class,
