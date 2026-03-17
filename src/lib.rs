@@ -530,7 +530,7 @@ impl RegexSet {
     let wrapped: Vec<String> = if whole_words {
       patterns
         .iter()
-        .map(|p| format!("\\b(?:{p})\\b"))
+        .map(|p| format!("(?-u:\\b)(?:{p})(?-u:\\b)"))
         .collect()
     } else {
       patterns
