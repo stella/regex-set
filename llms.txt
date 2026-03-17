@@ -16,18 +16,18 @@ const rs = new RegexSet([
 ]);
 
 rs.findIter("Born 15.03.1990, ID CZ123456");
-// [{ pattern: 0, start: 5, end: 15, text: "15.03.1990" },
-//  { pattern: 2, start: 20, end: 28, text: "CZ123456" }]
+// [{ pattern: 0, ..., text: "15.03.1990" },
+//  { pattern: 2, ..., text: "CZ123456" }]
 
 rs.replaceAll(text, ["[DATE]", "[PHONE]", "[ID]"]);
 ```
 
 ## API
 
-Constructor: `new RegexSet(patterns: string[])`
+Constructor: `new RegexSet(patterns: string[], options?: Options)`
 
-Patterns use Rust regex syntax (like PCRE but
-no backreferences or lookaround).
+Options:
+- `wholeWords`: `boolean` (default `false`, wraps patterns with `\b...\b`)
 
 Methods:
 - `findIter(haystack: string): Match[]`
@@ -49,10 +49,22 @@ type Match = {
 Offsets are UTF-16 code units, compatible with
 `String.prototype.slice()`.
 
+## Lookaround
+
+Lookahead (`(?=...)`, `(?!...)`) and lookbehind
+(`(?<=...)`, `(?<!...)`) are supported. Internally,
+assertions are stripped from patterns, cores are
+compiled into a single DFA, and assertions are
+verified as inline char checks (~1ns per match).
+Complex assertions fall back to fancy-regex on a
+small window.
+
 ## Important notes
 
 - Guaranteed O(m * n). No catastrophic backtracking.
-- Rust regex syntax: no backreferences, no lookaround.
+- Rust regex syntax: no backreferences.
 - `\d`, `\w`, `\s` are Unicode-aware by default.
-- Native dependency: requires prebuilt binary or Rust toolchain.
-- Composable with @stll/aho-corasick (same Match type).
+- `replaceAll` throws if `replacements.length !== patternCount`.
+- For pure literal patterns, use @stll/aho-corasick instead (faster for literals).
+- Composable with @stll/aho-corasick (same Match type, same UTF-16 offsets).
+- Native binary for Node.js/Bun. Bundlers auto-select via the `browser` field.

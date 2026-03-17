@@ -1,0 +1,5 @@
+{
+  "name": "regex-set-bench",
+  "private": true,
+  "description": "Benchmarks for @stll/regex-set"
+}

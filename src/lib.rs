@@ -45,34 +45,162 @@ fn byte_span_utf16_len(bytes: &[u8]) -> u32 {
   count
 }
 
-// ─── Lookaround handling ──────────────────────
+// ─── Inline boundary checks ──────────────────
 //
-// Strategy: strip lookaround from patterns, add
-// the "core" to the multi-DFA, then verify the
-// assertion as a post-filter. This keeps all
-// patterns on the fast single-pass path.
-//
-// Simple assertions (single char class after/before
-// the match) are verified as direct char checks.
-// Complex assertions fall back to fancy-regex on
-// a small window around the match.
+// Instead of calling fancy-regex on a window for
+// every match, classify the lookaround assertion
+// and inline it as a direct char check (~1ns vs
+// ~1μs per match).
 
-/// Strip simple lookaround from a pattern and
-/// return (core_pattern, pre_check, post_check).
-///
-/// Handles:
-/// - `(?!\X)` at end → post-check: next char doesn't match X
-/// - `(?<!\X)` at start → pre-check: prev char doesn't match X
-/// - `(?=\X)` at end → post-check: next char matches X
-/// - `(?<=\X)` at start → pre-check: prev char matches X
-///
-/// Returns None if the pattern has no lookaround
-/// or if the lookaround is too complex to strip.
-struct StrippedPattern {
-  core: String,
-  verifier: Option<fancy_regex::Regex>,
-  original_index: usize,
+/// A fast inline check that replaces fancy-regex
+/// verification for simple lookaround assertions.
+enum Verifier {
+  /// No verification needed.
+  None,
+  /// Inline char check (covers 90%+ of real
+  /// lookaround patterns).
+  Inline(InlineCheck),
+  /// Complex lookaround: use fancy-regex on a
+  /// small window.
+  Complex(fancy_regex::Regex),
 }
+
+/// Inline boundary check for a single char.
+struct InlineCheck {
+  /// Check before match start.
+  pre: Option<CharCheck>,
+  /// Check after match end.
+  post: Option<CharCheck>,
+}
+
+/// A single character assertion.
+/// Fast character classifier — avoids regex
+/// dispatch overhead by using native Rust functions.
+enum CharClass {
+  /// `\d` or `[0-9]`
+  Digit,
+  /// `\w` or `[a-zA-Z0-9_]`
+  WordChar,
+  /// `\s` or `[\t\n\r ]`
+  Whitespace,
+  /// `\p{L}` or `\p{Alphabetic}`
+  Alpha,
+  /// `\p{N}` or `\p{Numeric}`
+  Numeric,
+  /// Fallback: compiled regex for unknown classes
+  Regex(regex::Regex),
+}
+
+impl CharClass {
+  fn matches_char(&self, ch: char) -> bool {
+    match self {
+      // Unicode-aware to match Rust regex semantics
+      CharClass::Digit => ch.is_numeric(),
+      CharClass::WordChar => {
+        ch.is_alphanumeric()
+          || ch == '_'
+          || ch == '\u{200C}' // ZWJ
+          || ch == '\u{200D}' // ZWNJ
+      }
+      CharClass::Whitespace => ch.is_whitespace(),
+      CharClass::Alpha => ch.is_alphabetic(),
+      CharClass::Numeric => ch.is_numeric(),
+      CharClass::Regex(re) => {
+        let mut buf = [0u8; 4];
+        re.is_match(ch.encode_utf8(&mut buf))
+      }
+    }
+  }
+
+  /// Parse a char class from the assertion content.
+  fn from_str(
+    s: &str,
+  ) -> std::result::Result<Self, String> {
+    match s {
+      "\\d" | "[0-9]" => Ok(CharClass::Digit),
+      "\\w" | "[a-zA-Z0-9_]" => {
+        Ok(CharClass::WordChar)
+      }
+      "\\s" | "[\\t\\n\\r ]" => {
+        Ok(CharClass::Whitespace)
+      }
+      "\\p{L}" | "\\p{Alphabetic}"
+      | "\\p{Letter}" => Ok(CharClass::Alpha),
+      "\\p{N}" | "\\p{Numeric}"
+      | "\\p{Number}" => Ok(CharClass::Numeric),
+      _ => {
+        let re = regex::Regex::new(s)
+          .map_err(|e| format!("{e}"))?;
+        Ok(CharClass::Regex(re))
+      }
+    }
+  }
+}
+
+struct CharCheck {
+  class: CharClass,
+  negated: bool,
+}
+
+impl CharCheck {
+  fn test(
+    &self,
+    haystack: &str,
+    pos: usize,
+  ) -> bool {
+    if pos >= haystack.len() {
+      return self.negated;
+    }
+    let ch = haystack[pos..].chars().next().unwrap();
+    let matches = self.class.matches_char(ch);
+    if self.negated {
+      !matches
+    } else {
+      matches
+    }
+  }
+
+  fn test_before(
+    &self,
+    haystack: &str,
+    pos: usize,
+  ) -> bool {
+    if pos == 0 {
+      return self.negated;
+    }
+    let ch =
+      haystack[..pos].chars().next_back().unwrap();
+    let matches = self.class.matches_char(ch);
+    if self.negated {
+      !matches
+    } else {
+      matches
+    }
+  }
+}
+
+fn char_len_at(s: &str, pos: usize) -> usize {
+  let b = s.as_bytes()[pos];
+  if b < 0x80 {
+    1
+  } else if b < 0xE0 {
+    2
+  } else if b < 0xF0 {
+    3
+  } else {
+    4
+  }
+}
+
+fn prev_char_start(s: &str, pos: usize) -> usize {
+  let mut i = pos - 1;
+  while i > 0 && !s.is_char_boundary(i) {
+    i -= 1;
+  }
+  i
+}
+
+// ─── Lookaround parsing ──────────────────────
 
 fn has_lookaround(pattern: &str) -> bool {
   pattern.contains("(?=")
@@ -81,60 +209,178 @@ fn has_lookaround(pattern: &str) -> bool {
     || pattern.contains("(?<!")
 }
 
-/// Try to strip lookaround and produce a core
-/// pattern for the multi-DFA + a fancy-regex
-/// verifier for post-filtering.
-fn strip_lookaround(
+/// Extract leading lookbehind assertion content.
+/// Returns (content, is_negated, rest_of_pattern).
+fn extract_leading_lookbehind(
   pattern: &str,
-  idx: usize,
-) -> std::result::Result<StrippedPattern, String> {
-  if !has_lookaround(pattern) {
-    return Ok(StrippedPattern {
-      core: pattern.to_string(),
-      verifier: None,
-      original_index: idx,
-    });
-  }
+) -> Option<(String, bool, String)> {
+  let (prefix, negated) =
+    if pattern.starts_with("(?<!") {
+      ("(?<!", true)
+    } else if pattern.starts_with("(?<=") {
+      ("(?<=", false)
+    } else {
+      return None;
+    };
 
-  let verifier = fancy_regex::Regex::new(pattern)
-    .map_err(|e| {
-      format!("Failed to compile pattern {idx}: {e}")
-    })?;
-
-  // Strip lookaround for the core by removing
-  // (?=...), (?!...), (?<=...), (?<!...) groups.
-  // This is a simple string-level strip that
-  // handles the common patterns. Complex nested
-  // lookaround falls back to the full fancy-regex.
-  let core = strip_lookaround_str(pattern);
-
-  // Verify the core compiles with regex-automata.
-  if MetaRegex::new(&core).is_err() {
-    // Core doesn't compile (complex pattern).
-    // Use the full fancy-regex as both core scan
-    // and verifier.
-    return Ok(StrippedPattern {
-      core: core,
-      verifier: Some(verifier),
-      original_index: idx,
-    });
-  }
-
-  Ok(StrippedPattern {
-    core,
-    verifier: Some(verifier),
-    original_index: idx,
-  })
+  let end = find_matching_paren(pattern, 0)?;
+  let content =
+    pattern[prefix.len()..end].to_string();
+  let rest = pattern[end + 1..].to_string();
+  Some((content, negated, rest))
 }
 
-/// Strip lookaround assertions from a pattern
-/// string. Handles:
-/// - Leading (?<=...) and (?<!...)
-/// - Trailing (?=...) and (?!...)
+/// Extract trailing lookahead assertion content.
+/// Returns (rest_of_pattern, content, is_negated).
+fn extract_trailing_lookahead(
+  pattern: &str,
+) -> Option<(String, String, bool)> {
+  let start = find_last_lookahead_start(pattern)?;
+  let end = pattern.len() - 1; // last ')'
+
+  let prefix_len = if &pattern[start..start + 3]
+    == "(?!"
+  {
+    3
+  } else if &pattern[start..start + 3] == "(?=" {
+    3
+  } else {
+    return None;
+  };
+
+  let negated = &pattern[start + 2..start + 3] == "!";
+  let content =
+    pattern[start + prefix_len..end].to_string();
+  let rest = pattern[..start].to_string();
+  Some((rest, content, negated))
+}
+
+/// Check if a char-class content string is
+/// "simple" (matches a single character). Simple
+/// means: no quantifiers, no alternation, no
+/// groups.
+fn is_simple_char_class(content: &str) -> bool {
+  !content.contains('*')
+    && !content.contains('+')
+    && !content.contains('?')
+    && !content.contains('{')
+    && !content.contains('|')
+    && !content.contains('(')
+    && CharClass::from_str(content).is_ok()
+}
+
+/// Build a Verifier from a pattern's lookaround.
+fn build_verifier(
+  pattern: &str,
+) -> std::result::Result<(String, Verifier), String>
+{
+  if !has_lookaround(pattern) {
+    return Ok((
+      pattern.to_string(),
+      Verifier::None,
+    ));
+  }
+
+  let mut core = pattern.to_string();
+  let mut pre: Option<CharCheck> = None;
+  let mut post: Option<CharCheck> = None;
+
+  // Extract leading lookbehind.
+  if let Some((content, negated, rest)) =
+    extract_leading_lookbehind(&core)
+  {
+    if is_simple_char_class(&content) {
+      let class = CharClass::from_str(&content)
+        .map_err(|e| format!("{e}"))?;
+      pre = Some(CharCheck {
+        class,
+        negated,
+      });
+      core = rest;
+    }
+  }
+
+  // Extract trailing lookahead.
+  if let Some((rest, content, negated)) =
+    extract_trailing_lookahead(&core)
+  {
+    if is_simple_char_class(&content) {
+      let class = CharClass::from_str(&content)
+        .map_err(|e| format!("{e}"))?;
+      post = Some(CharCheck {
+        class,
+        negated,
+      });
+      core = rest;
+    }
+  }
+
+  // Check if all lookaround was inlined.
+  if !has_lookaround(&core) && (pre.is_some() || post.is_some()) {
+    return Ok((
+      core,
+      Verifier::Inline(InlineCheck { pre, post }),
+    ));
+  }
+
+  // Still has lookaround (complex or nested).
+  // Fall back to fancy-regex.
+  let core_stripped =
+    strip_lookaround_str(pattern);
+  let verifier =
+    fancy_regex::Regex::new(pattern)
+      .map_err(|e| format!("{e}"))?;
+
+  Ok((core_stripped, Verifier::Complex(verifier)))
+}
+
+impl Verifier {
+  fn check(
+    &self,
+    haystack: &str,
+    start: usize,
+    end: usize,
+  ) -> bool {
+    match self {
+      Verifier::None => true,
+      Verifier::Inline(ic) => {
+        if let Some(ref pre) = ic.pre {
+          if !pre.test_before(haystack, start) {
+            return false;
+          }
+        }
+        if let Some(ref post) = ic.post {
+          if !post.test(haystack, end) {
+            return false;
+          }
+        }
+        true
+      }
+      Verifier::Complex(re) => {
+        let ctx_start =
+          start.saturating_sub(20);
+        let ctx_end =
+          (end + 20).min(haystack.len());
+        let ctx_start =
+          floor_char_boundary(haystack, ctx_start);
+        let ctx_end =
+          ceil_char_boundary(haystack, ctx_end);
+        let window =
+          &haystack[ctx_start..ctx_end];
+        let offset = start - ctx_start;
+        re.find_from_pos(window, offset)
+          .ok()
+          .flatten()
+          .is_some()
+      }
+    }
+  }
+}
+
+// ─── String helpers ───────────────────────────
+
 fn strip_lookaround_str(pattern: &str) -> String {
   let mut result = pattern.to_string();
-
-  // Strip leading lookbehind: (?<=...) or (?<!...)
   while result.starts_with("(?<=")
     || result.starts_with("(?<!")
   {
@@ -146,18 +392,13 @@ fn strip_lookaround_str(pattern: &str) -> String {
       break;
     }
   }
-
-  // Strip trailing lookahead: (?=...) or (?!...)
-  // Find from the end
   loop {
     let trimmed = result.trim_end();
     if trimmed.ends_with(')') {
-      // Find the opening of the last group
       if let Some(start) =
         find_last_lookahead_start(trimmed)
       {
-        result =
-          trimmed[..start].to_string();
+        result = trimmed[..start].to_string();
       } else {
         break;
       }
@@ -165,12 +406,9 @@ fn strip_lookaround_str(pattern: &str) -> String {
       break;
     }
   }
-
   result
 }
 
-/// Find the matching closing paren for an opening
-/// paren at position `start`.
 fn find_matching_paren(
   s: &str,
   start: usize,
@@ -179,7 +417,6 @@ fn find_matching_paren(
   let mut depth = 0;
   let mut i = start;
   let mut escaped = false;
-
   while i < bytes.len() {
     if escaped {
       escaped = false;
@@ -202,27 +439,21 @@ fn find_matching_paren(
   None
 }
 
-/// Find the start of a trailing lookahead group.
 fn find_last_lookahead_start(
   s: &str,
 ) -> Option<usize> {
-  // Walk backwards from the last ')' to find
-  // the matching '(' that starts (?= or (?!
   let bytes = s.as_bytes();
   if bytes.is_empty() || *bytes.last()? != b')' {
     return None;
   }
-
   let mut depth = 0;
   let mut i = bytes.len() - 1;
-
   loop {
     match bytes[i] {
       b')' => depth += 1,
       b'(' => {
         depth -= 1;
         if depth == 0 {
-          // Check if this is (?= or (?!
           if i + 2 < bytes.len()
             && bytes[i + 1] == b'?'
             && (bytes[i + 2] == b'='
@@ -243,20 +474,33 @@ fn find_last_lookahead_start(
   None
 }
 
+fn floor_char_boundary(
+  s: &str,
+  mut i: usize,
+) -> usize {
+  while i > 0 && !s.is_char_boundary(i) {
+    i -= 1;
+  }
+  i
+}
+
+fn ceil_char_boundary(
+  s: &str,
+  mut i: usize,
+) -> usize {
+  while i < s.len() && !s.is_char_boundary(i) {
+    i += 1;
+  }
+  i
+}
+
 // ─── Engine ───────────────────────────────────
 
 struct PatternInfo {
-  /// Index in the original patterns array.
   original_index: u32,
-  /// If Some, this match needs verification with
-  /// fancy-regex (because lookaround was stripped).
-  verifier: Option<fancy_regex::Regex>,
+  verifier: Verifier,
 }
 
-/// Patterns that couldn't be added to the multi-DFA
-/// even after stripping (complex lookaround or
-/// unsupported features). These run as individual
-/// fancy-regex passes.
 struct FallbackPattern {
   original_index: u32,
   regex: fancy_regex::Regex,
@@ -264,13 +508,8 @@ struct FallbackPattern {
 
 #[napi]
 pub struct RegexSet {
-  /// Multi-pattern DFA (fast, single pass).
-  /// Contains all patterns (some with lookaround
-  /// stripped to their core).
   multi: Option<MetaRegex>,
-  /// Metadata per multi-DFA pattern slot.
   info: Vec<PatternInfo>,
-  /// Patterns that couldn't join the multi-DFA.
   fallbacks: Vec<FallbackPattern>,
   pattern_count: u32,
 }
@@ -297,41 +536,40 @@ impl RegexSet {
       patterns
     };
 
-    // Process each pattern: strip lookaround,
-    // try to add core to multi-DFA.
     let mut cores: Vec<String> = Vec::new();
     let mut info: Vec<PatternInfo> = Vec::new();
     let mut fallbacks: Vec<FallbackPattern> =
       Vec::new();
 
     for (i, p) in wrapped.iter().enumerate() {
-      let stripped = strip_lookaround(p, i)
-        .map_err(Error::from_reason)?;
+      let (core, verifier) = build_verifier(p)
+        .map_err(|e| {
+          Error::from_reason(format!(
+            "Failed to compile pattern {i}: {e}"
+          ))
+        })?;
 
-      // Try to add the core to the multi-DFA.
-      if MetaRegex::new(&stripped.core).is_ok() {
-        let slot = cores.len();
-        cores.push(stripped.core);
+      if MetaRegex::new(&core).is_ok() {
+        cores.push(core);
         info.push(PatternInfo {
-          original_index: stripped.original_index
-            as u32,
-          verifier: stripped.verifier,
-        });
-      } else if let Some(v) = stripped.verifier {
-        // Core doesn't compile; use full
-        // fancy-regex as fallback.
-        fallbacks.push(FallbackPattern {
           original_index: i as u32,
-          regex: v,
+          verifier,
         });
       } else {
-        return Err(Error::from_reason(format!(
-          "Failed to compile pattern {i}: no valid engine"
-        )));
+        // Core doesn't compile; full fallback.
+        let re = fancy_regex::Regex::new(p)
+          .map_err(|e| {
+            Error::from_reason(format!(
+              "Failed to compile pattern {i}: {e}"
+            ))
+          })?;
+        fallbacks.push(FallbackPattern {
+          original_index: i as u32,
+          regex: re,
+        });
       }
     }
 
-    // Build the multi-DFA from all cores.
     let multi = if cores.is_empty() {
       None
     } else {
@@ -361,38 +599,18 @@ impl RegexSet {
 
   #[napi]
   pub fn is_match(&self, haystack: String) -> bool {
-    // Check multi-DFA matches (with verification).
     if let Some(ref multi) = self.multi {
       for m in multi.find_iter(&haystack) {
-        let slot = m.pattern().as_usize();
-        let pi = &self.info[slot];
-        if let Some(ref v) = pi.verifier {
-          // Verify on small window around match.
-          let ctx_start = m.start().saturating_sub(10);
-          let ctx_end =
-            (m.end() + 10).min(haystack.len());
-          // Ensure we're at char boundaries.
-          let ctx_start = haystack
-            .floor_char_boundary(ctx_start);
-          let ctx_end =
-            haystack.ceil_char_boundary(ctx_end);
-          let window = &haystack[ctx_start..ctx_end];
-          let offset = m.start() - ctx_start;
-          if v
-            .find_from_pos(window, offset)
-            .ok()
-            .flatten()
-            .is_some()
-          {
-            return true;
-          }
-        } else {
+        let pi = &self.info[m.pattern().as_usize()];
+        if pi.verifier.check(
+          &haystack,
+          m.start(),
+          m.end(),
+        ) {
           return true;
         }
       }
     }
-
-    // Check fallback patterns.
     for fb in &self.fallbacks {
       if fb
         .regex
@@ -402,7 +620,6 @@ impl RegexSet {
         return true;
       }
     }
-
     false
   }
 
@@ -414,40 +631,14 @@ impl RegexSet {
     let mut all: Vec<(u32, usize, usize)> =
       Vec::new();
 
-    // Multi-DFA pass (fast, single scan).
     if let Some(ref multi) = self.multi {
       for m in multi.find_iter(&haystack) {
-        let slot = m.pattern().as_usize();
-        let pi = &self.info[slot];
-
-        if let Some(ref v) = pi.verifier {
-          // Verify with fancy-regex on a window.
-          let ctx_start =
-            m.start().saturating_sub(20);
-          let ctx_end =
-            (m.end() + 20).min(haystack.len());
-          let ctx_start = floor_char_boundary(
-            &haystack, ctx_start,
-          );
-          let ctx_end = ceil_char_boundary(
-            &haystack, ctx_end,
-          );
-          let window =
-            &haystack[ctx_start..ctx_end];
-          let offset = m.start() - ctx_start;
-
-          if let Ok(Some(vm)) =
-            v.find_from_pos(window, offset)
-          {
-            // Use the verified match's span
-            // (may differ from core's span).
-            all.push((
-              pi.original_index,
-              ctx_start + vm.start(),
-              ctx_start + vm.end(),
-            ));
-          }
-        } else {
+        let pi = &self.info[m.pattern().as_usize()];
+        if pi.verifier.check(
+          &haystack,
+          m.start(),
+          m.end(),
+        ) {
           all.push((
             pi.original_index,
             m.start(),
@@ -457,13 +648,10 @@ impl RegexSet {
       }
     }
 
-    // Fallback passes (individual fancy-regex).
     for fb in &self.fallbacks {
       let mut pos = 0;
       while pos <= haystack.len() {
-        match fb
-          .regex
-          .find_from_pos(&haystack, pos)
+        match fb.regex.find_from_pos(&haystack, pos)
         {
           Ok(Some(m)) => {
             all.push((
@@ -500,7 +688,7 @@ impl RegexSet {
       }
     }
 
-    // Convert to UTF-16 offsets.
+    // Pack with UTF-16 offsets.
     if haystack.is_ascii() {
       let mut packed = Vec::with_capacity(
         selected.len() * 3,
@@ -551,19 +739,34 @@ impl RegexSet {
     ];
     let mut result = Vec::new();
 
-    // Use findIter logic to get verified matches.
-    let packed = self.find_iter_packed(
-      haystack.clone(),
-    );
-    let data: &[u32] = packed.as_ref();
-    let mut i = 0;
-    while i < data.len() {
-      let idx = data[i] as usize;
-      if !seen[idx] {
+    if let Some(ref multi) = self.multi {
+      for m in multi.find_iter(&haystack) {
+        let pi = &self.info[m.pattern().as_usize()];
+        if pi.verifier.check(
+          &haystack,
+          m.start(),
+          m.end(),
+        ) {
+          let idx = pi.original_index as usize;
+          if !seen[idx] {
+            seen[idx] = true;
+            result.push(idx as u32);
+          }
+        }
+      }
+    }
+
+    for fb in &self.fallbacks {
+      let idx = fb.original_index as usize;
+      if !seen[idx]
+        && fb
+          .regex
+          .is_match(&haystack)
+          .unwrap_or(false)
+      {
         seen[idx] = true;
         result.push(idx as u32);
       }
-      i += 3;
     }
     result
   }
@@ -584,42 +787,20 @@ impl RegexSet {
       )));
     }
 
-    // Get all verified matches (byte offsets).
-    let mut all: Vec<(u32, usize, usize)> =
+    // Collect all verified matches.
+    let mut all: Vec<(usize, usize, usize)> =
       Vec::new();
 
     if let Some(ref multi) = self.multi {
       for m in multi.find_iter(&haystack) {
-        let slot = m.pattern().as_usize();
-        let pi = &self.info[slot];
-
-        if let Some(ref v) = pi.verifier {
-          let ctx_start =
-            m.start().saturating_sub(20);
-          let ctx_end =
-            (m.end() + 20).min(haystack.len());
-          let ctx_start = floor_char_boundary(
-            &haystack, ctx_start,
-          );
-          let ctx_end = ceil_char_boundary(
-            &haystack, ctx_end,
-          );
-          let window =
-            &haystack[ctx_start..ctx_end];
-          let offset = m.start() - ctx_start;
-
-          if let Ok(Some(vm)) =
-            v.find_from_pos(window, offset)
-          {
-            all.push((
-              pi.original_index,
-              ctx_start + vm.start(),
-              ctx_start + vm.end(),
-            ));
-          }
-        } else {
+        let pi = &self.info[m.pattern().as_usize()];
+        if pi.verifier.check(
+          &haystack,
+          m.start(),
+          m.end(),
+        ) {
           all.push((
-            pi.original_index,
+            pi.original_index as usize,
             m.start(),
             m.end(),
           ));
@@ -630,13 +811,11 @@ impl RegexSet {
     for fb in &self.fallbacks {
       let mut pos = 0;
       while pos <= haystack.len() {
-        match fb
-          .regex
-          .find_from_pos(&haystack, pos)
+        match fb.regex.find_from_pos(&haystack, pos)
         {
           Ok(Some(m)) => {
             all.push((
-              fb.original_index,
+              fb.original_index as usize,
               m.start(),
               m.end(),
             ));
@@ -662,9 +841,7 @@ impl RegexSet {
     for (pat, start, end) in all {
       if start >= last_end {
         result.push_str(&haystack[last..start]);
-        result.push_str(
-          &replacements[pat as usize],
-        );
+        result.push_str(&replacements[pat]);
         last = end;
         last_end = end;
       }
@@ -672,26 +849,4 @@ impl RegexSet {
     result.push_str(&haystack[last..]);
     Ok(result)
   }
-}
-
-// ─── Char boundary helpers ────────────────────
-
-fn floor_char_boundary(
-  s: &str,
-  mut i: usize,
-) -> usize {
-  while i > 0 && !s.is_char_boundary(i) {
-    i -= 1;
-  }
-  i
-}
-
-fn ceil_char_boundary(
-  s: &str,
-  mut i: usize,
-) -> usize {
-  while i < s.len() && !s.is_char_boundary(i) {
-    i += 1;
-  }
-  i
 }
