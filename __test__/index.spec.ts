@@ -319,6 +319,63 @@ describe("ascii word boundary", () => {
   });
 });
 
+// ─── Named patterns ─────────────────────────
+
+describe("named patterns", () => {
+  test("named pattern adds name to match", () => {
+    const rs = new RegexSet([
+      { pattern: "\\d+", name: "number" },
+      { pattern: "[a-z]+", name: "word" },
+    ]);
+    const matches = rs.findIter("abc 123");
+    expect(matches).toHaveLength(2);
+    expect(matches[0]!.name).toBe("word");
+    expect(matches[1]!.name).toBe("number");
+  });
+
+  test("named pattern with RegExp", () => {
+    const rs = new RegexSet([
+      { pattern: /\d{2}\.\d{2}\.\d{4}/, name: "date" },
+    ]);
+    const matches = rs.findIter("Born 15.03.1990");
+    expect(matches).toHaveLength(1);
+    expect(matches[0]!.name).toBe("date");
+    expect(matches[0]!.text).toBe("15.03.1990");
+  });
+
+  test("unnamed patterns have no name property", () => {
+    const rs = new RegexSet(["\\d+", "[a-z]+"]);
+    const matches = rs.findIter("abc 123");
+    for (const m of matches) {
+      expect("name" in m).toBe(false);
+    }
+  });
+
+  test("mixed named+unnamed: name absent on unnamed", () => {
+    const rs = new RegexSet([
+      { pattern: /\d+/, name: "num" },
+      /[a-z]+/, // unnamed
+    ]);
+    const matches = rs.findIter("a1");
+    const named = matches.find(
+      (m) => m.pattern === 0,
+    )!;
+    const unnamed = matches.find(
+      (m) => m.pattern === 1,
+    )!;
+    expect(named.name).toBe("num");
+    expect("name" in unnamed).toBe(false);
+  });
+
+  test("patternCount with named patterns", () => {
+    const rs = new RegexSet([
+      { pattern: "a", name: "first" },
+      { pattern: "b", name: "second" },
+    ]);
+    expect(rs.patternCount).toBe(2);
+  });
+});
+
 // ─── Same Match type as aho-corasick ──────────
 
 describe("Match type compatibility", () => {
