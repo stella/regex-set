@@ -94,9 +94,13 @@ enum CharClass {
 impl CharClass {
   fn matches_char(&self, ch: char) -> bool {
     match self {
-      CharClass::Digit => ch.is_ascii_digit(),
+      // Unicode-aware to match Rust regex semantics
+      CharClass::Digit => ch.is_numeric(),
       CharClass::WordChar => {
-        ch.is_alphanumeric() || ch == '_'
+        ch.is_alphanumeric()
+          || ch == '_'
+          || ch == '\u{200C}' // ZWJ
+          || ch == '\u{200D}' // ZWNJ
       }
       CharClass::Whitespace => ch.is_whitespace(),
       CharClass::Alpha => ch.is_alphabetic(),

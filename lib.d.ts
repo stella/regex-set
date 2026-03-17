@@ -28,7 +28,23 @@ export type Match = {
  * backtracking. Uses Rust regex syntax.
  */
 export declare class RegexSet {
-  constructor(patterns: string[], options?: Options);
+  /**
+   * Accepts strings (Rust regex syntax) or
+   * `RegExp` objects (JS flags converted
+   * automatically).
+   *
+   * @example
+   * ```ts
+   * new RegexSet([
+   *   /\d{2}\.\d{2}\.\d{4}/,  // RegExp
+   *   "\\+?\\d{9,12}",         // string
+   * ]);
+   * ```
+   */
+  constructor(
+    patterns: (string | RegExp)[],
+    options?: Options,
+  );
 
   /** Number of patterns. */
   get patternCount(): number;
