@@ -41,7 +41,8 @@ export type Match = {
  *
  * Compiles multiple regex patterns into a single
  * automaton. Guaranteed O(m * n) — no catastrophic
- * backtracking.
+ * backtracking. Uses Rust regex syntax for string
+ * patterns (no lookaheads/backreferences).
  *
  * @example
  * ```ts
