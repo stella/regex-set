@@ -138,7 +138,7 @@ describe("RegexSet", () => {
 
   test("invalid regex throws", () => {
     expect(() => new RegexSet(["[invalid"])).toThrow(
-      /Failed to compile regex/,
+      /Failed to compile/,
     );
   });
 
