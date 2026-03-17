@@ -117,14 +117,20 @@ console.log(
 );
 
 // Pattern 1: simple literal
+// NOTE: for pure literal string matching, use
+// @stll/aho-corasick instead of regex-set. V8's
+// Irregexp uses SIMD-optimized memchr for single
+// literals, which is faster than any regex engine.
+// regex-set's strength is multi-pattern and regex
+// patterns, not literal search.
 const rsTwain1 = new RegexSet(["Twain"]);
 bench(
-  "#1 literal: Twain",
+  "#1 literal: Twain (use aho-corasick instead)",
   () => rsTwain1.findIter(twain).length,
   N,
 );
 jsRegexBench(
-  "#1 JS: Twain",
+  "#1 JS: Twain (V8 SIMD fast path)",
   [/Twain/g],
   twain,
   N,
