@@ -23,16 +23,28 @@ function unpack(packed, haystack) {
   return matches;
 }
 
+/**
+ * Convert a pattern (string or RegExp) to a Rust
+ * regex string. Extracts .source from RegExp and
+ * converts JS flags to Rust inline flags.
+ *
+ * Replaces `\b` with `(?-u:\b)` so Rust uses
+ * ASCII-only word boundaries (matching JS semantics)
+ * instead of expensive Unicode word boundaries.
+ */
 function toRustPattern(p) {
-  if (typeof p === "string") return p;
+  if (typeof p === "string")
+    return p.replaceAll("\\b", "(?-u:\\b)");
   if (p instanceof RegExp) {
     let prefix = "";
     if (p.flags.includes("i")) prefix += "i";
     if (p.flags.includes("m")) prefix += "m";
     if (p.flags.includes("s")) prefix += "s";
-    return prefix
-      ? `(?${prefix})${p.source}`
-      : p.source;
+    const src = p.source.replaceAll(
+      "\\b",
+      "(?-u:\\b)",
+    );
+    return prefix ? `(?${prefix})${src}` : src;
   }
   throw new TypeError(
     "Pattern must be a string or RegExp",

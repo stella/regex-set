@@ -244,6 +244,55 @@ describe("unicode offsets", () => {
   });
 });
 
+// ─── ASCII word boundary performance ─────────
+// Regression: \b patterns were 10x slower than JS
+// due to Rust using Unicode word boundaries.
+
+describe("ascii word boundary", () => {
+  test("\\b in string patterns uses ASCII boundary", () => {
+    const rs = new RegexSet([
+      "\\bJan\\b",
+      "\\bPavel\\b",
+    ]);
+    const matches = rs.findIter(
+      "Jan met Pavel in Prague",
+    );
+    expect(matches).toHaveLength(2);
+    expect(matches[0]!.text).toBe("Jan");
+    expect(matches[1]!.text).toBe("Pavel");
+  });
+
+  test("\\b in RegExp patterns uses ASCII boundary", () => {
+    const rs = new RegexSet([/\bfoo\b/, /\bbar\b/]);
+    const matches = rs.findIter("foo met bar");
+    expect(matches).toHaveLength(2);
+    expect(matches[0]!.text).toBe("foo");
+    expect(matches[1]!.text).toBe("bar");
+  });
+
+  test("\\b performance is not 10x slower than JS", () => {
+    const text = "a".repeat(100_000);
+    const rs = new RegexSet(["\\btest\\b"]);
+    const start = performance.now();
+    rs.findIter(text);
+    const elapsed = performance.now() - start;
+    // With Unicode \b this would be ~10ms+
+    // With ASCII (?-u:\b) it should be <2ms
+    expect(elapsed).toBeLessThan(10);
+  });
+
+  test("wholeWords uses ASCII boundary", () => {
+    const rs = new RegexSet(["test"], {
+      wholeWords: true,
+    });
+    const text = "x".repeat(100_000);
+    const start = performance.now();
+    rs.findIter(text);
+    const elapsed = performance.now() - start;
+    expect(elapsed).toBeLessThan(10);
+  });
+});
+
 // ─── Same Match type as aho-corasick ──────────
 
 describe("Match type compatibility", () => {
