@@ -1,0 +1,58 @@
+# @stll/regex-set
+
+> NAPI-RS bindings to Rust regex-automata for
+> multi-pattern regex matching in Node.js and Bun.
+> Single pass, O(m*n) guaranteed, no backtracking.
+
+## Quick start
+
+```typescript
+import { RegexSet } from "@stll/regex-set";
+
+const rs = new RegexSet([
+  "\\d{2}\\.\\d{2}\\.\\d{4}",
+  "\\+?\\d{9,12}",
+  "[A-Z]{2}\\d{6}",
+]);
+
+rs.findIter("Born 15.03.1990, ID CZ123456");
+// [{ pattern: 0, start: 5, end: 15, text: "15.03.1990" },
+//  { pattern: 2, start: 20, end: 28, text: "CZ123456" }]
+
+rs.replaceAll(text, ["[DATE]", "[PHONE]", "[ID]"]);
+```
+
+## API
+
+Constructor: `new RegexSet(patterns: string[])`
+
+Patterns use Rust regex syntax (like PCRE but
+no backreferences or lookaround).
+
+Methods:
+- `findIter(haystack: string): Match[]`
+- `isMatch(haystack: string): boolean`
+- `whichMatch(haystack: string): number[]`
+- `replaceAll(haystack: string, replacements: string[]): string`
+- `patternCount: number`
+
+Match type (same as @stll/aho-corasick):
+```typescript
+type Match = {
+  pattern: number;
+  start: number;
+  end: number;
+  text: string;
+};
+```
+
+Offsets are UTF-16 code units, compatible with
+`String.prototype.slice()`.
+
+## Important notes
+
+- Guaranteed O(m * n). No catastrophic backtracking.
+- Rust regex syntax: no backreferences, no lookaround.
+- `\d`, `\w`, `\s` are Unicode-aware by default.
+- Native dependency: requires prebuilt binary or Rust toolchain.
+- Composable with @stll/aho-corasick (same Match type).

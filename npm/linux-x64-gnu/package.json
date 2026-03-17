@@ -1,0 +1,14 @@
+{
+  "name": "@stll/regex-set-linux-x64-gnu",
+  "version": "0.1.0",
+  "os": ["linux"],
+  "cpu": ["x64"],
+  "main": "regex-set.linux-x64-gnu.node",
+  "files": ["regex-set.linux-x64-gnu.node"],
+  "libc": ["glibc"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stella/regex-set"
+  }
+}
