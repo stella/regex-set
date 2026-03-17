@@ -327,14 +327,7 @@ fn build_verifier(
     fancy_regex::Regex::new(pattern)
       .map_err(|e| format!("{e}"))?;
 
-  if MetaRegex::new(&core_stripped).is_ok() {
-    Ok((core_stripped, Verifier::Complex(verifier)))
-  } else {
-    Ok((
-      core_stripped,
-      Verifier::Complex(verifier),
-    ))
-  }
+  Ok((core_stripped, Verifier::Complex(verifier)))
 }
 
 impl Verifier {
