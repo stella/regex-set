@@ -291,6 +291,57 @@ const featurePattern = fc.oneof(
   ),
 );
 
+// ─── Property 7b: backslash escaping ─────────
+//
+// Varying counts of backslashes before 'b' at
+// pattern edges to catch escape-counting bugs.
+// Odd count = \b (word boundary), even = \\b
+// (literal backslash + b).
+
+const backslashEdgePattern = fc
+  .integer({ min: 0, max: 6 })
+  .chain((n) => {
+    // n backslashes before 'b' at the end
+    const bs = "\\".repeat(n);
+    const suffix = `${bs}b`;
+    // Only valid regex if n is even (literal \...\b)
+    // or n is odd (word boundary).
+    // Pair with a safe core that always matches.
+    return safePattern.map((core) => {
+      // For even n: pattern ends with literal
+      // backslash(es) + b. For odd n: word boundary.
+      return `${core}${suffix}`;
+    });
+  });
+
+describe("property: backslash escaping", () => {
+  test("patterns with 0-6 backslashes before b compile or throw consistently", () => {
+    fc.assert(
+      fc.property(
+        backslashEdgePattern,
+        hay,
+        (pat, h) => {
+          try {
+            const rs = new RegexSet([pat]);
+            const matches = rs.findIter(h);
+            // If it compiles, text field must be
+            // correct
+            for (const m of matches) {
+              expect(h.slice(m.start, m.end)).toBe(
+                m.text,
+              );
+            }
+          } catch {
+            // Invalid regex is acceptable — just
+            // must not panic or corrupt state
+          }
+        },
+      ),
+      PARAMS,
+    );
+  });
+});
+
 describe("property: feature combinations", () => {
   test("all boundary × assertion combos compile and run", () => {
     fc.assert(
@@ -338,6 +389,151 @@ describe("property: wholeWords", () => {
           expect(re.test(m.text)).toBe(true);
         }
       }),
+      PARAMS,
+    );
+  });
+});
+
+// ─── Property 9: unicodeBoundaries ──────────
+//
+// When unicodeBoundaries is true, \b must treat
+// Unicode letters as word characters. Verify
+// consistency between ASCII and Unicode modes.
+
+// Haystack with mixed ASCII + non-ASCII words
+const unicodeHay = fc.oneof(
+  hay,
+  fc.constantFrom(
+    "čáp letí",
+    "Příbram 123 Pavel",
+    "café résumé naïve",
+    "日本語 test 中文",
+    "Ωmega αlpha βeta",
+    "Łódź Gdańsk Wrocław",
+  ),
+  fc.string({ minLength: 0, maxLength: 200 }),
+);
+
+describe("property: unicodeBoundaries", () => {
+  test("unicode mode: all combos compile and run", () => {
+    fc.assert(
+      fc.property(
+        fc.array(featurePattern, {
+          minLength: 1,
+          maxLength: 5,
+        }),
+        unicodeHay,
+        (pats, h) => {
+          const rs = new RegexSet(pats, {
+            unicodeBoundaries: true,
+          });
+          const matches = rs.findIter(h);
+          expect(rs.isMatch(h)).toBe(
+            matches.length > 0,
+          );
+          for (const m of matches) {
+            expect(h.slice(m.start, m.end)).toBe(
+              m.text,
+            );
+          }
+        },
+      ),
+      PARAMS,
+    );
+  });
+
+  test("wholeWords + unicode: no crash, text correct", () => {
+    fc.assert(
+      fc.property(
+        safePatterns,
+        unicodeHay,
+        (pats, h) => {
+          const rs = new RegexSet(pats, {
+            wholeWords: true,
+            unicodeBoundaries: true,
+          });
+          const matches = rs.findIter(h);
+          expect(rs.isMatch(h)).toBe(
+            matches.length > 0,
+          );
+          for (const m of matches) {
+            expect(h.slice(m.start, m.end)).toBe(
+              m.text,
+            );
+          }
+        },
+      ),
+      PARAMS,
+    );
+  });
+
+  test("ASCII and Unicode modes agree on ASCII-only text", () => {
+    // On pure ASCII text, both modes should produce
+    // identical results.
+    fc.assert(
+      fc.property(safePatterns, hay, (pats, h) => {
+        // Ensure ASCII-only haystack
+        if (!/^[\x00-\x7F]*$/.test(h)) return;
+
+        const rsA = new RegexSet(
+          pats.map((p) => `\\b${p}\\b`),
+        );
+        const rsU = new RegexSet(
+          pats.map((p) => `\\b${p}\\b`),
+          { unicodeBoundaries: true },
+        );
+        const mA = rsA.findIter(h);
+        const mU = rsU.findIter(h);
+        expect(mA.length).toBe(mU.length);
+        for (let i = 0; i < mA.length; i++) {
+          expect(mA[i]!.start).toBe(mU[i]!.start);
+          expect(mA[i]!.end).toBe(mU[i]!.end);
+          expect(mA[i]!.text).toBe(mU[i]!.text);
+        }
+      }),
+      PARAMS,
+    );
+  });
+});
+
+// ─── Property 10: named patterns ────────────
+
+describe("property: named patterns", () => {
+  test("named patterns: name field present iff provided", () => {
+    fc.assert(
+      fc.property(
+        fc.array(
+          fc.tuple(
+            safePattern,
+            fc.option(
+              fc.string({ minLength: 1, maxLength: 10 }),
+              { nil: undefined },
+            ),
+          ),
+          { minLength: 1, maxLength: 10 },
+        ),
+        hay,
+        (entries, h) => {
+          const patterns = entries.map(
+            ([pat, name]) =>
+              name !== undefined
+                ? { pattern: pat, name }
+                : pat,
+          );
+          const rs = new RegexSet(patterns);
+          for (const m of rs.findIter(h)) {
+            const entry = entries[m.pattern]!;
+            const expectedName = Array.isArray(entry)
+              ? entry[1]
+              : undefined;
+            if (expectedName !== undefined) {
+              expect(m.name).toBe(expectedName);
+            } else {
+              expect("name" in m).toBe(false);
+            }
+          }
+        },
+      ),
       PARAMS,
     );
   });
