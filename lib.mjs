@@ -66,9 +66,10 @@ function asciiBoundaries(src) {
  */
 function regexpToRust(re) {
   let prefix = "";
-  if (re.flags.includes("i")) prefix += "i-u";
+  if (re.flags.includes("i")) prefix += "i";
   if (re.flags.includes("m")) prefix += "m";
   if (re.flags.includes("s")) prefix += "s";
+  if (re.flags.includes("i")) prefix += "-u";
   return prefix
     ? `(?${prefix})${re.source}`
     : re.source;
