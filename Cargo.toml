@@ -28,6 +28,23 @@ unicode-segmentation = "1"
 [build-dependencies]
 napi-build = "2"
 
+[lints.clippy]
+cast_lossless = "warn"
+filter_map_next = "warn"
+flat_map_option = "warn"
+implicit_clone = "warn"
+inefficient_to_string = "warn"
+manual_let_else = "warn"
+needless_continue = "warn"
+ptr_as_ptr = "warn"
+uninlined_format_args = "warn"
+unnecessary_wraps = "warn"
+unused_self = "warn"
+needless_pass_by_ref_mut = "warn"
+
+[lints.rust]
+unsafe_code = "warn"
+
 [profile.release]
 lto = true
 strip = "symbols"
