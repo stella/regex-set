@@ -65,14 +65,43 @@ function asciiBoundaries(src) {
  * Convert a RegExp to Rust regex syntax string.
  */
 function regexpToRust(re) {
-  let prefix = "";
-  if (re.flags.includes("i")) prefix += "i";
-  if (re.flags.includes("m")) prefix += "m";
-  if (re.flags.includes("s")) prefix += "s";
-  if (re.flags.includes("i")) prefix += "-u";
-  return prefix
-    ? `(?${prefix})${re.source}`
-    : re.source;
+  let flags = "";
+  if (re.flags.includes("i")) flags += "i";
+  if (re.flags.includes("m")) flags += "m";
+  if (re.flags.includes("s")) flags += "s";
+
+  if (!flags) return re.source;
+
+  if (!flags.includes("i")) {
+    return `(?${flags})${re.source}`;
+  }
+
+  let src = re.source;
+  let leading = "";
+  let trailing = "";
+
+  if (src.startsWith("\\b")) {
+    leading = "\\b";
+    src = src.slice(2);
+  } else if (src.startsWith("\\B")) {
+    leading = "\\B";
+    src = src.slice(2);
+  }
+  if (
+    src.endsWith("\\b") &&
+    !src.endsWith("\\\\b")
+  ) {
+    trailing = "\\b";
+    src = src.slice(0, -2);
+  } else if (
+    src.endsWith("\\B") &&
+    !src.endsWith("\\\\B")
+  ) {
+    trailing = "\\B";
+    src = src.slice(0, -2);
+  }
+
+  return `${leading}(?${flags}-u:${src})${trailing}`;
 }
 
 /**

@@ -2,7 +2,27 @@ use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use regex_automata::meta::Regex as MetaRegex;
 use regex_automata::Input;
+use std::panic;
 use unicode_segmentation::UnicodeSegmentation;
+
+/// Safe wrapper for fancy-regex calls that may panic
+/// (known bug in fancy-regex v0.14 with certain
+/// pattern combinations). Converts panics to None.
+/// Returns (start, end) byte positions.
+fn safe_fancy_find(
+  re: &fancy_regex::Regex,
+  haystack: &str,
+  pos: usize,
+) -> Option<(usize, usize)> {
+  panic::catch_unwind(panic::AssertUnwindSafe(|| {
+    re.find_from_pos(haystack, pos)
+      .ok()
+      .flatten()
+      .map(|m| (m.start(), m.end()))
+  }))
+  .ok()
+  .flatten()
+}
 
 /// Options for constructing a `RegexSet`.
 #[napi(object)]
@@ -608,10 +628,8 @@ impl Verifier {
           &haystack[ctx_start..ctx_end];
         let offset = start - ctx_start;
         // Must match exactly at offset.
-        re.find_from_pos(window, offset)
-          .ok()
-          .flatten()
-          .filter(|m| m.start() == offset)
+        safe_fancy_find(re, window, offset)
+          .filter(|&(s, _)| s == offset)
           .is_some()
       }
     }
@@ -1202,28 +1220,26 @@ impl RegexSet {
     for fb in &self.fallbacks {
       let mut pos = 0;
       while pos <= haystack.len() {
-        match fb.regex.find_from_pos(haystack, pos)
-        {
-          Ok(Some(m)) => {
+        match safe_fancy_find(
+          &fb.regex,
+          haystack,
+          pos,
+        ) {
+          Some((ms, me)) => {
             let passes = !fb.boundaries.has_any()
               || fb.boundaries.check_with_mode(
-                haystack,
-                m.start(),
-                m.end(),
-                &mode,
+                haystack, ms, me, &mode,
               );
             if passes {
               all.push((
-                fb.original_index,
-                m.start(),
-                m.end(),
+                fb.original_index, ms, me,
               ));
-              pos = m.end().max(pos + 1);
+              pos = me.max(pos + 1);
             } else {
-              pos = m.start() + 1;
+              pos = ms + 1;
             }
           }
-          _ => break,
+          None => break,
         }
       }
     }
@@ -1410,22 +1426,22 @@ impl RegexSet {
     for fb in &self.fallbacks {
       let mut pos = 0;
       while pos <= haystack.len() {
-        match fb.regex.find_from_pos(haystack, pos)
-        {
-          Ok(Some(m)) => {
+        match safe_fancy_find(
+          &fb.regex,
+          haystack,
+          pos,
+        ) {
+          Some((ms, me)) => {
             let passes = !fb.boundaries.has_any()
               || fb.boundaries.check_with_mode(
-                haystack,
-                m.start(),
-                m.end(),
-                &mode,
+                haystack, ms, me, &mode,
               );
             if passes {
               return true;
             }
-            pos = m.start() + 1;
+            pos = ms + 1;
           }
-          _ => break,
+          None => break,
         }
       }
     }

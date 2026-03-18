@@ -70,17 +70,53 @@ function asciiBoundaries(src) {
  * inline flags.
  */
 function regexpToRust(re) {
-  let prefix = "";
-  // Build flags: positive flags first, then -u
-  // if /i is present. (?i-um) would DISABLE m,
-  // so -u must come last: (?im-u).
-  if (re.flags.includes("i")) prefix += "i";
-  if (re.flags.includes("m")) prefix += "m";
-  if (re.flags.includes("s")) prefix += "s";
-  if (re.flags.includes("i")) prefix += "-u";
-  return prefix
-    ? `(?${prefix})${re.source}`
-    : re.source;
+  let flags = "";
+  if (re.flags.includes("i")) flags += "i";
+  if (re.flags.includes("m")) flags += "m";
+  if (re.flags.includes("s")) flags += "s";
+
+  if (!flags) return re.source;
+
+  // When /i is present, use -u for ASCII case folding
+  // (avoids Unicode case folding DFA state explosion).
+  // Scope -u to the content only so edge \b stays in
+  // Unicode mode for unicodeBoundaries.
+  //
+  // /\btest\b/i → \b(?i-u:test)\b
+  //   \b outside: Unicode (default)
+  //   content: ASCII case + \w/\d/\s (matches JS)
+  if (!flags.includes("i")) {
+    return `(?${flags})${re.source}`;
+  }
+
+  let src = re.source;
+  let leading = "";
+  let trailing = "";
+
+  // Strip edge \b/\B from source
+  if (src.startsWith("\\b")) {
+    leading = "\\b";
+    src = src.slice(2);
+  } else if (src.startsWith("\\B")) {
+    leading = "\\B";
+    src = src.slice(2);
+  }
+
+  if (
+    src.endsWith("\\b") &&
+    !src.endsWith("\\\\b")
+  ) {
+    trailing = "\\b";
+    src = src.slice(0, -2);
+  } else if (
+    src.endsWith("\\B") &&
+    !src.endsWith("\\\\B")
+  ) {
+    trailing = "\\B";
+    src = src.slice(0, -2);
+  }
+
+  return `${leading}(?${flags}-u:${src})${trailing}`;
 }
 
 /**
