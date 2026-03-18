@@ -295,6 +295,23 @@ describe("ascii word boundary", () => {
     expect(matches[0]!.text).toBe("\\b");
   });
 
+  test("multiple escaped backslashes before b", () => {
+    // \\\\b = two literal backslashes + letter b
+    // Must NOT be stripped as a word boundary
+    const rs = new RegexSet(["\\\\\\\\b"]);
+    const matches = rs.findIter("a\\\\b");
+    expect(matches).toHaveLength(1);
+    expect(matches[0]!.text).toBe("\\\\b");
+  });
+
+  test("odd backslashes before b is word boundary", () => {
+    // \\\b = literal backslash + word boundary
+    const rs = new RegexSet(["\\\\\\btest\\b"]);
+    const matches = rs.findIter("\\test done");
+    expect(matches).toHaveLength(1);
+    expect(matches[0]!.text).toBe("\\test");
+  });
+
   test("\\b perf: no catastrophic slowdown", () => {
     // Loose threshold (500ms) to catch only
     // catastrophic regressions (Unicode \b would

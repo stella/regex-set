@@ -131,35 +131,28 @@ fn strip_edge_boundaries(
     start += 2;
   }
 
-  // Trailing \b or \B (check it's not \\b)
+  // Trailing \b or \B (check it's not \\b).
+  // Count consecutive backslashes before the final
+  // char: odd = word boundary, even = escaped.
   if end - start >= 2
-    && bytes[end - 1] == b'b'
+    && (bytes[end - 1] == b'b'
+      || bytes[end - 1] == b'B')
     && bytes[end - 2] == b'\\'
   {
-    // Make sure the \ is not itself escaped
-    let escaped = end >= 3 && bytes[end - 3] == b'\\'
-      && !(end >= 4 && bytes[end - 4] == b'\\');
-    if !escaped {
+    let mut num_bs = 0usize;
+    let mut k = end - 2;
+    while k > start && bytes[k - 1] == b'\\' {
+      num_bs += 1;
+      k -= 1;
+    }
+    // num_bs = extra backslashes before the one at
+    // end-2. Odd extra = the \ is escaped (\\b).
+    if num_bs % 2 == 0 {
       if bytes[end - 1] == b'b' {
         eb.trailing_b = true;
+      } else {
+        eb.trailing_big_b = true;
       }
-      // Note: trailing \B would be bytes[end-1]=='B'
-      // but we already checked it's 'b' above.
-      // Handle \B separately:
-      end -= 2;
-    }
-  }
-
-  // Re-check trailing for \B if not already stripped
-  if !eb.trailing_b
-    && end - start >= 2
-    && bytes[end - 1] == b'B'
-    && bytes[end - 2] == b'\\'
-  {
-    let escaped = end >= 3 && bytes[end - 3] == b'\\'
-      && !(end >= 4 && bytes[end - 4] == b'\\');
-    if !escaped {
-      eb.trailing_big_b = true;
       end -= 2;
     }
   }
