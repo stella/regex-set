@@ -68,7 +68,11 @@ function asciiBoundaries(src) {
  */
 function regexpToRust(re) {
   let prefix = "";
-  if (re.flags.includes("i")) prefix += "i";
+  // Use (?i-u) not (?i) — JS /i is ASCII-only
+  // case folding. Rust (?i) enables Unicode case
+  // folding which explodes DFA state count for
+  // alternation patterns (month names etc.).
+  if (re.flags.includes("i")) prefix += "i-u";
   if (re.flags.includes("m")) prefix += "m";
   if (re.flags.includes("s")) prefix += "s";
   return prefix
