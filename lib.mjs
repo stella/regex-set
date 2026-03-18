@@ -12,13 +12,13 @@ function unpack(packed, haystack, names) {
   const matches = new Array(len / 3);
   for (let i = 0, j = 0; i < len; i += 3, j++) {
     const idx = packed[i];
-    const start = packed[i + 1];
-    const end = packed[i + 2];
+    const s = packed[i + 1];
+    const e = packed[i + 2];
     const m = {
       pattern: idx,
-      start,
-      end,
-      text: haystack.slice(start, end),
+      start: s,
+      end: e,
+      text: haystack.slice(s, e),
     };
     if (names && names[idx] !== undefined)
       m.name = names[idx];
@@ -65,13 +65,45 @@ function asciiBoundaries(src) {
  * Convert a RegExp to Rust regex syntax string.
  */
 function regexpToRust(re) {
-  let prefix = "";
-  if (re.flags.includes("i")) prefix += "i";
-  if (re.flags.includes("m")) prefix += "m";
-  if (re.flags.includes("s")) prefix += "s";
-  return prefix
-    ? `(?${prefix})${re.source}`
-    : re.source;
+  let flags = "";
+  if (re.flags.includes("i")) flags += "i";
+  if (re.flags.includes("m")) flags += "m";
+  if (re.flags.includes("s")) flags += "s";
+
+  if (!flags) return re.source;
+
+  if (!flags.includes("i")) {
+    return `(?${flags})${re.source}`;
+  }
+
+  let src = re.source;
+  let leading = "";
+  let trailing = "";
+
+  if (src.startsWith("\\b")) {
+    leading = "\\b";
+    src = src.slice(2);
+  } else if (src.startsWith("\\B")) {
+    leading = "\\B";
+    src = src.slice(2);
+  }
+  if (src.length >= 2) {
+    const last = src[src.length - 1];
+    if (last === "b" || last === "B") {
+      let bs = 0;
+      let k = src.length - 2;
+      while (k >= 0 && src[k] === "\\") {
+        bs++;
+        k--;
+      }
+      if (bs > 0 && bs % 2 === 1) {
+        trailing = "\\" + last;
+        src = src.slice(0, -2);
+      }
+    }
+  }
+
+  return `${leading}(?${flags}-u:${src})${trailing}`;
 }
 
 /**

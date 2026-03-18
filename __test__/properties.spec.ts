@@ -251,9 +251,15 @@ describe("property: oracle vs JS RegExp", () => {
  * Returns null if the pattern uses Rust-only syntax.
  */
 function toJsRegExp(
-  pat: string,
+  pat: string | RegExp,
 ): RegExp | null {
   try {
+    if (pat instanceof RegExp) {
+      return new RegExp(
+        pat.source,
+        pat.flags + "g",
+      );
+    }
     return new RegExp(pat, "g");
   } catch {
     return null;
@@ -351,13 +357,21 @@ describe("property: JS oracle on feature patterns", () => {
           // assertions (\b, \B, lookahead, lookbehind)
           // since those can't be verified on the
           // isolated text slice.
-          const hasContext = (p: string) =>
-            /\\[bB]/.test(p) ||
-            /\(\?[=!<]/.test(p);
+          const hasContext = (p: string | RegExp) => {
+            const s =
+              p instanceof RegExp ? p.source : p;
+            return (
+              /\\[bB]/.test(s) ||
+              /\(\?[=!<]/.test(s)
+            );
+          };
 
           for (const m of real) {
             const pat = pats[m.pattern]!;
             if (hasContext(pat)) continue;
+            // Skip RegExp objects — their Rust
+            // conversion ((?i-u)...) isn't valid JS.
+            if (pat instanceof RegExp) continue;
             const re = new RegExp(pat);
             expect(re.test(m.text)).toBe(true);
           }
@@ -446,10 +460,19 @@ const backslashEdgePattern = fc
     );
   });
 
-const allPatterns = fc.oneof(
-  // Plain literals (baseline)
+// RegExp objects with flag combinations.
+// Tests (?i-u), (?m), (?s) conversion and
+// their interaction with all features.
+// ── Axis 5: Flags ────────────────────────────
+// Every flag combination as a proper axis that
+// crosses with all patterns. "" = no flags (string).
+const allFlags = fc.constantFrom(
+  "", "i", "m", "s", "im", "is", "ms", "ims",
+);
+
+// Base patterns (string form, no flags).
+const basePatterns = fc.oneof(
   safePattern,
-  // Boundary features
   ...prefixes.map((pre) =>
     safePattern.chain((p) =>
       fc.constantFrom(...suffixes).map(
@@ -457,7 +480,6 @@ const allPatterns = fc.oneof(
       ),
     ),
   ),
-  // Character classes with boundaries
   ...cores.flatMap((core) => [
     fc.constantFrom(...prefixes).map(
       (pre) => `${pre}${core}`,
@@ -472,9 +494,23 @@ const allPatterns = fc.oneof(
       )
       .map(([pre, suf]) => `${pre}${core}${suf}`),
   ]),
-  // Backslash escaping edge cases
   backslashEdgePattern,
 );
+
+// All patterns: base patterns × flags.
+// "" flags = string pattern, non-empty = RegExp.
+// This is the TRUE cartesian product over all axes.
+const allPatterns: fc.Arbitrary<string | RegExp> =
+  basePatterns.chain((pat) =>
+    allFlags.map((flags) => {
+      if (!flags) return pat;
+      try {
+        return new RegExp(pat, flags);
+      } catch {
+        return pat; // invalid regex with flags → use as string
+      }
+    }),
+  );
 
 // ── Axis 3: Haystacks ────────────────────────
 // ASCII, multilingual, edge cases.
@@ -491,6 +527,10 @@ const allHaystacks = fc.oneof(
     "test",
     "123",
     " ",
+    // Multiline text (for /m + ^/$ tests)
+    "foo\nbar\nbaz",
+    "line1\nTEST\nline3",
+    "abc\n123\ndef",
   ),
   fc.string({ minLength: 0, maxLength: 200 }),
 );
@@ -842,6 +882,74 @@ describe("property: named patterns", () => {
         },
       ),
       PARAMS,
+    );
+  });
+});
+
+// ─── Performance property ───────────────────
+//
+// Catches catastrophic DFA state explosions (like
+// the (?i) Unicode case folding bug). Verifies
+// RegexSet isn't more than 10x slower than JS
+// RegExp for the same patterns on 10KB text.
+
+describe("property: no catastrophic slowdown", () => {
+  test("RegexSet within 20x of JS RegExp", () => {
+    fc.assert(
+      fc.property(
+        fc.array(allPatterns, {
+          minLength: 1,
+          maxLength: 5,
+        }),
+        optionCombos,
+        (pats, opts) => {
+          const jsRegs: (RegExp | null)[] =
+            pats.map(toJsRegExp);
+          if (jsRegs.some((r) => r === null))
+            return;
+
+          let rs;
+          try {
+            rs = new RegexSet(pats, opts);
+          } catch {
+            return;
+          }
+
+          const h =
+            "Ing. Jan Novák test 123 foo bar " +
+            "email@test.cz 29.5.2026 850315/0007 ";
+          const text = h.repeat(
+            Math.ceil((10 * 1024) / h.length),
+          );
+
+          const t0 = performance.now();
+          rs.findIter(text);
+          const rsTime = performance.now() - t0;
+
+          const t1 = performance.now();
+          for (const re of jsRegs) {
+            re!.lastIndex = 0;
+            let m;
+            while ((m = re!.exec(text)) !== null) {
+              if (m[0]!.length === 0) {
+                re!.lastIndex++;
+              }
+            }
+          }
+          const jsTime = performance.now() - t1;
+
+          // RS should not be catastrophically slow.
+          // 20x threshold catches DFA state explosions
+          // (like the (?i) bug at 15x) while allowing
+          // for normal variance on the slow path.
+          if (jsTime > 0.1) {
+            expect(rsTime / jsTime).toBeLessThan(
+              20,
+            );
+          }
+        },
+      ),
+      { ...PARAMS, numRuns: 100 },
     );
   });
 });

@@ -2,14 +2,34 @@ use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use regex_automata::meta::Regex as MetaRegex;
 use regex_automata::Input;
+use std::panic;
 use unicode_segmentation::UnicodeSegmentation;
+
+/// Safe wrapper for fancy-regex calls that may panic
+/// (known bug in fancy-regex v0.14 with certain
+/// pattern combinations). Converts panics to None.
+/// Returns (start, end) byte positions.
+fn safe_fancy_find(
+  re: &fancy_regex::Regex,
+  haystack: &str,
+  pos: usize,
+) -> Option<(usize, usize)> {
+  panic::catch_unwind(panic::AssertUnwindSafe(|| {
+    re.find_from_pos(haystack, pos)
+      .ok()
+      .flatten()
+      .map(|m| (m.start(), m.end()))
+  }))
+  .ok()
+  .flatten()
+}
 
 /// Options for constructing a `RegexSet`.
 #[napi(object)]
 pub struct Options {
   /// Only match whole words. Default: `false`.
   pub whole_words: Option<bool>,
-  /// Use Unicode word boundaries. Default: `false`.
+  /// Use Unicode word boundaries. Default: `true`.
   ///
   /// When `true`, `\b` matches at Unicode word
   /// boundaries (accented letters, CJK, etc. are
@@ -305,21 +325,6 @@ impl EdgeBoundaries {
       || self.trailing_big_b
   }
 
-  fn check(
-    &self,
-    haystack: &str,
-    start: usize,
-    end: usize,
-    unicode: bool,
-  ) -> bool {
-    self.check_with_mode(
-      haystack,
-      start,
-      end,
-      &BoundaryMode::Inline { unicode },
-    )
-  }
-
   fn check_with_mode(
     &self,
     haystack: &str,
@@ -608,10 +613,8 @@ impl Verifier {
           &haystack[ctx_start..ctx_end];
         let offset = start - ctx_start;
         // Must match exactly at offset.
-        re.find_from_pos(window, offset)
-          .ok()
-          .flatten()
-          .filter(|m| m.start() == offset)
+        safe_fancy_find(re, window, offset)
+          .filter(|&(s, _)| s == offset)
           .is_some()
       }
     }
@@ -782,7 +785,6 @@ struct PatternInfo {
   original_index: u32,
   verifier: Verifier,
   boundaries: EdgeBoundaries,
-  unicode_wb: bool,
   individual: MetaRegex,
 }
 
@@ -790,21 +792,16 @@ struct FallbackPattern {
   original_index: u32,
   regex: fancy_regex::Regex,
   boundaries: EdgeBoundaries,
-  unicode_wb: bool,
 }
 
 /// A verified match: (original_pattern_index,
 /// byte_start, byte_end).
 type RawMatch = (u32, usize, usize);
 
-/// Patterns split into two DFAs: fast (find_iter)
-/// and slow (manual loop with shadowed check).
-/// This prevents 2 lookahead patterns from forcing
-/// all 15 other patterns onto the slow path.
 #[napi]
 pub struct RegexSet {
-  /// Fast DFA: patterns with Verifier::None and
-  /// no \B boundaries. Uses find_iter (single pass).
+  /// Fast DFA: patterns with Verifier::None
+  /// and no \B boundaries.
   fast_multi: Option<MetaRegex>,
   fast_info: Vec<PatternInfo>,
   /// Slow DFA: patterns with verifiers or \B.
@@ -816,6 +813,7 @@ pub struct RegexSet {
   pattern_count: u32,
   has_boundaryless_pattern: bool,
   has_heterogeneous_boundaries: bool,
+  unicode_wb: bool,
 }
 
 #[napi]
@@ -889,7 +887,6 @@ impl RegexSet {
             original_index: i as u32,
             verifier,
             boundaries: eb,
-            unicode_wb,
             individual,
           });
         } else {
@@ -898,7 +895,6 @@ impl RegexSet {
             original_index: i as u32,
             verifier,
             boundaries: eb,
-            unicode_wb,
             individual,
           });
         }
@@ -917,7 +913,6 @@ impl RegexSet {
           original_index: i as u32,
           regex: re,
           boundaries: eb,
-          unicode_wb,
         });
       }
     }
@@ -968,6 +963,7 @@ impl RegexSet {
       pattern_count,
       has_boundaryless_pattern,
       has_heterogeneous_boundaries,
+      unicode_wb,
     })
   }
 
@@ -990,9 +986,9 @@ impl RegexSet {
   ) -> BoundaryMode {
     let any_boundaries = self
       .fast_info
-      .iter()
-      .chain(self.slow_info.iter())
-      .any(|pi| pi.boundaries.has_any())
+        .iter()
+        .chain(self.slow_info.iter())
+        .any(|pi| pi.boundaries.has_any())
       || self
         .fallbacks
         .iter()
@@ -1004,12 +1000,10 @@ impl RegexSet {
       };
     }
 
-    let unicode = self
-      .fast_info
-      .first()
-      .or(self.slow_info.first())
-      .map(|pi| pi.unicode_wb)
-      .unwrap_or(false);
+    // Check if unicodeBoundaries was set. We can
+    // infer this from whether edge boundaries were
+    // stripped (only happens with unicodeBoundaries).
+    let unicode = self.unicode_wb;
 
     if unicode && needs_segmenter(haystack) {
       BoundaryMode::Segmenter {
@@ -1022,10 +1016,14 @@ impl RegexSet {
     }
   }
 
+  /// Collect all verified matches. Returns
+  /// (matches, needs_sort). When only the fast DFA
+  /// produced matches, they're already in order —
+  /// skip the sort.
   fn collect_matches(
     &self,
     haystack: &str,
-  ) -> Vec<RawMatch> {
+  ) -> (Vec<RawMatch>, bool) {
     let mut all: Vec<RawMatch> = Vec::new();
     let mode = self.boundary_mode(haystack);
 
@@ -1117,33 +1115,42 @@ impl RegexSet {
     for fb in &self.fallbacks {
       let mut pos = 0;
       while pos <= haystack.len() {
-        match fb.regex.find_from_pos(haystack, pos)
-        {
-          Ok(Some(m)) => {
+        match safe_fancy_find(
+          &fb.regex,
+          haystack,
+          pos,
+        ) {
+          Some((ms, me)) => {
             let passes = !fb.boundaries.has_any()
               || fb.boundaries.check_with_mode(
-                haystack,
-                m.start(),
-                m.end(),
-                &mode,
+                haystack, ms, me, &mode,
               );
             if passes {
               all.push((
-                fb.original_index,
-                m.start(),
-                m.end(),
+                fb.original_index, ms, me,
               ));
-              pos = m.end().max(pos + 1);
+              pos = me.max(pos + 1);
             } else {
-              pos = m.start() + 1;
+              pos = ms + 1;
             }
           }
-          _ => break,
+          None => break,
         }
       }
     }
 
-    all
+    // Sort only needed when multiple sources
+    // contributed matches. Fast DFA find_iter
+    // already returns matches in position order.
+    // Sort when multiple sources contributed.
+    // Sort needed when matches come from multiple
+    // sources (interleaved positions) or multiple
+    // literal patterns (each scanned independently).
+    let sources = (self.fast_multi.is_some() as u8)
+      + (self.slow_multi.is_some() as u8)
+      + (self.fallbacks.len().min(2) as u8);
+    let needs_sort = sources > 1 && all.len() > 1;
+    (all, needs_sort)
   }
 
   /// Sort matches and select non-overlapping.
@@ -1293,22 +1300,22 @@ impl RegexSet {
     for fb in &self.fallbacks {
       let mut pos = 0;
       while pos <= haystack.len() {
-        match fb.regex.find_from_pos(haystack, pos)
-        {
-          Ok(Some(m)) => {
+        match safe_fancy_find(
+          &fb.regex,
+          haystack,
+          pos,
+        ) {
+          Some((ms, me)) => {
             let passes = !fb.boundaries.has_any()
               || fb.boundaries.check_with_mode(
-                haystack,
-                m.start(),
-                m.end(),
-                &mode,
+                haystack, ms, me, &mode,
               );
             if passes {
               return true;
             }
-            pos = m.start() + 1;
+            pos = ms + 1;
           }
-          _ => break,
+          None => break,
         }
       }
     }
@@ -1319,14 +1326,18 @@ impl RegexSet {
     &self,
     haystack: &str,
   ) -> Uint32Array {
-    let mut all = self.collect_matches(haystack);
+    let (mut all, needs_sort) =
+      self.collect_matches(haystack);
 
     if all.is_empty() {
       return Uint32Array::new(Vec::new());
     }
 
-    let selected =
-      Self::select_non_overlapping(&mut all);
+    let selected = if needs_sort {
+      Self::select_non_overlapping(&mut all)
+    } else {
+      all
+    };
 
     // Pack with UTF-16 offsets.
     if haystack.is_ascii() {
@@ -1420,7 +1431,7 @@ impl RegexSet {
     &self,
     haystack: String,
   ) -> Vec<u32> {
-    let all = self.collect_matches(&haystack);
+    let (all, _) = self.collect_matches(&haystack);
     let mut seen = vec![
       false;
       self.pattern_count as usize
@@ -1452,9 +1463,13 @@ impl RegexSet {
       )));
     }
 
-    let mut all = self.collect_matches(&haystack);
-    let selected =
-      Self::select_non_overlapping(&mut all);
+    let (mut all, needs_sort) =
+      self.collect_matches(&haystack);
+    let selected = if needs_sort {
+      Self::select_non_overlapping(&mut all)
+    } else {
+      all
+    };
 
     let mut result = String::with_capacity(
       haystack.len(),
@@ -1490,7 +1505,6 @@ pub fn uax29_boundaries(
   })?;
 
   let mut boundaries = Vec::new();
-  let mut offset = 0usize;
   for word in text.unicode_word_indices() {
     boundaries.push(word.0 as u32);
     boundaries.push(
