@@ -6,8 +6,19 @@ use regex_automata::meta::Regex as MetaRegex;
 #[napi(object)]
 pub struct Options {
   /// Only match whole words. Default: `false`.
-  /// Wraps each pattern with `\b...\b`.
   pub whole_words: Option<bool>,
+  /// Use Unicode word boundaries. Default: `false`.
+  ///
+  /// When `true`, `\b` matches at Unicode word
+  /// boundaries (accented letters, CJK, etc. are
+  /// word chars). When `false`, `\b` uses ASCII
+  /// semantics matching JS `RegExp` behavior.
+  ///
+  /// Implementation: edge `\b` is stripped from the
+  /// pattern and verified inline per match (O(1)),
+  /// so there is zero DFA overhead regardless of
+  /// which mode is used.
+  pub unicode_boundaries: Option<bool>,
 }
 
 /// A single match returned by search methods.
@@ -45,7 +56,174 @@ fn byte_span_utf16_len(bytes: &[u8]) -> u32 {
   count
 }
 
-// ─── Inline boundary checks ──────────────────
+// ─── Word boundary verification ─────────────
+//
+// Instead of embedding \b in the DFA (which causes
+// a 10x slowdown for Unicode mode), we strip edge
+// \b from patterns and verify boundaries inline
+// after each match. Two char lookups per boundary,
+// O(1) per match, zero DFA overhead.
+
+fn is_word_char_unicode(ch: char) -> bool {
+  ch.is_alphanumeric() || ch == '_'
+}
+
+fn is_word_char_ascii(ch: char) -> bool {
+  ch.is_ascii_alphanumeric() || ch == '_'
+}
+
+/// Check word boundary at a byte position.
+/// A boundary exists when the "word-ness" of the
+/// char before and after the position differ.
+fn check_word_boundary(
+  haystack: &str,
+  byte_pos: usize,
+  unicode: bool,
+) -> bool {
+  let is_wc = if unicode {
+    is_word_char_unicode
+  } else {
+    is_word_char_ascii
+  };
+
+  let before = if byte_pos == 0 {
+    false
+  } else {
+    let ch =
+      haystack[..byte_pos].chars().next_back().unwrap();
+    is_wc(ch)
+  };
+  let after = if byte_pos >= haystack.len() {
+    false
+  } else {
+    let ch =
+      haystack[byte_pos..].chars().next().unwrap();
+    is_wc(ch)
+  };
+  before != after
+}
+
+/// Strip leading/trailing `\b` or `\B` from a
+/// pattern string. Returns (core, edge_boundaries).
+///
+/// Only strips unescaped `\b`/`\B` at the very
+/// edges. Mid-pattern boundaries are left for the
+/// regex engine.
+fn strip_edge_boundaries(
+  pattern: &str,
+) -> (String, EdgeBoundaries) {
+  let bytes = pattern.as_bytes();
+  let mut start = 0;
+  let mut end = bytes.len();
+  let mut eb = EdgeBoundaries::default();
+
+  // Leading \b or \B
+  if end - start >= 2
+    && bytes[start] == b'\\'
+    && (bytes[start + 1] == b'b'
+      || bytes[start + 1] == b'B')
+  {
+    if bytes[start + 1] == b'b' {
+      eb.leading_b = true;
+    } else {
+      eb.leading_big_b = true;
+    }
+    start += 2;
+  }
+
+  // Trailing \b or \B (check it's not \\b)
+  if end - start >= 2
+    && bytes[end - 1] == b'b'
+    && bytes[end - 2] == b'\\'
+  {
+    // Make sure the \ is not itself escaped
+    let escaped = end >= 3 && bytes[end - 3] == b'\\'
+      && !(end >= 4 && bytes[end - 4] == b'\\');
+    if !escaped {
+      if bytes[end - 1] == b'b' {
+        eb.trailing_b = true;
+      }
+      // Note: trailing \B would be bytes[end-1]=='B'
+      // but we already checked it's 'b' above.
+      // Handle \B separately:
+      end -= 2;
+    }
+  }
+
+  // Re-check trailing for \B if not already stripped
+  if !eb.trailing_b
+    && end - start >= 2
+    && bytes[end - 1] == b'B'
+    && bytes[end - 2] == b'\\'
+  {
+    let escaped = end >= 3 && bytes[end - 3] == b'\\'
+      && !(end >= 4 && bytes[end - 4] == b'\\');
+    if !escaped {
+      eb.trailing_big_b = true;
+      end -= 2;
+    }
+  }
+
+  (pattern[start..end].to_string(), eb)
+}
+
+#[derive(Default, Clone, Copy)]
+struct EdgeBoundaries {
+  leading_b: bool,
+  trailing_b: bool,
+  leading_big_b: bool,
+  trailing_big_b: bool,
+}
+
+impl EdgeBoundaries {
+  fn has_any(&self) -> bool {
+    self.leading_b
+      || self.trailing_b
+      || self.leading_big_b
+      || self.trailing_big_b
+  }
+
+  /// Verify all edge boundaries for a match.
+  fn check(
+    &self,
+    haystack: &str,
+    start: usize,
+    end: usize,
+    unicode: bool,
+  ) -> bool {
+    if self.leading_b
+      && !check_word_boundary(
+        haystack, start, unicode,
+      )
+    {
+      return false;
+    }
+    if self.trailing_b
+      && !check_word_boundary(
+        haystack, end, unicode,
+      )
+    {
+      return false;
+    }
+    if self.leading_big_b
+      && check_word_boundary(
+        haystack, start, unicode,
+      )
+    {
+      return false;
+    }
+    if self.trailing_big_b
+      && check_word_boundary(
+        haystack, end, unicode,
+      )
+    {
+      return false;
+    }
+    true
+  }
+}
+
+// ─── Inline lookaround checks ────────────────
 //
 // Instead of calling fancy-regex on a window for
 // every match, classify the lookaround assertion
@@ -316,7 +494,9 @@ fn build_verifier(
   }
 
   // Check if all lookaround was inlined.
-  if !has_lookaround(&core) && (pre.is_some() || post.is_some()) {
+  if !has_lookaround(&core)
+    && (pre.is_some() || post.is_some())
+  {
     return Ok((
       core,
       Verifier::Inline(InlineCheck { pre, post }),
@@ -324,13 +504,11 @@ fn build_verifier(
   }
 
   // Still has lookaround (complex or nested).
-  // Fall back to fancy-regex, which does not
-  // support (?-u:\b). Revert to Unicode \b.
+  // Fall back to fancy-regex.
   //
   // ascii_boundary_for_fancy() expresses ASCII \b
   // as lookaround on [a-zA-Z0-9_], so both paths
-  // use identical ASCII word boundary semantics
-  // (matching JS \b behavior).
+  // use identical ASCII word boundary semantics.
   let core_stripped =
     strip_lookaround_str(pattern);
   let fancy_pat = ascii_boundary_for_fancy(pattern);
@@ -507,14 +685,7 @@ const W: &str = "[a-zA-Z0-9_]";
 
 /// Replace `(?-u:\b)` / `(?-u:\B)` with
 /// ASCII-equivalent lookaround expressions that
-/// fancy-regex understands. This preserves ASCII
-/// word boundary semantics (matching JS `\b`)
-/// instead of falling back to Unicode `\b`.
-///
-/// `\b` ≡ boundary between word and non-word:
-///   (?:(?<=[W])(?![W])|(?<![W])(?=[W]))
-/// `\B` ≡ non-boundary (both same class):
-///   (?:(?<=[W])(?=[W])|(?<![W])(?![W]))
+/// fancy-regex understands.
 fn ascii_boundary_for_fancy(s: &str) -> String {
   let b = format!(
     "(?:(?<={W})(?!{W})|(?<!{W})(?={W}))",
@@ -531,11 +702,15 @@ fn ascii_boundary_for_fancy(s: &str) -> String {
 struct PatternInfo {
   original_index: u32,
   verifier: Verifier,
+  boundaries: EdgeBoundaries,
+  unicode_wb: bool,
 }
 
 struct FallbackPattern {
   original_index: u32,
   regex: fancy_regex::Regex,
+  boundaries: EdgeBoundaries,
+  unicode_wb: bool,
 }
 
 #[napi]
@@ -546,6 +721,29 @@ pub struct RegexSet {
   pattern_count: u32,
 }
 
+/// Check all conditions for a match: verifier
+/// (lookaround) AND edge word boundaries.
+fn match_passes(
+  haystack: &str,
+  start: usize,
+  end: usize,
+  verifier: &Verifier,
+  boundaries: &EdgeBoundaries,
+  unicode_wb: bool,
+) -> bool {
+  if !verifier.check(haystack, start, end) {
+    return false;
+  }
+  if boundaries.has_any()
+    && !boundaries.check(
+      haystack, start, end, unicode_wb,
+    )
+  {
+    return false;
+  }
+  true
+}
+
 #[napi]
 impl RegexSet {
   #[napi(constructor)]
@@ -554,12 +752,22 @@ impl RegexSet {
     options: Option<Options>,
   ) -> Result<Self> {
     let whole_words = options
+      .as_ref()
       .and_then(|o| o.whole_words)
+      .unwrap_or(false);
+    let unicode_wb = options
+      .as_ref()
+      .and_then(|o| o.unicode_boundaries)
       .unwrap_or(false);
 
     let pattern_count = patterns.len() as u32;
 
-    let wrapped: Vec<String> = if whole_words {
+    // wholeWords wrapping: only add (?-u:\b) in
+    // ASCII mode. In Unicode mode, boundaries are
+    // verified inline (no DFA overhead).
+    let wrapped: Vec<String> = if whole_words
+      && !unicode_wb
+    {
       patterns
         .iter()
         .map(|p| format!("(?-u:\\b)(?:{p})(?-u:\\b)"))
@@ -574,8 +782,24 @@ impl RegexSet {
       Vec::new();
 
     for (i, p) in wrapped.iter().enumerate() {
-      let (core, verifier) = build_verifier(p)
-        .map_err(|e| {
+      // Strip edge \b/\B and record boundary flags.
+      // In Unicode mode: strip raw \b from patterns.
+      // In ASCII mode: patterns have (?-u:\b) from
+      // JS, which MetaRegex handles natively — but
+      // we still strip for consistency with the
+      // verify-inline approach.
+      let (stripped, mut eb) =
+        strip_edge_boundaries(p);
+
+      // wholeWords in Unicode mode: force both
+      // boundaries regardless of pattern content.
+      if whole_words && unicode_wb {
+        eb.leading_b = true;
+        eb.trailing_b = true;
+      }
+
+      let (core, verifier) =
+        build_verifier(&stripped).map_err(|e| {
           Error::from_reason(format!(
             "Failed to compile pattern {i}: {e}"
           ))
@@ -586,17 +810,18 @@ impl RegexSet {
         info.push(PatternInfo {
           original_index: i as u32,
           verifier,
+          boundaries: eb,
+          unicode_wb,
         });
       } else {
         // Core doesn't compile in MetaRegex.
-        // Reuse the fancy-regex from build_verifier
-        // if it already compiled one (Complex path),
-        // otherwise compile fresh.
+        // Reuse fancy-regex from build_verifier
+        // if available, otherwise compile fresh.
         let re = match verifier {
           Verifier::Complex(re) => re,
           _ => {
             let fancy_pat =
-              ascii_boundary_for_fancy(p);
+              ascii_boundary_for_fancy(&stripped);
             fancy_regex::Regex::new(&fancy_pat)
               .map_err(|e| {
                 Error::from_reason(format!(
@@ -608,6 +833,8 @@ impl RegexSet {
         fallbacks.push(FallbackPattern {
           original_index: i as u32,
           regex: re,
+          boundaries: eb,
+          unicode_wb,
         });
       }
     }
@@ -644,22 +871,40 @@ impl RegexSet {
     if let Some(ref multi) = self.multi {
       for m in multi.find_iter(&haystack) {
         let pi = &self.info[m.pattern().as_usize()];
-        if pi.verifier.check(
+        if match_passes(
           &haystack,
           m.start(),
           m.end(),
+          &pi.verifier,
+          &pi.boundaries,
+          pi.unicode_wb,
         ) {
           return true;
         }
       }
     }
     for fb in &self.fallbacks {
-      if fb
-        .regex
-        .is_match(&haystack)
-        .unwrap_or(false)
-      {
-        return true;
+      let mut pos = 0;
+      while pos <= haystack.len() {
+        match fb.regex.find_from_pos(&haystack, pos)
+        {
+          Ok(Some(m)) => {
+            if fb.boundaries.has_any() {
+              if fb.boundaries.check(
+                &haystack,
+                m.start(),
+                m.end(),
+                fb.unicode_wb,
+              ) {
+                return true;
+              }
+            } else {
+              return true;
+            }
+            pos = m.end().max(pos + 1);
+          }
+          _ => break,
+        }
       }
     }
     false
@@ -676,10 +921,13 @@ impl RegexSet {
     if let Some(ref multi) = self.multi {
       for m in multi.find_iter(&haystack) {
         let pi = &self.info[m.pattern().as_usize()];
-        if pi.verifier.check(
+        if match_passes(
           &haystack,
           m.start(),
           m.end(),
+          &pi.verifier,
+          &pi.boundaries,
+          pi.unicode_wb,
         ) {
           all.push((
             pi.original_index,
@@ -696,11 +944,20 @@ impl RegexSet {
         match fb.regex.find_from_pos(&haystack, pos)
         {
           Ok(Some(m)) => {
-            all.push((
-              fb.original_index,
-              m.start(),
-              m.end(),
-            ));
+            let passes = !fb.boundaries.has_any()
+              || fb.boundaries.check(
+                &haystack,
+                m.start(),
+                m.end(),
+                fb.unicode_wb,
+              );
+            if passes {
+              all.push((
+                fb.original_index,
+                m.start(),
+                m.end(),
+              ));
+            }
             pos = m.end().max(pos + 1);
           }
           _ => break,
@@ -784,10 +1041,13 @@ impl RegexSet {
     if let Some(ref multi) = self.multi {
       for m in multi.find_iter(&haystack) {
         let pi = &self.info[m.pattern().as_usize()];
-        if pi.verifier.check(
+        if match_passes(
           &haystack,
           m.start(),
           m.end(),
+          &pi.verifier,
+          &pi.boundaries,
+          pi.unicode_wb,
         ) {
           let idx = pi.original_index as usize;
           if !seen[idx] {
@@ -800,14 +1060,32 @@ impl RegexSet {
 
     for fb in &self.fallbacks {
       let idx = fb.original_index as usize;
-      if !seen[idx]
-        && fb
-          .regex
-          .is_match(&haystack)
-          .unwrap_or(false)
-      {
-        seen[idx] = true;
-        result.push(idx as u32);
+      if !seen[idx] {
+        let mut pos = 0;
+        while pos <= haystack.len() {
+          match fb
+            .regex
+            .find_from_pos(&haystack, pos)
+          {
+            Ok(Some(m)) => {
+              let passes =
+                !fb.boundaries.has_any()
+                  || fb.boundaries.check(
+                    &haystack,
+                    m.start(),
+                    m.end(),
+                    fb.unicode_wb,
+                  );
+              if passes {
+                seen[idx] = true;
+                result.push(idx as u32);
+                break;
+              }
+              pos = m.end().max(pos + 1);
+            }
+            _ => break,
+          }
+        }
       }
     }
     result
@@ -836,10 +1114,13 @@ impl RegexSet {
     if let Some(ref multi) = self.multi {
       for m in multi.find_iter(&haystack) {
         let pi = &self.info[m.pattern().as_usize()];
-        if pi.verifier.check(
+        if match_passes(
           &haystack,
           m.start(),
           m.end(),
+          &pi.verifier,
+          &pi.boundaries,
+          pi.unicode_wb,
         ) {
           all.push((
             pi.original_index as usize,
@@ -856,11 +1137,20 @@ impl RegexSet {
         match fb.regex.find_from_pos(&haystack, pos)
         {
           Ok(Some(m)) => {
-            all.push((
-              fb.original_index as usize,
-              m.start(),
-              m.end(),
-            ));
+            let passes = !fb.boundaries.has_any()
+              || fb.boundaries.check(
+                &haystack,
+                m.start(),
+                m.end(),
+                fb.unicode_wb,
+              );
+            if passes {
+              all.push((
+                fb.original_index as usize,
+                m.start(),
+                m.end(),
+              ));
+            }
             pos = m.end().max(pos + 1);
           }
           _ => break,

@@ -351,6 +351,73 @@ describe("ascii word boundary", () => {
   });
 });
 
+// ─── Unicode word boundaries ─────────────────
+
+describe("unicodeBoundaries", () => {
+  test("čáp: ASCII \\b treats p as standalone", () => {
+    // ASCII \b: č and á are NOT word chars
+    const rs = new RegexSet(["\\bp\\b"]);
+    expect(rs.findIter("čáp")).toHaveLength(1);
+    expect(rs.findIter("čáp")[0]!.text).toBe("p");
+  });
+
+  test("čáp: Unicode \\b treats čáp as one word", () => {
+    // Unicode \b: č and á ARE word chars
+    const rs = new RegexSet(["\\bp\\b"], {
+      unicodeBoundaries: true,
+    });
+    // p is NOT at a word boundary — čáp is one word
+    expect(rs.findIter("čáp")).toHaveLength(0);
+  });
+
+  test("Unicode \\b matches whole Czech word", () => {
+    const rs = new RegexSet(["\\bčáp\\b"], {
+      unicodeBoundaries: true,
+    });
+    expect(rs.findIter("malý čáp letí")).toHaveLength(
+      1,
+    );
+    expect(
+      rs.findIter("malý čáp letí")[0]!.text,
+    ).toBe("čáp");
+    // Should not match inside another word
+    expect(rs.findIter("čápek")).toHaveLength(0);
+  });
+
+  test("wholeWords + unicodeBoundaries", () => {
+    const rs = new RegexSet(["Pavel", "Příbram"], {
+      wholeWords: true,
+      unicodeBoundaries: true,
+    });
+    const text = "Pavel je z Příbrami";
+    const matches = rs.findIter(text);
+    expect(matches).toHaveLength(1);
+    expect(matches[0]!.text).toBe("Pavel");
+    // Příbrami ≠ Příbram (not whole word)
+  });
+
+  test("Unicode \\b + lookahead works", () => {
+    const rs = new RegexSet(
+      [String.raw`\b\d{3}(?!\d)\b`],
+      { unicodeBoundaries: true },
+    );
+    const matches = rs.findIter("abc 123 def 4567");
+    expect(matches).toHaveLength(1);
+    expect(matches[0]!.text).toBe("123");
+  });
+
+  test("Unicode \\b perf: no DFA overhead", () => {
+    const rs = new RegexSet(["\\btest\\b"], {
+      unicodeBoundaries: true,
+    });
+    const text = "a".repeat(100_000);
+    const start = performance.now();
+    rs.findIter(text);
+    const elapsed = performance.now() - start;
+    expect(elapsed).toBeLessThan(500);
+  });
+});
+
 // ─── Named patterns ─────────────────────────
 
 describe("named patterns", () => {

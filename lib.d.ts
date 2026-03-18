@@ -6,6 +6,18 @@ export type Options = {
    * @default false
    */
   wholeWords?: boolean;
+  /**
+   * Use Unicode word boundaries. When `true`,
+   * `\b` treats accented letters, CJK, etc. as
+   * word characters (correct for non-English text).
+   * When `false` (default), `\b` uses ASCII
+   * semantics matching JS `RegExp` behavior.
+   *
+   * Zero performance overhead in either mode —
+   * boundaries are verified inline per match.
+   * @default false
+   */
+  unicodeBoundaries?: boolean;
 };
 
 /** A named pattern entry. */
