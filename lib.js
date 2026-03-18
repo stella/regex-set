@@ -125,16 +125,10 @@ function regexpToRust(re) {
 }
 
 /**
-/**
- * Convert inline (?i), (?im), (?is), (?ims) flags
- * in string patterns to use -u (ASCII case folding).
- * Without -u, Rust (?i) enables Unicode case folding
- * which explodes DFA state count.
- */
-/**
  * Convert inline (?i), (?im), (?ims), and scoped
  * (?i:...) flags to use -u (ASCII case folding).
- * Handles both bare (?i) and scoped (?i:content).
+ * Without -u, Rust (?i) enables Unicode case folding
+ * which explodes DFA state count on non-ASCII text.
  */
 function scopeInlineFlags(src) {
   return src.replace(
@@ -148,6 +142,9 @@ function scopeInlineFlags(src) {
   );
 }
 
+/**
+ * Normalize a pattern entry to { pattern, name }.
+ */
 function normalizeEntry(p, i) {
   if (typeof p === "string") {
     return {

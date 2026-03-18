@@ -109,7 +109,8 @@ function regexpToRust(re) {
 }
 
 /**
- * Normalize a pattern entry to { pattern, name }.
+ * Convert inline (?i) flags to (?i-u) for ASCII
+ * case folding. Handles bare and scoped groups.
  */
 function scopeInlineFlags(src) {
   return src.replace(
@@ -123,6 +124,9 @@ function scopeInlineFlags(src) {
   );
 }
 
+/**
+ * Normalize a pattern entry to { pattern, name }.
+ */
 function normalizeEntry(p, i) {
   if (typeof p === "string") {
     return {
