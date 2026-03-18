@@ -1,7 +1,7 @@
 {
   "name": "@stll/regex-set",
   "version": "0.3.0",
-  "description": "NAPI-RS bindings to Rust regex-automata for multi-pattern regex matching in Node.js/Bun",
+  "description": "Multi-pattern regex for Node.js/Bun. 2-9x faster than JS RegExp, backtracking-immune, Unicode word boundaries. Rust DFA engine via NAPI-RS.",
   "license": "MIT",
   "repository": {
     "type": "git",
