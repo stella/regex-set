@@ -872,15 +872,17 @@ impl RegexSet {
           ))
         })?;
 
-      if let Ok(individual) = MetaRegex::new(&core)
+      if let Ok(individual) =
+        MetaRegex::new(&core)
       {
-        // Split: verifiers or \B → slow path,
-        // everything else → fast path.
+        // Any verifier or \B → slow path.
+        // Only Verifier::None goes to fast path
+        // because find_iter can't retry rejected
+        // positions for other patterns.
         let needs_slow =
           !matches!(&verifier, Verifier::None)
             || eb.leading_big_b
             || eb.trailing_big_b;
-
         if needs_slow {
           slow_cores.push(core);
           slow_info.push(PatternInfo {
@@ -901,19 +903,16 @@ impl RegexSet {
           });
         }
       } else {
-        let re = match verifier {
-          Verifier::Complex(re) => re,
-          _ => {
-            let fancy_pat =
-              ascii_boundary_for_fancy(&stripped);
-            fancy_regex::Regex::new(&fancy_pat)
-              .map_err(|e| {
-                Error::from_reason(format!(
-                  "Failed to compile pattern {i}: {e}"
-                ))
-              })?
-          }
-        };
+        // Core doesn't compile in MetaRegex.
+        let fancy_pat =
+          ascii_boundary_for_fancy(&stripped);
+        let re =
+          fancy_regex::Regex::new(&fancy_pat)
+            .map_err(|e| {
+              Error::from_reason(format!(
+                "Failed to compile pattern {i}: {e}"
+              ))
+            })?;
         fallbacks.push(FallbackPattern {
           original_index: i as u32,
           regex: re,
@@ -1030,17 +1029,25 @@ impl RegexSet {
     let mut all: Vec<RawMatch> = Vec::new();
     let mode = self.boundary_mode(haystack);
 
-    // Fast DFA: single-pass find_iter (no verifiers).
+    // Fast DFA: single-pass find_iter.
+    // Checks boundaries + inline verifiers (None
+    // or Inline char checks — never Complex).
     if let Some(ref multi) = self.fast_multi {
       for m in multi.find_iter(haystack) {
         let pi =
           &self.fast_info[m.pattern().as_usize()];
-        if !pi.boundaries.has_any()
+        let boundary_ok = !pi.boundaries.has_any()
           || pi.boundaries.check_with_mode(
             haystack,
             m.start(),
             m.end(),
             &mode,
+          );
+        if boundary_ok
+          && pi.verifier.check(
+            haystack,
+            m.start(),
+            m.end(),
           )
         {
           all.push((
@@ -1220,12 +1227,18 @@ impl RegexSet {
       for m in multi.find_iter(haystack) {
         let pi =
           &self.fast_info[m.pattern().as_usize()];
-        if !pi.boundaries.has_any()
+        let boundary_ok = !pi.boundaries.has_any()
           || pi.boundaries.check_with_mode(
             haystack,
             m.start(),
             m.end(),
             &mode,
+          );
+        if boundary_ok
+          && pi.verifier.check(
+            haystack,
+            m.start(),
+            m.end(),
           )
         {
           return true;
