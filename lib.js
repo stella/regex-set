@@ -87,7 +87,7 @@ function regexpToRust(re) {
   //   \b outside: Unicode (default)
   //   content: ASCII case + \w/\d/\s (matches JS)
   if (!flags.includes("i")) {
-    return `(?${flags})${re.source}`;
+    return `(?${flags})${scopeInlineFlags(re.source)}`;
   }
 
   let src = re.source;

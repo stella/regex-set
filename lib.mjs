@@ -75,7 +75,7 @@ function regexpToRust(re) {
   }
 
   if (!flags.includes("i")) {
-    return `(?${flags})${re.source}`;
+    return `(?${flags})${scopeInlineFlags(re.source)}`;
   }
 
   let src = re.source;
