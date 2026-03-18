@@ -134,7 +134,7 @@ class RegexSet {
     );
 
     const unicode =
-      options?.unicodeBoundaries ?? false;
+      options?.unicodeBoundaries ?? true;
     const processed = unicode
       ? entries.map((e) => e.pattern)
       : entries.map((e) =>

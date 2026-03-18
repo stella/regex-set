@@ -373,7 +373,9 @@ describe("ascii word boundary", () => {
 describe("unicodeBoundaries", () => {
   test("čáp: ASCII \\b treats p as standalone", () => {
     // ASCII \b: č and á are NOT word chars
-    const rs = new RegexSet(["\\bp\\b"]);
+    const rs = new RegexSet(["\\bp\\b"], {
+      unicodeBoundaries: false,
+    });
     expect(rs.findIter("čáp")).toHaveLength(1);
     expect(rs.findIter("čáp")[0]!.text).toBe("p");
   });

@@ -15,7 +15,9 @@ export type Options = {
    *
    * Zero performance overhead in either mode —
    * boundaries are verified inline per match.
-   * @default false
+   * Automatically uses UAX#29 segmentation for
+   * Thai/CJK/Lao/Khmer/Myanmar text.
+   * @default true
    */
   unicodeBoundaries?: boolean;
 };

@@ -23,6 +23,7 @@ napi = { version = "3", default-features = false, features = [
   "serde-json",
 ] }
 napi-derive = "3"
+unicode-segmentation = "1"
 
 [build-dependencies]
 napi-build = "2"

@@ -142,7 +142,7 @@ class RegexSet {
     // false, convert \b to (?-u:\b) for fast ASCII
     // DFA matching.
     const unicode =
-      options?.unicodeBoundaries ?? false;
+      options?.unicodeBoundaries ?? true;
     const processed = unicode
       ? entries.map((e) => e.pattern)
       : entries.map((e) =>

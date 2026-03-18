@@ -283,10 +283,12 @@ describe("property: JS oracle on feature patterns", () => {
           if (jsRegexps.some((r) => r === null))
             return;
 
-          // RegexSet (default: ASCII \b)
+          // RegexSet with ASCII \b (matches JS)
           let rs;
           try {
-            rs = new RegexSet(pats);
+            rs = new RegexSet(pats, {
+              unicodeBoundaries: false,
+            });
           } catch {
             return;
           }

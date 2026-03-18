@@ -2,6 +2,7 @@ use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use regex_automata::meta::Regex as MetaRegex;
 use regex_automata::Input;
+use unicode_segmentation::UnicodeSegmentation;
 
 /// Options for constructing a `RegexSet`.
 #[napi(object)]
@@ -98,6 +99,119 @@ fn check_word_boundary(
   before != after
 }
 
+// ─── UAX#29 segmenter fallback ──────────────
+//
+// For scripts where is_alphanumeric() diverges
+// from UAX#29 word boundaries (Thai, CJK, Lao,
+// Khmer, Myanmar), pre-compute the boundary set
+// using the unicode-segmentation crate. Only
+// activated when the haystack actually contains
+// these scripts.
+
+/// Fast byte scan: does the haystack contain any
+/// script that needs UAX#29 segmentation?
+/// Checks for Thai, Lao, Myanmar, Khmer, CJK
+/// byte ranges in UTF-8.
+fn needs_segmenter(haystack: &str) -> bool {
+  let bytes = haystack.as_bytes();
+  let mut i = 0;
+  while i < bytes.len() {
+    let b = bytes[i];
+    if b < 0x80 {
+      i += 1;
+      continue;
+    }
+    if b < 0xE0 {
+      i += 2;
+      continue;
+    }
+    // 3-byte UTF-8: decode the code point
+    if b < 0xF0 && i + 2 < bytes.len() {
+      let cp = ((b as u32 & 0x0F) << 12)
+        | ((bytes[i + 1] as u32 & 0x3F) << 6)
+        | (bytes[i + 2] as u32 & 0x3F);
+      // Thai: U+0E00–U+0E7F
+      // Lao: U+0E80–U+0EFF
+      // Myanmar: U+1000–U+109F
+      // Khmer: U+1780–U+17FF
+      // CJK Unified: U+4E00–U+9FFF
+      // CJK Ext A: U+3400–U+4DBF
+      // Hiragana: U+3040–U+309F
+      // Katakana: U+30A0–U+30FF
+      // Hangul: U+AC00–U+D7AF
+      if (0x0E00..=0x0E7F).contains(&cp)  // Thai
+        || (0x0E80..=0x0EFF).contains(&cp) // Lao
+        || (0x1000..=0x109F).contains(&cp) // Myanmar
+        || (0x1780..=0x17FF).contains(&cp) // Khmer
+        || (0x3040..=0x30FF).contains(&cp) // Kana
+        || (0x3400..=0x9FFF).contains(&cp) // CJK
+        || (0xAC00..=0xD7AF).contains(&cp) // Hangul
+      {
+        return true;
+      }
+      i += 3;
+      continue;
+    }
+    // 4-byte: CJK Ext B+ (U+20000+)
+    if b >= 0xF0 && i + 3 < bytes.len() {
+      let cp = ((b as u32 & 0x07) << 18)
+        | ((bytes[i + 1] as u32 & 0x3F) << 12)
+        | ((bytes[i + 2] as u32 & 0x3F) << 6)
+        | (bytes[i + 3] as u32 & 0x3F);
+      if (0x20000..=0x2FA1F).contains(&cp) {
+        return true;
+      }
+      i += 4;
+      continue;
+    }
+    i += 1;
+  }
+  false
+}
+
+/// Compute UAX#29 word boundary byte positions.
+fn compute_uax29_boundaries(
+  haystack: &str,
+) -> Vec<usize> {
+  use unicode_segmentation::UnicodeSegmentation;
+  let mut boundaries = Vec::new();
+  for (offset, word) in
+    haystack.unicode_word_indices()
+  {
+    boundaries.push(offset);
+    boundaries.push(offset + word.len());
+  }
+  boundaries.push(0);
+  boundaries.push(haystack.len());
+  boundaries.sort_unstable();
+  boundaries.dedup();
+  boundaries
+}
+
+/// Boundary checker that can use either inline
+/// is_alphanumeric or pre-computed UAX#29 set.
+enum BoundaryMode {
+  /// Fast: inline char check.
+  Inline { unicode: bool },
+  /// UAX#29: lookup in pre-computed set.
+  Segmenter { boundaries: Vec<usize> },
+}
+
+impl BoundaryMode {
+  fn is_boundary(&self, pos: usize) -> bool {
+    match self {
+      BoundaryMode::Segmenter { boundaries } => {
+        boundaries.binary_search(&pos).is_ok()
+      }
+      // Inline mode doesn't use this method —
+      // it calls check_word_boundary directly.
+      BoundaryMode::Inline { .. } => {
+        unreachable!()
+      }
+    }
+  }
+}
+
 /// Strip leading/trailing `\b` or `\B` from a
 /// pattern string.
 fn strip_edge_boundaries(
@@ -171,32 +285,44 @@ impl EdgeBoundaries {
     end: usize,
     unicode: bool,
   ) -> bool {
-    if self.leading_b
-      && !check_word_boundary(
-        haystack, start, unicode,
-      )
-    {
+    self.check_with_mode(
+      haystack,
+      start,
+      end,
+      &BoundaryMode::Inline { unicode },
+    )
+  }
+
+  fn check_with_mode(
+    &self,
+    haystack: &str,
+    start: usize,
+    end: usize,
+    mode: &BoundaryMode,
+  ) -> bool {
+    let is_wb = |pos: usize| -> bool {
+      match mode {
+        BoundaryMode::Inline { unicode } => {
+          check_word_boundary(
+            haystack, pos, *unicode,
+          )
+        }
+        BoundaryMode::Segmenter { .. } => {
+          mode.is_boundary(pos)
+        }
+      }
+    };
+
+    if self.leading_b && !is_wb(start) {
       return false;
     }
-    if self.trailing_b
-      && !check_word_boundary(
-        haystack, end, unicode,
-      )
-    {
+    if self.trailing_b && !is_wb(end) {
       return false;
     }
-    if self.leading_big_b
-      && check_word_boundary(
-        haystack, start, unicode,
-      )
-    {
+    if self.leading_big_b && is_wb(start) {
       return false;
     }
-    if self.trailing_big_b
-      && check_word_boundary(
-        haystack, end, unicode,
-      )
-    {
+    if self.trailing_big_b && is_wb(end) {
       return false;
     }
     true
@@ -608,11 +734,11 @@ fn check_match(
   end: usize,
   verifier: &Verifier,
   boundaries: &EdgeBoundaries,
-  unicode_wb: bool,
+  mode: &BoundaryMode,
 ) -> std::result::Result<(), Rejection> {
   if boundaries.has_any()
-    && !boundaries.check(
-      haystack, start, end, unicode_wb,
+    && !boundaries.check_with_mode(
+      haystack, start, end, mode,
     )
   {
     return Err(Rejection::Boundary);
@@ -668,7 +794,7 @@ impl RegexSet {
     let unicode_wb = options
       .as_ref()
       .and_then(|o| o.unicode_boundaries)
-      .unwrap_or(false);
+      .unwrap_or(true);
 
     let pattern_count = patterns.len() as u32;
 
@@ -783,26 +909,62 @@ impl RegexSet {
   /// single source of truth for match logic —
   /// is_match, find_iter, which_match, and
   /// replace_all all delegate here.
+  /// Determine the boundary mode for a haystack.
+  /// If unicodeBoundaries is on and the text has
+  /// Thai/CJK/Lao/Khmer/Myanmar, use UAX#29.
+  /// Otherwise use fast inline checks.
+  fn boundary_mode(
+    &self,
+    haystack: &str,
+  ) -> BoundaryMode {
+    let any_boundaries = self.info.iter().any(
+      |pi| pi.boundaries.has_any(),
+    ) || self.fallbacks.iter().any(|fb| {
+      fb.boundaries.has_any()
+    });
+
+    if !any_boundaries {
+      return BoundaryMode::Inline {
+        unicode: false,
+      };
+    }
+
+    // Check if any pattern uses unicode boundaries
+    let unicode = self
+      .info
+      .first()
+      .map(|pi| pi.unicode_wb)
+      .unwrap_or(false);
+
+    if unicode && needs_segmenter(haystack) {
+      BoundaryMode::Segmenter {
+        boundaries: compute_uax29_boundaries(
+          haystack,
+        ),
+      }
+    } else {
+      BoundaryMode::Inline { unicode }
+    }
+  }
+
   fn collect_matches(
     &self,
     haystack: &str,
   ) -> Vec<RawMatch> {
     let mut all: Vec<RawMatch> = Vec::new();
+    let mode = self.boundary_mode(haystack);
 
     if let Some(ref multi) = self.multi {
       if !self.needs_slow_path {
-        // Fast path: single-pass find_iter scan
-        // with inline boundary filter. Valid when
-        // no verifiers and no \B boundaries.
         for m in multi.find_iter(haystack) {
           let pi =
             &self.info[m.pattern().as_usize()];
           if !pi.boundaries.has_any()
-            || pi.boundaries.check(
+            || pi.boundaries.check_with_mode(
               haystack,
               m.start(),
               m.end(),
-              pi.unicode_wb,
+              &mode,
             )
           {
             all.push((
@@ -830,7 +992,7 @@ impl RegexSet {
                 m.end(),
                 &pi.verifier,
                 &pi.boundaries,
-                pi.unicode_wb,
+                &mode,
               ) {
                 Ok(()) => {
                   all.push((
@@ -849,6 +1011,7 @@ impl RegexSet {
                       haystack,
                       m.start(),
                       dfa_idx,
+                      &mode,
                     )
                   {
                     all.push(alt);
@@ -876,11 +1039,11 @@ impl RegexSet {
         {
           Ok(Some(m)) => {
             let passes = !fb.boundaries.has_any()
-              || fb.boundaries.check(
+              || fb.boundaries.check_with_mode(
                 haystack,
                 m.start(),
                 m.end(),
-                fb.unicode_wb,
+                &mode,
               );
             if passes {
               all.push((
@@ -926,6 +1089,7 @@ impl RegexSet {
     haystack: &str,
     at: usize,
     skip: usize,
+    mode: &BoundaryMode,
   ) -> Option<RawMatch> {
     for (idx, pi) in self.info.iter().enumerate() {
       if idx == skip {
@@ -941,7 +1105,7 @@ impl RegexSet {
             m.end(),
             &pi.verifier,
             &pi.boundaries,
-            pi.unicode_wb,
+            mode,
           )
           .is_ok()
         {
@@ -971,18 +1135,19 @@ impl RegexSet {
   // ── Internal methods ──────────────────────
 
   fn _is_match(&self, haystack: &str) -> bool {
-    // Early exit: check multi-DFA first.
+    let mode = self.boundary_mode(haystack);
+
     if let Some(ref multi) = self.multi {
       if !self.needs_slow_path {
         for m in multi.find_iter(haystack) {
           let pi =
             &self.info[m.pattern().as_usize()];
           if !pi.boundaries.has_any()
-            || pi.boundaries.check(
+            || pi.boundaries.check_with_mode(
               haystack,
               m.start(),
               m.end(),
-              pi.unicode_wb,
+              &mode,
             )
           {
             return true;
@@ -1004,7 +1169,7 @@ impl RegexSet {
                 m.end(),
                 &pi.verifier,
                 &pi.boundaries,
-                pi.unicode_wb,
+                &mode,
               ) {
                 Ok(()) => return true,
                 Err(ref rej)
@@ -1016,6 +1181,7 @@ impl RegexSet {
                       haystack,
                       m.start(),
                       dfa_idx,
+                      &mode,
                     )
                     .is_some()
                   {
@@ -1038,11 +1204,11 @@ impl RegexSet {
         {
           Ok(Some(m)) => {
             let passes = !fb.boundaries.has_any()
-              || fb.boundaries.check(
+              || fb.boundaries.check_with_mode(
                 haystack,
                 m.start(),
                 m.end(),
-                fb.unicode_wb,
+                &mode,
               );
             if passes {
               return true;
@@ -1210,4 +1376,45 @@ impl RegexSet {
     result.push_str(&haystack[last..]);
     Ok(result)
   }
+}
+
+// ─── Benchmark: UAX#29 word boundaries ──────
+
+/// Compute UAX#29 word boundary positions using
+/// the unicode-segmentation crate. Returns the
+/// set as a sorted Vec of byte offsets.
+#[napi(js_name = "_uax29Boundaries")]
+pub fn uax29_boundaries(
+  haystack: Buffer,
+) -> Result<Vec<u32>> {
+  let text = std::str::from_utf8(
+    haystack.as_ref(),
+  )
+  .map_err(|e| {
+    Error::from_reason(format!(
+      "Invalid UTF-8: {e}"
+    ))
+  })?;
+
+  let mut boundaries = Vec::new();
+  let mut offset = 0usize;
+  for word in text.unicode_word_indices() {
+    boundaries.push(word.0 as u32);
+    boundaries.push(
+      (word.0 + word.1.len()) as u32,
+    );
+  }
+  // Add 0 and len as boundaries
+  if boundaries.is_empty()
+    || boundaries[0] != 0
+  {
+    boundaries.insert(0, 0);
+  }
+  let len = text.len() as u32;
+  if *boundaries.last().unwrap_or(&0) != len {
+    boundaries.push(len);
+  }
+  boundaries.sort_unstable();
+  boundaries.dedup();
+  Ok(boundaries)
 }
