@@ -70,7 +70,9 @@ function regexpToRust(re) {
   if (re.flags.includes("m")) flags += "m";
   if (re.flags.includes("s")) flags += "s";
 
-  if (!flags) return re.source;
+  if (!flags) {
+    return scopeInlineFlags(re.source);
+  }
 
   if (!flags.includes("i")) {
     return `(?${flags})${re.source}`;

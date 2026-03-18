@@ -72,7 +72,11 @@ function regexpToRust(re) {
   if (re.flags.includes("m")) flags += "m";
   if (re.flags.includes("s")) flags += "s";
 
-  if (!flags) return re.source;
+  if (!flags) {
+    // No JS flags, but source might contain
+    // inline (?i) — scope those too.
+    return scopeInlineFlags(re.source);
+  }
 
   // When /i is present, use -u for ASCII case folding
   // (avoids Unicode case folding DFA state explosion).
@@ -121,10 +125,6 @@ function regexpToRust(re) {
 }
 
 /**
- * Normalize a pattern entry to { pattern, name }.
- * Does NOT apply boundary conversion — that's
- * handled in the constructor based on options.
- */
 /**
  * Convert inline (?i), (?im), (?is), (?ims) flags
  * in string patterns to use -u (ASCII case folding).
