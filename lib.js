@@ -102,18 +102,22 @@ function regexpToRust(re) {
     src = src.slice(2);
   }
 
-  if (
-    src.endsWith("\\b") &&
-    !src.endsWith("\\\\b")
-  ) {
-    trailing = "\\b";
-    src = src.slice(0, -2);
-  } else if (
-    src.endsWith("\\B") &&
-    !src.endsWith("\\\\B")
-  ) {
-    trailing = "\\B";
-    src = src.slice(0, -2);
+  // Count trailing backslashes before b/B.
+  // Odd = word boundary, even = escaped.
+  if (src.length >= 2) {
+    const last = src[src.length - 1];
+    if (last === "b" || last === "B") {
+      let bs = 0;
+      let k = src.length - 2;
+      while (k >= 0 && src[k] === "\\") {
+        bs++;
+        k--;
+      }
+      if (bs > 0 && bs % 2 === 1) {
+        trailing = "\\" + last;
+        src = src.slice(0, -(bs > 1 ? 2 : 2));
+      }
+    }
   }
 
   return `${leading}(?${flags}-u:${src})${trailing}`;

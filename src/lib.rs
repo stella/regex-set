@@ -1148,7 +1148,7 @@ impl RegexSet {
     // literal patterns (each scanned independently).
     let sources = (self.fast_multi.is_some() as u8)
       + (self.slow_multi.is_some() as u8)
-      + (!self.fallbacks.is_empty() as u8);
+      + (self.fallbacks.len().min(2) as u8);
     let needs_sort = sources > 1 && all.len() > 1;
     (all, needs_sort)
   }
