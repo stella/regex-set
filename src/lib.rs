@@ -1,6 +1,7 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use regex_automata::meta::Regex as MetaRegex;
+use regex_automata::Input;
 
 /// Options for constructing a `RegexSet`.
 #[napi(object)]
@@ -869,17 +870,29 @@ impl RegexSet {
 
   fn _is_match(&self, haystack: &str) -> bool {
     if let Some(ref multi) = self.multi {
-      for m in multi.find_iter(haystack) {
-        let pi = &self.info[m.pattern().as_usize()];
-        if match_passes(
-          haystack,
-          m.start(),
-          m.end(),
-          &pi.verifier,
-          &pi.boundaries,
-          pi.unicode_wb,
-        ) {
-          return true;
+      let mut pos = 0;
+      while pos <= haystack.len() {
+        let input =
+          Input::new(haystack).range(pos..);
+        match multi.find(input) {
+          Some(m) => {
+            let pi =
+              &self.info[m.pattern().as_usize()];
+            if match_passes(
+              haystack,
+              m.start(),
+              m.end(),
+              &pi.verifier,
+              &pi.boundaries,
+              pi.unicode_wb,
+            ) {
+              return true;
+            }
+            // Rejected: retry from start+1 to
+            // find shadowed matches.
+            pos = m.start() + 1;
+          }
+          None => break,
         }
       }
     }
@@ -918,21 +931,33 @@ impl RegexSet {
       Vec::new();
 
     if let Some(ref multi) = self.multi {
-      for m in multi.find_iter(haystack) {
-        let pi = &self.info[m.pattern().as_usize()];
-        if match_passes(
-          haystack,
-          m.start(),
-          m.end(),
-          &pi.verifier,
-          &pi.boundaries,
-          pi.unicode_wb,
-        ) {
-          all.push((
-            pi.original_index,
-            m.start(),
-            m.end(),
-          ));
+      let mut pos = 0;
+      while pos <= haystack.len() {
+        let input =
+          Input::new(haystack).range(pos..);
+        match multi.find(input) {
+          Some(m) => {
+            let pi =
+              &self.info[m.pattern().as_usize()];
+            if match_passes(
+              haystack,
+              m.start(),
+              m.end(),
+              &pi.verifier,
+              &pi.boundaries,
+              pi.unicode_wb,
+            ) {
+              all.push((
+                pi.original_index,
+                m.start(),
+                m.end(),
+              ));
+              pos = m.end().max(pos + 1);
+            } else {
+              pos = m.start() + 1;
+            }
+          }
+          None => break,
         }
       }
     }
@@ -1090,21 +1115,33 @@ impl RegexSet {
     let mut result = Vec::new();
 
     if let Some(ref multi) = self.multi {
-      for m in multi.find_iter(&haystack) {
-        let pi = &self.info[m.pattern().as_usize()];
-        if match_passes(
-          &haystack,
-          m.start(),
-          m.end(),
-          &pi.verifier,
-          &pi.boundaries,
-          pi.unicode_wb,
-        ) {
-          let idx = pi.original_index as usize;
-          if !seen[idx] {
-            seen[idx] = true;
-            result.push(idx as u32);
+      let mut pos = 0;
+      while pos <= haystack.len() {
+        let input =
+          Input::new(haystack.as_str()).range(pos..);
+        match multi.find(input) {
+          Some(m) => {
+            let pi =
+              &self.info[m.pattern().as_usize()];
+            if match_passes(
+              &haystack,
+              m.start(),
+              m.end(),
+              &pi.verifier,
+              &pi.boundaries,
+              pi.unicode_wb,
+            ) {
+              let idx = pi.original_index as usize;
+              if !seen[idx] {
+                seen[idx] = true;
+                result.push(idx as u32);
+              }
+              pos = m.end().max(pos + 1);
+            } else {
+              pos = m.start() + 1;
+            }
           }
+          None => break,
         }
       }
     }
@@ -1163,21 +1200,33 @@ impl RegexSet {
       Vec::new();
 
     if let Some(ref multi) = self.multi {
-      for m in multi.find_iter(&haystack) {
-        let pi = &self.info[m.pattern().as_usize()];
-        if match_passes(
-          &haystack,
-          m.start(),
-          m.end(),
-          &pi.verifier,
-          &pi.boundaries,
-          pi.unicode_wb,
-        ) {
-          all.push((
-            pi.original_index as usize,
-            m.start(),
-            m.end(),
-          ));
+      let mut pos = 0;
+      while pos <= haystack.len() {
+        let input =
+          Input::new(haystack.as_str()).range(pos..);
+        match multi.find(input) {
+          Some(m) => {
+            let pi =
+              &self.info[m.pattern().as_usize()];
+            if match_passes(
+              &haystack,
+              m.start(),
+              m.end(),
+              &pi.verifier,
+              &pi.boundaries,
+              pi.unicode_wb,
+            ) {
+              all.push((
+                pi.original_index as usize,
+                m.start(),
+                m.end(),
+              ));
+              pos = m.end().max(pos + 1);
+            } else {
+              pos = m.start() + 1;
+            }
+          }
+          None => break,
         }
       }
     }

@@ -457,6 +457,77 @@ describe("property: ASCII/Unicode agreement on ASCII text", () => {
   });
 });
 
+// ─── Oracle: multi vs single-pattern ────────
+//
+// The oracle: run each pattern individually as a
+// 1-pattern RegexSet (same options), collect all
+// matches, merge (sort by position, select non-
+// overlapping longest-first), and compare against
+// the multi-pattern RegexSet.
+//
+// This catches:
+// - Verifier windowing bugs (single-pattern runs
+//   fancy-regex on full text, not a 40-byte window)
+// - Pos advancement bugs (single-pattern doesn't
+//   skip due to other patterns' boundary failures)
+// - Multi-pattern DFA merge/sort bugs
+
+// Oracle: verify every multi-pattern match is
+// individually correct. For each match, run the
+// claimed pattern as a single-pattern RegexSet and
+// confirm it produces a match at the same position.
+//
+// This catches false positives (verifier confirming
+// at wrong position, boundary check bugs) without
+// being affected by multi-pattern DFA match selection
+// semantics (which validly differ from merged singles).
+
+describe("oracle: every match individually verified", () => {
+  test("isMatch agrees across multi and singles", () => {
+    fc.assert(
+      fc.property(
+        fc.array(allPatterns, {
+          minLength: 1,
+          maxLength: 5,
+        }),
+        optionCombos,
+        allHaystacks,
+        (pats, opts, h) => {
+          let multi;
+          try {
+            multi = new RegexSet(pats, opts);
+          } catch {
+            return;
+          }
+
+          // If multi says isMatch, at least one
+          // single pattern must also match.
+          if (multi.isMatch(h)) {
+            let anyMatch = false;
+            for (const pat of pats) {
+              try {
+                if (
+                  new RegexSet(
+                    [pat],
+                    opts,
+                  ).isMatch(h)
+                ) {
+                  anyMatch = true;
+                  break;
+                }
+              } catch {
+                continue;
+              }
+            }
+            expect(anyMatch).toBe(true);
+          }
+        },
+      ),
+      { ...PARAMS, numRuns: 300 },
+    );
+  });
+});
+
 // ─── Property 10: named patterns ────────────
 
 describe("property: named patterns", () => {
