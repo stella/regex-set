@@ -804,6 +804,11 @@ pub struct RegexSet {
   fallbacks: Vec<FallbackPattern>,
   pattern_count: u32,
   has_boundaryless_pattern: bool,
+  /// True if patterns have different boundary
+  /// configs (e.g., \b vs \B). When true, a
+  /// boundary rejection for one pattern doesn't
+  /// imply all patterns fail at that position.
+  has_heterogeneous_boundaries: bool,
   needs_slow_path: bool,
 }
 
@@ -908,6 +913,22 @@ impl RegexSet {
 
     let has_boundaryless_pattern =
       info.iter().any(|pi| !pi.boundaries.has_any());
+    let has_heterogeneous_boundaries =
+      if info.len() < 2 {
+        false
+      } else {
+        let first = &info[0].boundaries;
+        info.iter().any(|pi| {
+          pi.boundaries.leading_b
+            != first.leading_b
+            || pi.boundaries.trailing_b
+              != first.trailing_b
+            || pi.boundaries.leading_big_b
+              != first.leading_big_b
+            || pi.boundaries.trailing_big_b
+              != first.trailing_big_b
+        })
+      };
     let needs_slow_path = info.iter().any(|pi| {
       !matches!(&pi.verifier, Verifier::None)
         || pi.boundaries.leading_big_b
@@ -920,6 +941,7 @@ impl RegexSet {
       fallbacks,
       pattern_count,
       has_boundaryless_pattern,
+      has_heterogeneous_boundaries,
       needs_slow_path,
     })
   }
@@ -1155,6 +1177,7 @@ impl RegexSet {
       Rejection::Verifier => true,
       Rejection::Boundary => {
         self.has_boundaryless_pattern
+          || self.has_heterogeneous_boundaries
       }
     }
   }

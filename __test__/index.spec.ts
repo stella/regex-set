@@ -437,6 +437,37 @@ describe("unicodeBoundaries", () => {
   });
 });
 
+// ─── Heterogeneous boundary shadowing ────────
+
+describe("heterogeneous boundaries", () => {
+  test("\\bfoo\\b + \\bfoo\\B: second matches in foobar", () => {
+    // Pattern 0: \bfoo\b (trailing word boundary)
+    // Pattern 1: \bfoo\B (trailing non-word-boundary)
+    // On "foobar": foo at 0..3, trailing is o|b
+    // (both word chars) → \b fails, \B passes.
+    // Pattern 1 should match.
+    const rs = new RegexSet(
+      ["\\bfoo\\b", "\\bfoo\\B"],
+      { unicodeBoundaries: true },
+    );
+    const matches = rs.findIter("foobar");
+    expect(matches).toHaveLength(1);
+    expect(matches[0]!.pattern).toBe(1);
+    expect(matches[0]!.text).toBe("foo");
+  });
+
+  test("\\bfoo\\b + \\bfoo\\B: first matches in foo bar", () => {
+    const rs = new RegexSet(
+      ["\\bfoo\\b", "\\bfoo\\B"],
+      { unicodeBoundaries: true },
+    );
+    const matches = rs.findIter("foo bar");
+    expect(matches).toHaveLength(1);
+    expect(matches[0]!.pattern).toBe(0);
+    expect(matches[0]!.text).toBe("foo");
+  });
+});
+
 // ─── Named patterns ─────────────────────────
 
 describe("named patterns", () => {
