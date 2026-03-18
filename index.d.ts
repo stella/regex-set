@@ -33,7 +33,7 @@ export interface Options {
   /** Only match whole words. Default: `false`. */
   wholeWords?: boolean
   /**
-   * Use Unicode word boundaries. Default: `false`.
+   * Use Unicode word boundaries. Default: `true`.
    *
    * When `true`, `\b` matches at Unicode word
    * boundaries (accented letters, CJK, etc. are

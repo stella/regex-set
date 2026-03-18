@@ -98,7 +98,7 @@ function regexpToRust(re) {
       }
       if (bs > 0 && bs % 2 === 1) {
         trailing = "\\" + last;
-        src = src.slice(0, -(bs > 1 ? 2 : 2));
+        src = src.slice(0, -2);
       }
     }
   }
