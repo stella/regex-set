@@ -165,27 +165,27 @@ Run locally:
 | Twain 16 MB (word boundary) | **15 ms** | 72 ms | 55 ms |
 | Twain 16 MB (suffix match) | **26 ms** | 121 ms | 100 ms |
 
-### Small documents (real Czech contracts, 4 patterns)
+### Small documents (4 patterns)
 
-| Document | @stll/regex-set | JS RegExp | Speedup |
+| Size | @stll/regex-set | JS RegExp | Speedup |
 | --- | --- | --- | --- |
-| Price quote (0.6 KB) | **3 μs** | 5 μs | 1.5x |
-| Travel contract (16 KB) | **56 μs** | 117 μs | 2.1x |
-| Service agreement (27 KB) | **92 μs** | 230 μs | 2.5x |
-| Share transfer (63 KB) | **249 μs** | 551 μs | 2.2x |
+| 0.6 KB | **3 μs** | 5 μs | 1.5x |
+| 16 KB | **56 μs** | 117 μs | 2.1x |
+| 27 KB | **92 μs** | 230 μs | 2.5x |
+| 63 KB | **249 μs** | 551 μs | 2.2x |
 
 ### Anonymization workload (20 patterns)
 
-| Document | @stll/regex-set | JS RegExp | Speedup |
+| Size | @stll/regex-set | JS RegExp | Speedup |
 | --- | --- | --- | --- |
-| Price quote (0.6 KB) | **3 μs** | 8 μs | 2.8x |
-| Travel contract (16 KB) | **63 μs** | 217 μs | 3.4x |
-| Service agreement (27 KB) | **114 μs** | 353 μs | 3.1x |
-| Share transfer (63 KB) | **279 μs** | 921 μs | 3.3x |
+| 0.6 KB | **3 μs** | 8 μs | 2.8x |
+| 16 KB | **63 μs** | 217 μs | 3.4x |
+| 27 KB | **114 μs** | 353 μs | 3.1x |
+| 63 KB | **279 μs** | 921 μs | 3.3x |
 
 ### Unicode boundaries (zero overhead)
 
-| Mode | 63 KB contract | vs JS |
+| Mode | 63 KB document | vs JS |
 | --- | --- | --- |
 | ASCII `\b` (default) | 279 μs | 3.3x faster |
 | Unicode `\b` | 322 μs | 2.9x faster |
