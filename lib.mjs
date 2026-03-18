@@ -152,12 +152,16 @@ class RegexSet {
   }
 
   isMatch(haystack) {
-    return this._inner.isMatch(haystack);
+    return this._inner._isMatchBuf(
+      Buffer.from(haystack),
+    );
   }
 
   findIter(haystack) {
     return unpack(
-      this._inner._findIterPacked(haystack),
+      this._inner._findIterPackedBuf(
+        Buffer.from(haystack),
+      ),
       haystack,
       this._hasNames ? this._names : null,
     );

@@ -866,13 +866,14 @@ impl RegexSet {
     self.pattern_count
   }
 
-  #[napi]
-  pub fn is_match(&self, haystack: String) -> bool {
+  // ── Internal methods (operate on &str) ──────
+
+  fn _is_match(&self, haystack: &str) -> bool {
     if let Some(ref multi) = self.multi {
-      for m in multi.find_iter(&haystack) {
+      for m in multi.find_iter(haystack) {
         let pi = &self.info[m.pattern().as_usize()];
         if match_passes(
-          &haystack,
+          haystack,
           m.start(),
           m.end(),
           &pi.verifier,
@@ -886,19 +887,17 @@ impl RegexSet {
     for fb in &self.fallbacks {
       let mut pos = 0;
       while pos <= haystack.len() {
-        match fb.regex.find_from_pos(&haystack, pos)
+        match fb.regex.find_from_pos(haystack, pos)
         {
           Ok(Some(m)) => {
-            if fb.boundaries.has_any() {
-              if fb.boundaries.check(
-                &haystack,
+            if !fb.boundaries.has_any()
+              || fb.boundaries.check(
+                haystack,
                 m.start(),
                 m.end(),
                 fb.unicode_wb,
-              ) {
-                return true;
-              }
-            } else {
+              )
+            {
               return true;
             }
             pos = m.end().max(pos + 1);
@@ -910,19 +909,18 @@ impl RegexSet {
     false
   }
 
-  #[napi(js_name = "_findIterPacked")]
-  pub fn find_iter_packed(
+  fn _find_iter_packed(
     &self,
-    haystack: String,
+    haystack: &str,
   ) -> Uint32Array {
     let mut all: Vec<(u32, usize, usize)> =
       Vec::new();
 
     if let Some(ref multi) = self.multi {
-      for m in multi.find_iter(&haystack) {
+      for m in multi.find_iter(haystack) {
         let pi = &self.info[m.pattern().as_usize()];
         if match_passes(
-          &haystack,
+          haystack,
           m.start(),
           m.end(),
           &pi.verifier,
@@ -941,12 +939,12 @@ impl RegexSet {
     for fb in &self.fallbacks {
       let mut pos = 0;
       while pos <= haystack.len() {
-        match fb.regex.find_from_pos(&haystack, pos)
+        match fb.regex.find_from_pos(haystack, pos)
         {
           Ok(Some(m)) => {
             let passes = !fb.boundaries.has_any()
               || fb.boundaries.check(
-                &haystack,
+                haystack,
                 m.start(),
                 m.end(),
                 fb.unicode_wb,
@@ -1025,6 +1023,50 @@ impl RegexSet {
       packed.push(utf16_end);
     }
     Uint32Array::new(packed)
+  }
+
+  // ── NAPI entry points ─────────────────────
+
+  #[napi]
+  pub fn is_match(&self, haystack: String) -> bool {
+    self._is_match(&haystack)
+  }
+
+  /// Zero-copy variant: accepts Buffer (no string
+  /// copy across FFI boundary).
+  #[napi(js_name = "_isMatchBuf")]
+  pub fn is_match_buf(
+    &self,
+    haystack: Buffer,
+  ) -> bool {
+    let text = unsafe {
+      std::str::from_utf8_unchecked(
+        haystack.as_ref(),
+      )
+    };
+    self._is_match(text)
+  }
+
+  #[napi(js_name = "_findIterPacked")]
+  pub fn find_iter_packed(
+    &self,
+    haystack: String,
+  ) -> Uint32Array {
+    self._find_iter_packed(&haystack)
+  }
+
+  /// Zero-copy variant: accepts Buffer.
+  #[napi(js_name = "_findIterPackedBuf")]
+  pub fn find_iter_packed_buf(
+    &self,
+    haystack: Buffer,
+  ) -> Uint32Array {
+    let text = unsafe {
+      std::str::from_utf8_unchecked(
+        haystack.as_ref(),
+      )
+    };
+    self._find_iter_packed(text)
   }
 
   #[napi]
