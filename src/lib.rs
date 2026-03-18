@@ -785,10 +785,13 @@ impl RegexSet {
         strip_edge_boundaries(p);
 
       // wholeWords in Unicode mode: force both
-      // boundaries regardless of pattern content.
+      // word boundaries. Clear any \B flags to
+      // avoid contradictory boundary requirements.
       if whole_words && unicode_wb {
         eb.leading_b = true;
         eb.trailing_b = true;
+        eb.leading_big_b = false;
+        eb.trailing_big_b = false;
       }
 
       let (core, verifier) =
@@ -1031,13 +1034,16 @@ impl RegexSet {
   pub fn is_match_buf(
     &self,
     haystack: Buffer,
-  ) -> bool {
-    let text = unsafe {
-      std::str::from_utf8_unchecked(
-        haystack.as_ref(),
-      )
-    };
-    self._is_match(text)
+  ) -> Result<bool> {
+    let text = std::str::from_utf8(
+      haystack.as_ref(),
+    )
+    .map_err(|e| {
+      Error::from_reason(format!(
+        "Invalid UTF-8: {e}"
+      ))
+    })?;
+    Ok(self._is_match(text))
   }
 
   #[napi(js_name = "_findIterPacked")]
@@ -1053,13 +1059,16 @@ impl RegexSet {
   pub fn find_iter_packed_buf(
     &self,
     haystack: Buffer,
-  ) -> Uint32Array {
-    let text = unsafe {
-      std::str::from_utf8_unchecked(
-        haystack.as_ref(),
-      )
-    };
-    self._find_iter_packed(text)
+  ) -> Result<Uint32Array> {
+    let text = std::str::from_utf8(
+      haystack.as_ref(),
+    )
+    .map_err(|e| {
+      Error::from_reason(format!(
+        "Invalid UTF-8: {e}"
+      ))
+    })?;
+    Ok(self._find_iter_packed(text))
   }
 
   #[napi]
