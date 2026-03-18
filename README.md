@@ -88,22 +88,29 @@ const rs = new RegexSet(patterns, {
   // Only match whole words (default: false)
   wholeWords: true,
 
-  // Unicode word boundaries (default: false)
-  // When true, \b treats accented letters, CJK,
-  // etc. as word characters. Zero perf overhead.
+  // Unicode word boundaries (default: true)
+  // Treats accented letters, CJK, etc. as word
+  // characters. Auto UAX#29 for Thai/CJK.
+  // Set to false for JS RegExp ASCII parity.
   unicodeBoundaries: true,
 });
 ```
 
 ### Unicode word boundaries
 
-By default, `\b` uses ASCII semantics (matching
-JS `RegExp`). Set `unicodeBoundaries: true` for
-correct multilingual word boundaries:
+By default, `\b` uses Unicode semantics — correct
+for all scripts. Set `unicodeBoundaries: false` for
+JS `RegExp` ASCII parity:
 
 ```typescript
-// ASCII \b: "p" matches as standalone word (WRONG)
+// Default (Unicode \b): "čáp" is one word (CORRECT)
 new RegexSet(["\\bp\\b"]).findIter("čáp");
+// → [] (no match — p is inside a word)
+
+// ASCII \b: "p" matches as standalone (WRONG)
+new RegexSet(["\\bp\\b"], {
+  unicodeBoundaries: false,
+}).findIter("čáp");
 // → [{ text: "p" }]
 
 // Unicode \b: "čáp" is one word (CORRECT)
