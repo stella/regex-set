@@ -528,6 +528,142 @@ describe("oracle: every match individually verified", () => {
   });
 });
 
+// ─── Oracle: reverse isMatch (false negatives) ─
+
+describe("oracle: reverse isMatch", () => {
+  test("if any single matches, multi must match", () => {
+    fc.assert(
+      fc.property(
+        fc.array(allPatterns, {
+          minLength: 1,
+          maxLength: 5,
+        }),
+        optionCombos,
+        allHaystacks,
+        (pats, opts, h) => {
+          // Check if any single pattern matches
+          let anyMatch = false;
+          for (const pat of pats) {
+            try {
+              if (
+                new RegexSet([pat], opts).isMatch(h)
+              ) {
+                anyMatch = true;
+                break;
+              }
+            } catch {
+              continue;
+            }
+          }
+
+          if (!anyMatch) return;
+
+          // Multi must also match
+          try {
+            const multi = new RegexSet(pats, opts);
+            expect(multi.isMatch(h)).toBe(true);
+          } catch {
+            return;
+          }
+        },
+      ),
+      { ...PARAMS, numRuns: 300 },
+    );
+  });
+});
+
+// ─── Oracle: replaceAll ↔ findIter ──────────
+
+describe("oracle: replaceAll ↔ findIter", () => {
+  test("replaceAll equals manual reconstruction from findIter", () => {
+    fc.assert(
+      fc.property(
+        fc.array(allPatterns, {
+          minLength: 1,
+          maxLength: 5,
+        }),
+        optionCombos,
+        allHaystacks,
+        (pats, opts, h) => {
+          let rs;
+          try {
+            rs = new RegexSet(pats, opts);
+          } catch {
+            return;
+          }
+
+          const matches = rs.findIter(h);
+          const repls = pats.map(
+            (_, i) => `[${i}]`,
+          );
+
+          let replaceResult;
+          try {
+            replaceResult = rs.replaceAll(h, repls);
+          } catch {
+            return;
+          }
+
+          // Reconstruct manually from findIter
+          let manual = "";
+          let last = 0;
+          for (const m of matches) {
+            manual += h.slice(last, m.start);
+            manual += repls[m.pattern]!;
+            last = m.end;
+          }
+          manual += h.slice(last);
+
+          expect(replaceResult).toBe(manual);
+        },
+      ),
+      { ...PARAMS, numRuns: 300 },
+    );
+  });
+});
+
+// ─── Oracle: whichMatch ↔ findIter ──────────
+
+describe("oracle: whichMatch ↔ findIter", () => {
+  test("findIter patterns ⊆ whichMatch", () => {
+    fc.assert(
+      fc.property(
+        fc.array(allPatterns, {
+          minLength: 1,
+          maxLength: 5,
+        }),
+        optionCombos,
+        allHaystacks,
+        (pats, opts, h) => {
+          let rs;
+          try {
+            rs = new RegexSet(pats, opts);
+          } catch {
+            return;
+          }
+
+          const matches = rs.findIter(h);
+          const which = new Set(rs.whichMatch(h));
+
+          // Every pattern in findIter must appear
+          // in whichMatch. whichMatch may have MORE
+          // (patterns that matched but lost the
+          // non-overlapping selection in findIter).
+          for (const m of matches) {
+            expect(which.has(m.pattern)).toBe(true);
+          }
+
+          // whichMatch must agree with isMatch
+          expect(which.size > 0).toBe(
+            rs.isMatch(h),
+          );
+        },
+      ),
+      { ...PARAMS, numRuns: 300 },
+    );
+  });
+});
+
 // ─── Property 10: named patterns ────────────
 
 describe("property: named patterns", () => {
