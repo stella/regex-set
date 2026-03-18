@@ -111,12 +111,12 @@ function regexpToRust(re) {
  */
 function scopeInlineFlags(src) {
   return src.replace(
-    /\(\?([ims]+)\)/g,
-    (_, flags) => {
+    /\(\?([ims]+)([:)])/g,
+    (_, flags, close) => {
       if (flags.includes("i")) {
-        return `(?${flags}-u)`;
+        return `(?${flags}-u${close}`;
       }
-      return `(?${flags})`;
+      return `(?${flags}${close}`;
     },
   );
 }
@@ -151,7 +151,9 @@ function normalizeEntry(p, i) {
     const inner =
       p.pattern instanceof RegExp
         ? { pattern: regexpToRust(p.pattern) }
-        : { pattern: p.pattern };
+        : {
+            pattern: scopeInlineFlags(p.pattern),
+          };
     if (
       p.name !== undefined &&
       typeof p.name !== "string"

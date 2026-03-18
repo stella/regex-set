@@ -131,15 +131,19 @@ function regexpToRust(re) {
  * Without -u, Rust (?i) enables Unicode case folding
  * which explodes DFA state count.
  */
+/**
+ * Convert inline (?i), (?im), (?ims), and scoped
+ * (?i:...) flags to use -u (ASCII case folding).
+ * Handles both bare (?i) and scoped (?i:content).
+ */
 function scopeInlineFlags(src) {
-  // Match (?[ims]+) at start or anywhere in pattern
   return src.replace(
-    /\(\?([ims]+)\)/g,
-    (_, flags) => {
+    /\(\?([ims]+)([:)])/g,
+    (_, flags, close) => {
       if (flags.includes("i")) {
-        return `(?${flags}-u)`;
+        return `(?${flags}-u${close}`;
       }
-      return `(?${flags})`;
+      return `(?${flags}${close}`;
     },
   );
 }
@@ -174,7 +178,9 @@ function normalizeEntry(p, i) {
     const inner =
       p.pattern instanceof RegExp
         ? { pattern: regexpToRust(p.pattern) }
-        : { pattern: p.pattern };
+        : {
+            pattern: scopeInlineFlags(p.pattern),
+          };
     if (
       p.name !== undefined &&
       typeof p.name !== "string"
