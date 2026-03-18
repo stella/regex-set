@@ -721,29 +721,52 @@ pub struct RegexSet {
   info: Vec<PatternInfo>,
   fallbacks: Vec<FallbackPattern>,
   pattern_count: u32,
+  /// True if any multi-DFA pattern has no boundary
+  /// requirement. When false, boundary rejections
+  /// are position-symmetric and find_shadowed can
+  /// be skipped entirely for boundary failures.
+  has_boundaryless_pattern: bool,
+  /// True when the fast find_iter path can't be
+  /// used: patterns have verifiers (need shadowed
+  /// check) or \B boundaries (need sub-match retry
+  /// since \B passes inside greedy matches).
+  needs_slow_path: bool,
 }
 
-/// Check all conditions for a match: verifier
-/// (lookaround) AND edge word boundaries.
-fn match_passes(
+/// Match rejection reason — determines whether
+/// find_shadowed is needed.
+enum Rejection {
+  /// Boundary failed (position-symmetric: all
+  /// patterns with same boundaries also fail).
+  Boundary,
+  /// Verifier failed (pattern-specific: other
+  /// patterns may pass at this position).
+  Verifier,
+}
+
+/// Check all conditions for a match.
+/// Returns Ok(()) on pass, Err(Rejection) on fail.
+fn check_match(
   haystack: &str,
   start: usize,
   end: usize,
   verifier: &Verifier,
   boundaries: &EdgeBoundaries,
   unicode_wb: bool,
-) -> bool {
-  if !verifier.check(haystack, start, end) {
-    return false;
-  }
+) -> std::result::Result<(), Rejection> {
+  // Check boundaries first (cheap, shared).
   if boundaries.has_any()
     && !boundaries.check(
       haystack, start, end, unicode_wb,
     )
   {
-    return false;
+    return Err(Rejection::Boundary);
   }
-  true
+  // Check verifier (pattern-specific).
+  if !verifier.check(haystack, start, end) {
+    return Err(Rejection::Verifier);
+  }
+  Ok(())
 }
 
 #[napi]
@@ -860,11 +883,21 @@ impl RegexSet {
       )?)
     };
 
+    let has_boundaryless_pattern =
+      info.iter().any(|pi| !pi.boundaries.has_any());
+    let needs_slow_path = info.iter().any(|pi| {
+      !matches!(&pi.verifier, Verifier::None)
+        || pi.boundaries.leading_big_b
+        || pi.boundaries.trailing_big_b
+    });
+
     Ok(Self {
       multi,
       info,
       fallbacks,
       pattern_count,
+      has_boundaryless_pattern,
+      needs_slow_path,
     })
   }
 
@@ -893,7 +926,7 @@ impl RegexSet {
         Input::new(haystack).range(at..);
       if let Some(m) = pi.individual.find(input) {
         if m.start() == at
-          && match_passes(
+          && check_match(
             haystack,
             m.start(),
             m.end(),
@@ -901,6 +934,7 @@ impl RegexSet {
             &pi.boundaries,
             pi.unicode_wb,
           )
+          .is_ok()
         {
           return Some((
             pi.original_index,
@@ -913,41 +947,84 @@ impl RegexSet {
     None
   }
 
+  /// Should we check for shadowed matches after
+  /// a rejection? Only for verifier rejections,
+  /// or boundary rejections when some pattern
+  /// has no boundaries (could pass where others
+  /// fail).
+  fn needs_shadowed_check(
+    &self,
+    rejection: &Rejection,
+  ) -> bool {
+    match rejection {
+      Rejection::Verifier => true,
+      Rejection::Boundary => {
+        self.has_boundaryless_pattern
+      }
+    }
+  }
+
   fn _is_match(&self, haystack: &str) -> bool {
     if let Some(ref multi) = self.multi {
-      let mut pos = 0;
-      while pos <= haystack.len() {
-        let input =
-          Input::new(haystack).range(pos..);
-        match multi.find(input) {
-          Some(m) => {
-            let dfa_idx = m.pattern().as_usize();
-            let pi = &self.info[dfa_idx];
-            if match_passes(
+      if !self.needs_slow_path {
+        // Fast path: no verifiers, only boundary
+        // checks. find_iter is a single-pass scan.
+        for m in multi.find_iter(haystack) {
+          let pi =
+            &self.info[m.pattern().as_usize()];
+          if !pi.boundaries.has_any()
+            || pi.boundaries.check(
               haystack,
               m.start(),
               m.end(),
-              &pi.verifier,
-              &pi.boundaries,
               pi.unicode_wb,
-            ) {
-              return true;
-            }
-            // DFA winner rejected — check other
-            // patterns at this position.
-            if self
-              .find_shadowed(
+            )
+          {
+            return true;
+          }
+        }
+      } else {
+        // Slow path: verifiers present, need
+        // manual loop with shadowed check.
+        let mut pos = 0;
+        while pos <= haystack.len() {
+          let input =
+            Input::new(haystack).range(pos..);
+          match multi.find(input) {
+            Some(m) => {
+              let dfa_idx =
+                m.pattern().as_usize();
+              let pi = &self.info[dfa_idx];
+              match check_match(
                 haystack,
                 m.start(),
-                dfa_idx,
-              )
-              .is_some()
-            {
-              return true;
+                m.end(),
+                &pi.verifier,
+                &pi.boundaries,
+                pi.unicode_wb,
+              ) {
+                Ok(()) => return true,
+                Err(ref rej)
+                  if self
+                    .needs_shadowed_check(rej) =>
+                {
+                  if self
+                    .find_shadowed(
+                      haystack,
+                      m.start(),
+                      dfa_idx,
+                    )
+                    .is_some()
+                  {
+                    return true;
+                  }
+                }
+                Err(_) => {}
+              }
+              pos = m.start() + 1;
             }
-            pos = m.start() + 1;
+            None => break,
           }
-          None => break,
         }
       }
     }
@@ -986,42 +1063,77 @@ impl RegexSet {
       Vec::new();
 
     if let Some(ref multi) = self.multi {
-      let mut pos = 0;
-      while pos <= haystack.len() {
-        let input =
-          Input::new(haystack).range(pos..);
-        match multi.find(input) {
-          Some(m) => {
-            let dfa_idx = m.pattern().as_usize();
-            let pi = &self.info[dfa_idx];
-            if match_passes(
+      if !self.needs_slow_path {
+        // Fast path: single-pass scan.
+        for m in multi.find_iter(haystack) {
+          let pi =
+            &self.info[m.pattern().as_usize()];
+          if !pi.boundaries.has_any()
+            || pi.boundaries.check(
               haystack,
               m.start(),
               m.end(),
-              &pi.verifier,
-              &pi.boundaries,
               pi.unicode_wb,
-            ) {
-              all.push((
-                pi.original_index,
-                m.start(),
-                m.end(),
-              ));
-              pos = m.end().max(pos + 1);
-            } else if let Some(alt) = self
-              .find_shadowed(
+            )
+          {
+            all.push((
+              pi.original_index,
+              m.start(),
+              m.end(),
+            ));
+          }
+        }
+      } else {
+        // Slow path: manual loop with shadowed.
+        let mut pos = 0;
+        while pos <= haystack.len() {
+          let input =
+            Input::new(haystack).range(pos..);
+          match multi.find(input) {
+            Some(m) => {
+              let dfa_idx =
+                m.pattern().as_usize();
+              let pi = &self.info[dfa_idx];
+              match check_match(
                 haystack,
                 m.start(),
-                dfa_idx,
-              )
-            {
-              all.push(alt);
-              pos = alt.2.max(pos + 1);
-            } else {
-              pos = m.start() + 1;
+                m.end(),
+                &pi.verifier,
+                &pi.boundaries,
+                pi.unicode_wb,
+              ) {
+                Ok(()) => {
+                  all.push((
+                    pi.original_index,
+                    m.start(),
+                    m.end(),
+                  ));
+                  pos = m.end().max(pos + 1);
+                }
+                Err(ref rej)
+                  if self
+                    .needs_shadowed_check(rej) =>
+                {
+                  if let Some(alt) = self
+                    .find_shadowed(
+                      haystack,
+                      m.start(),
+                      dfa_idx,
+                    )
+                  {
+                    all.push(alt);
+                    pos = alt.2.max(pos + 1);
+                  } else {
+                    pos = m.start() + 1;
+                  }
+                }
+                Err(_) => {
+                  pos = m.start() + 1;
+                }
+              }
             }
+            None => break,
           }
-          None => break,
         }
       }
     }
@@ -1179,46 +1291,82 @@ impl RegexSet {
     let mut result = Vec::new();
 
     if let Some(ref multi) = self.multi {
-      let mut pos = 0;
-      while pos <= haystack.len() {
-        let input =
-          Input::new(haystack.as_str()).range(pos..);
-        match multi.find(input) {
-          Some(m) => {
-            let dfa_idx = m.pattern().as_usize();
-            let pi = &self.info[dfa_idx];
-            if match_passes(
+      if !self.needs_slow_path {
+        for m in multi.find_iter(&haystack) {
+          let pi =
+            &self.info[m.pattern().as_usize()];
+          if !pi.boundaries.has_any()
+            || pi.boundaries.check(
               &haystack,
               m.start(),
               m.end(),
-              &pi.verifier,
-              &pi.boundaries,
               pi.unicode_wb,
-            ) {
-              let idx = pi.original_index as usize;
-              if !seen[idx] {
-                seen[idx] = true;
-                result.push(idx as u32);
-              }
-              pos = m.end().max(pos + 1);
-            } else if let Some(alt) = self
-              .find_shadowed(
-                &haystack,
-                m.start(),
-                dfa_idx,
-              )
-            {
-              let idx = alt.0 as usize;
-              if !seen[idx] {
-                seen[idx] = true;
-                result.push(idx as u32);
-              }
-              pos = alt.2.max(pos + 1);
-            } else {
-              pos = m.start() + 1;
+            )
+          {
+            let idx = pi.original_index as usize;
+            if !seen[idx] {
+              seen[idx] = true;
+              result.push(idx as u32);
             }
           }
-          None => break,
+        }
+      } else {
+        let mut pos = 0;
+        while pos <= haystack.len() {
+          let input = Input::new(
+            haystack.as_str(),
+          )
+          .range(pos..);
+          match multi.find(input) {
+            Some(m) => {
+              let dfa_idx =
+                m.pattern().as_usize();
+              let pi = &self.info[dfa_idx];
+              match check_match(
+                &haystack,
+                m.start(),
+                m.end(),
+                &pi.verifier,
+                &pi.boundaries,
+                pi.unicode_wb,
+              ) {
+                Ok(()) => {
+                  let idx =
+                    pi.original_index as usize;
+                  if !seen[idx] {
+                    seen[idx] = true;
+                    result.push(idx as u32);
+                  }
+                  pos = m.end().max(pos + 1);
+                }
+                Err(ref rej)
+                  if self
+                    .needs_shadowed_check(rej) =>
+                {
+                  if let Some(alt) = self
+                    .find_shadowed(
+                      &haystack,
+                      m.start(),
+                      dfa_idx,
+                    )
+                  {
+                    let idx = alt.0 as usize;
+                    if !seen[idx] {
+                      seen[idx] = true;
+                      result.push(idx as u32);
+                    }
+                    pos = alt.2.max(pos + 1);
+                  } else {
+                    pos = m.start() + 1;
+                  }
+                }
+                Err(_) => {
+                  pos = m.start() + 1;
+                }
+              }
+            }
+            None => break,
+          }
         }
       }
     }
@@ -1277,46 +1425,81 @@ impl RegexSet {
       Vec::new();
 
     if let Some(ref multi) = self.multi {
-      let mut pos = 0;
-      while pos <= haystack.len() {
-        let input =
-          Input::new(haystack.as_str()).range(pos..);
-        match multi.find(input) {
-          Some(m) => {
-            let dfa_idx = m.pattern().as_usize();
-            let pi = &self.info[dfa_idx];
-            if match_passes(
+      if !self.needs_slow_path {
+        for m in multi.find_iter(&haystack) {
+          let pi =
+            &self.info[m.pattern().as_usize()];
+          if !pi.boundaries.has_any()
+            || pi.boundaries.check(
               &haystack,
               m.start(),
               m.end(),
-              &pi.verifier,
-              &pi.boundaries,
               pi.unicode_wb,
-            ) {
-              all.push((
-                pi.original_index as usize,
-                m.start(),
-                m.end(),
-              ));
-              pos = m.end().max(pos + 1);
-            } else if let Some(alt) = self
-              .find_shadowed(
+            )
+          {
+            all.push((
+              pi.original_index as usize,
+              m.start(),
+              m.end(),
+            ));
+          }
+        }
+      } else {
+        let mut pos = 0;
+        while pos <= haystack.len() {
+          let input = Input::new(
+            haystack.as_str(),
+          )
+          .range(pos..);
+          match multi.find(input) {
+            Some(m) => {
+              let dfa_idx =
+                m.pattern().as_usize();
+              let pi = &self.info[dfa_idx];
+              match check_match(
                 &haystack,
                 m.start(),
-                dfa_idx,
-              )
-            {
-              all.push((
-                alt.0 as usize,
-                alt.1,
-                alt.2,
-              ));
-              pos = alt.2.max(pos + 1);
-            } else {
-              pos = m.start() + 1;
+                m.end(),
+                &pi.verifier,
+                &pi.boundaries,
+                pi.unicode_wb,
+              ) {
+                Ok(()) => {
+                  all.push((
+                    pi.original_index as usize,
+                    m.start(),
+                    m.end(),
+                  ));
+                  pos = m.end().max(pos + 1);
+                }
+                Err(ref rej)
+                  if self
+                    .needs_shadowed_check(rej) =>
+                {
+                  if let Some(alt) = self
+                    .find_shadowed(
+                      &haystack,
+                      m.start(),
+                      dfa_idx,
+                    )
+                  {
+                    all.push((
+                      alt.0 as usize,
+                      alt.1,
+                      alt.2,
+                    ));
+                    pos = alt.2.max(pos + 1);
+                  } else {
+                    pos = m.start() + 1;
+                  }
+                }
+                Err(_) => {
+                  pos = m.start() + 1;
+                }
+              }
             }
+            None => break,
           }
-          None => break,
         }
       }
     }
