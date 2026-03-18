@@ -546,9 +546,12 @@ impl Verifier {
         let window =
           &haystack[ctx_start..ctx_end];
         let offset = start - ctx_start;
+        // Must match exactly at offset, not at
+        // a later position in the window.
         re.find_from_pos(window, offset)
           .ok()
           .flatten()
+          .filter(|m| m.start() == offset)
           .is_some()
       }
     }
@@ -886,17 +889,19 @@ impl RegexSet {
         match fb.regex.find_from_pos(haystack, pos)
         {
           Ok(Some(m)) => {
-            if !fb.boundaries.has_any()
+            let passes = !fb.boundaries.has_any()
               || fb.boundaries.check(
                 haystack,
                 m.start(),
                 m.end(),
                 fb.unicode_wb,
-              )
-            {
+              );
+            if passes {
               return true;
             }
-            pos = m.end().max(pos + 1);
+            // Advance by 1 on boundary failure to
+            // not skip overlapping candidates.
+            pos = m.start() + 1;
           }
           _ => break,
         }
@@ -951,8 +956,10 @@ impl RegexSet {
                 m.start(),
                 m.end(),
               ));
+              pos = m.end().max(pos + 1);
+            } else {
+              pos = m.start() + 1;
             }
-            pos = m.end().max(pos + 1);
           }
           _ => break,
         }
@@ -1125,7 +1132,7 @@ impl RegexSet {
                 result.push(idx as u32);
                 break;
               }
-              pos = m.end().max(pos + 1);
+              pos = m.start() + 1;
             }
             _ => break,
           }
@@ -1194,8 +1201,10 @@ impl RegexSet {
                 m.start(),
                 m.end(),
               ));
+              pos = m.end().max(pos + 1);
+            } else {
+              pos = m.start() + 1;
             }
-            pos = m.end().max(pos + 1);
           }
           _ => break,
         }
