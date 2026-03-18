@@ -256,8 +256,7 @@ const prefixes = [
 ];
 
 const cores = [
-  ...["[a-z]+", "\\d+", "\\w+", "[A-Z][a-z]+"],
-  // also use a random safe literal
+  "[a-z]+", "\\d+", "\\w+", "[A-Z][a-z]+",
 ];
 
 const suffixes = [
