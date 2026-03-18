@@ -6,6 +6,20 @@ export type Options = {
    * @default false
    */
   wholeWords?: boolean;
+  /**
+   * Use Unicode word boundaries. When `true`,
+   * `\b` treats accented letters, CJK, etc. as
+   * word characters (correct for non-English text).
+   * When `false` (default), `\b` uses ASCII
+   * semantics matching JS `RegExp` behavior.
+   *
+   * Zero performance overhead in either mode —
+   * boundaries are verified inline per match.
+   * Automatically uses UAX#29 segmentation for
+   * Thai/CJK/Lao/Khmer/Myanmar text.
+   * @default true
+   */
+  unicodeBoundaries?: boolean;
 };
 
 /** A named pattern entry. */

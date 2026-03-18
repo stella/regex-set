@@ -64,15 +64,72 @@ rs.replaceAll(
 // "Born [DATE], phone [PHONE]"
 ```
 
+### Named patterns
+
+```typescript
+const rs = new RegexSet([
+  { pattern: /\d{2}\.\d{2}\.\d{4}/, name: "date" },
+  { pattern: /\+?\d{9,12}/, name: "phone" },
+  "[A-Z]{2}\\d{6}", // unnamed
+]);
+
+rs.findIter("Born 15.03.1990, ID CZ123456");
+// [
+//   { pattern: 0, ..., name: "date" },
+//   { pattern: 2, ..., text: "CZ123456" },
+//   ← no `name` property on unnamed patterns
+// ]
+```
+
 ### Options
 
 ```typescript
 const rs = new RegexSet(patterns, {
   // Only match whole words (default: false)
-  // Wraps each pattern with \b...\b
   wholeWords: true,
+
+  // Unicode word boundaries (default: true)
+  // Treats accented letters, CJK, etc. as word
+  // characters. Auto UAX#29 for Thai/CJK.
+  // Set to false for JS RegExp ASCII parity.
+  unicodeBoundaries: true,
 });
 ```
+
+### Unicode word boundaries
+
+By default, `\b` uses Unicode semantics — correct
+for all scripts. Set `unicodeBoundaries: false` for
+JS `RegExp` ASCII parity:
+
+```typescript
+// Default (Unicode \b): "čáp" is one word (CORRECT)
+new RegexSet(["\\bp\\b"]).findIter("čáp");
+// → [] (no match — p is inside a word)
+
+// ASCII \b: "p" matches as standalone (WRONG)
+new RegexSet(["\\bp\\b"], {
+  unicodeBoundaries: false,
+}).findIter("čáp");
+// → [{ text: "p" }]
+
+// Unicode \b: "čáp" is one word (CORRECT)
+new RegexSet(["\\bp\\b"], {
+  unicodeBoundaries: true,
+}).findIter("čáp");
+// → [] (no match — p is inside a word)
+
+new RegexSet(["\\bčáp\\b"], {
+  unicodeBoundaries: true,
+}).findIter("malý čáp letí");
+// → [{ text: "čáp" }]
+```
+
+Implementation: edge `\b` is stripped from patterns
+and verified inline per match (two char lookups).
+The DFA never sees `\b`, so there is zero overhead
+regardless of mode. Unicode mode is actually
+slightly faster because the DFA is simpler.
 
 ### Lookaround
 
@@ -115,12 +172,31 @@ Run locally:
 | Twain 16 MB (word boundary) | **15 ms** | 72 ms | 55 ms |
 | Twain 16 MB (suffix match) | **26 ms** | 121 ms | 100 ms |
 
-### Small documents (real contracts)
+### Small documents (4 patterns)
 
-| Document | @stll/regex-set | node-re2 | JS RegExp |
+| Size | @stll/regex-set | JS RegExp | Speedup |
 | --- | --- | --- | --- |
-| Czech purchase agreement (1 KB) | **3.7 μs** | 22 μs | 9 μs |
-| German lease agreement (1 KB) | **2.8 μs** | 12 μs | 9 μs |
+| 0.6 KB | **4 μs** | 5 μs | 1.3x |
+| 16 KB | **63 μs** | 115 μs | 1.8x |
+| 27 KB | **107 μs** | 218 μs | 2.0x |
+| 63 KB | **300 μs** | 550 μs | 1.8x |
+
+### Anonymization workload (20 patterns)
+
+| Size | @stll/regex-set | JS RegExp | Speedup |
+| --- | --- | --- | --- |
+| 0.6 KB | **3 μs** | 7 μs | 2.4x |
+| 16 KB | **97 μs** | 189 μs | 1.9x |
+| 27 KB | **149 μs** | 321 μs | 2.2x |
+| 63 KB | **387 μs** | 934 μs | 2.4x |
+
+### Unicode boundaries (zero overhead)
+
+| Mode | 20 patterns, 27 KB | vs JS |
+| --- | --- | --- |
+| ASCII `\b` (default) | 149 μs | 2.2x faster |
+| Unicode `\b` | 119 μs | 3.1x faster |
+| JS RegExp (20 passes) | 363 μs | baseline |
 
 ### Backtracking resistance
 
@@ -158,8 +234,14 @@ no regex engine can match).
 ### Types
 
 ```typescript
+type PatternEntry =
+  | string
+  | RegExp
+  | { pattern: string | RegExp; name?: string };
+
 type Options = {
   wholeWords?: boolean;
+  unicodeBoundaries?: boolean;
 };
 
 type Match = {
@@ -167,6 +249,7 @@ type Match = {
   start: number; // UTF-16 code unit offset
   end: number; // exclusive
   text: string; // matched substring
+  name?: string; // pattern name (if provided)
 };
 ```
 
@@ -215,7 +298,7 @@ bun install
 # Build native module (requires Rust toolchain)
 bun run build
 
-# Run tests (22 unit + 9 property)
+# Run tests (47 unit + 17 property)
 bun test
 bun run test:props
 

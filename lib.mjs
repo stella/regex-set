@@ -62,27 +62,28 @@ function asciiBoundaries(src) {
 }
 
 /**
+ * Convert a RegExp to Rust regex syntax string.
+ */
+function regexpToRust(re) {
+  let prefix = "";
+  if (re.flags.includes("i")) prefix += "i";
+  if (re.flags.includes("m")) prefix += "m";
+  if (re.flags.includes("s")) prefix += "s";
+  return prefix
+    ? `(?${prefix})${re.source}`
+    : re.source;
+}
+
+/**
  * Normalize a pattern entry to { pattern, name }.
- * Applies asciiBoundaries to convert \b/\B to
- * ASCII-only equivalents matching JS semantics.
  */
 function normalizeEntry(p, i) {
   if (typeof p === "string") {
-    return {
-      pattern: asciiBoundaries(p),
-      name: undefined,
-    };
+    return { pattern: p, name: undefined };
   }
   if (p instanceof RegExp) {
-    let prefix = "";
-    if (p.flags.includes("i")) prefix += "i";
-    if (p.flags.includes("m")) prefix += "m";
-    if (p.flags.includes("s")) prefix += "s";
-    const src = asciiBoundaries(p.source);
     return {
-      pattern: prefix
-        ? `(?${prefix})${src}`
-        : src,
+      pattern: regexpToRust(p),
       name: undefined,
     };
   }
@@ -102,10 +103,8 @@ function normalizeEntry(p, i) {
     }
     const inner =
       p.pattern instanceof RegExp
-        ? normalizeEntry(p.pattern, i)
-        : {
-            pattern: asciiBoundaries(p.pattern),
-          };
+        ? { pattern: regexpToRust(p.pattern) }
+        : { pattern: p.pattern };
     if (
       p.name !== undefined &&
       typeof p.name !== "string"
@@ -133,8 +132,17 @@ class RegexSet {
     this._hasNames = entries.some(
       (e) => e.name !== undefined,
     );
+
+    const unicode =
+      options?.unicodeBoundaries ?? true;
+    const processed = unicode
+      ? entries.map((e) => e.pattern)
+      : entries.map((e) =>
+          asciiBoundaries(e.pattern),
+        );
+
     this._inner = new NativeRegexSet(
-      entries.map((e) => e.pattern),
+      processed,
       options,
     );
   }
@@ -144,12 +152,16 @@ class RegexSet {
   }
 
   isMatch(haystack) {
-    return this._inner.isMatch(haystack);
+    return this._inner._isMatchBuf(
+      Buffer.from(haystack),
+    );
   }
 
   findIter(haystack) {
     return unpack(
-      this._inner._findIterPacked(haystack),
+      this._inner._findIterPackedBuf(
+        Buffer.from(haystack),
+      ),
       haystack,
       this._hasNames ? this._names : null,
     );

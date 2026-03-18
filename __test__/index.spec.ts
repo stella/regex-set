@@ -295,6 +295,23 @@ describe("ascii word boundary", () => {
     expect(matches[0]!.text).toBe("\\b");
   });
 
+  test("multiple escaped backslashes before b", () => {
+    // \\\\b = two literal backslashes + letter b
+    // Must NOT be stripped as a word boundary
+    const rs = new RegexSet(["\\\\\\\\b"]);
+    const matches = rs.findIter("a\\\\b");
+    expect(matches).toHaveLength(1);
+    expect(matches[0]!.text).toBe("\\\\b");
+  });
+
+  test("odd backslashes before b is word boundary", () => {
+    // \\\b = literal backslash + word boundary
+    const rs = new RegexSet(["\\\\\\btest\\b"]);
+    const matches = rs.findIter("\\test done");
+    expect(matches).toHaveLength(1);
+    expect(matches[0]!.text).toBe("\\test");
+  });
+
   test("\\b perf: no catastrophic slowdown", () => {
     // Loose threshold (500ms) to catch only
     // catastrophic regressions (Unicode \b would
@@ -307,6 +324,38 @@ describe("ascii word boundary", () => {
     expect(elapsed).toBeLessThan(500);
   });
 
+  test("\\b + lookahead combination works", () => {
+    // Regression: (?-u:\b) broke fancy-regex fallback
+    const rs = new RegexSet([
+      String.raw`\b\d{3}(?!\d)\b`,
+    ]);
+    const matches = rs.findIter("abc 123 def 4567");
+    expect(matches).toHaveLength(1);
+    expect(matches[0]!.text).toBe("123");
+    // 4567 should NOT match (lookahead rejects)
+  });
+
+  test("\\b + lookbehind + lookahead works", () => {
+    // Both assertions prevent inline extraction,
+    // forcing the fancy-regex fallback path.
+    const rs = new RegexSet([
+      String.raw`\b(?<!\d)\d{3}(?!\d)\b`,
+    ]);
+    const matches = rs.findIter("abc 123 def 4567");
+    expect(matches).toHaveLength(1);
+    expect(matches[0]!.text).toBe("123");
+  });
+
+  test("\\b + lookahead in phone pattern", () => {
+    // The exact pattern from the bug report
+    const rs = new RegexSet([
+      String.raw`\b(?:[2-578]\d|60)\d[\s.\-]?\d{3}[\s.\-]?\d{3}(?!\d)\b`,
+    ]);
+    expect(rs.isMatch("601 234 567")).toBe(true);
+    expect(rs.isMatch("601234567")).toBe(true);
+    expect(rs.isMatch("6012345678")).toBe(false);
+  });
+
   test("wholeWords perf: uses ASCII boundary", () => {
     const rs = new RegexSet(["test"], {
       wholeWords: true,
@@ -316,6 +365,106 @@ describe("ascii word boundary", () => {
     rs.findIter(text);
     const elapsed = performance.now() - start;
     expect(elapsed).toBeLessThan(500);
+  });
+});
+
+// ─── Unicode word boundaries ─────────────────
+
+describe("unicodeBoundaries", () => {
+  test("čáp: ASCII \\b treats p as standalone", () => {
+    // ASCII \b: č and á are NOT word chars
+    const rs = new RegexSet(["\\bp\\b"], {
+      unicodeBoundaries: false,
+    });
+    expect(rs.findIter("čáp")).toHaveLength(1);
+    expect(rs.findIter("čáp")[0]!.text).toBe("p");
+  });
+
+  test("čáp: Unicode \\b treats čáp as one word", () => {
+    // Unicode \b: č and á ARE word chars
+    const rs = new RegexSet(["\\bp\\b"], {
+      unicodeBoundaries: true,
+    });
+    // p is NOT at a word boundary — čáp is one word
+    expect(rs.findIter("čáp")).toHaveLength(0);
+  });
+
+  test("Unicode \\b matches whole Czech word", () => {
+    const rs = new RegexSet(["\\bčáp\\b"], {
+      unicodeBoundaries: true,
+    });
+    expect(rs.findIter("malý čáp letí")).toHaveLength(
+      1,
+    );
+    expect(
+      rs.findIter("malý čáp letí")[0]!.text,
+    ).toBe("čáp");
+    // Should not match inside another word
+    expect(rs.findIter("čápek")).toHaveLength(0);
+  });
+
+  test("wholeWords + unicodeBoundaries", () => {
+    const rs = new RegexSet(["Pavel", "Příbram"], {
+      wholeWords: true,
+      unicodeBoundaries: true,
+    });
+    const text = "Pavel je z Příbrami";
+    const matches = rs.findIter(text);
+    expect(matches).toHaveLength(1);
+    expect(matches[0]!.text).toBe("Pavel");
+    // Příbrami ≠ Příbram (not whole word)
+  });
+
+  test("Unicode \\b + lookahead works", () => {
+    const rs = new RegexSet(
+      [String.raw`\b\d{3}(?!\d)\b`],
+      { unicodeBoundaries: true },
+    );
+    const matches = rs.findIter("abc 123 def 4567");
+    expect(matches).toHaveLength(1);
+    expect(matches[0]!.text).toBe("123");
+  });
+
+  test("Unicode \\b perf: no DFA overhead", () => {
+    const rs = new RegexSet(["\\btest\\b"], {
+      unicodeBoundaries: true,
+    });
+    const text = "a".repeat(100_000);
+    const start = performance.now();
+    rs.findIter(text);
+    const elapsed = performance.now() - start;
+    expect(elapsed).toBeLessThan(500);
+  });
+});
+
+// ─── Heterogeneous boundary shadowing ────────
+
+describe("heterogeneous boundaries", () => {
+  test("\\bfoo\\b + \\bfoo\\B: second matches in foobar", () => {
+    // Pattern 0: \bfoo\b (trailing word boundary)
+    // Pattern 1: \bfoo\B (trailing non-word-boundary)
+    // On "foobar": foo at 0..3, trailing is o|b
+    // (both word chars) → \b fails, \B passes.
+    // Pattern 1 should match.
+    const rs = new RegexSet(
+      ["\\bfoo\\b", "\\bfoo\\B"],
+      { unicodeBoundaries: true },
+    );
+    const matches = rs.findIter("foobar");
+    expect(matches).toHaveLength(1);
+    expect(matches[0]!.pattern).toBe(1);
+    expect(matches[0]!.text).toBe("foo");
+  });
+
+  test("\\bfoo\\b + \\bfoo\\B: first matches in foo bar", () => {
+    const rs = new RegexSet(
+      ["\\bfoo\\b", "\\bfoo\\B"],
+      { unicodeBoundaries: true },
+    );
+    const matches = rs.findIter("foo bar");
+    expect(matches).toHaveLength(1);
+    expect(matches[0]!.pattern).toBe(0);
+    expect(matches[0]!.text).toBe("foo");
   });
 });
 
