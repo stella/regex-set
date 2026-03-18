@@ -8,6 +8,20 @@ export type Options = {
   wholeWords?: boolean;
 };
 
+/** A named pattern entry. */
+export type NamedPattern = {
+  /** The regex pattern (string or RegExp). */
+  pattern: string | RegExp;
+  /** Optional name for this pattern. */
+  name?: string;
+};
+
+/** A pattern entry: string, RegExp, or named. */
+export type PatternEntry =
+  | string
+  | RegExp
+  | NamedPattern;
+
 /** A single match result. */
 export type Match = {
   /** Index of the pattern that matched. */
@@ -18,6 +32,8 @@ export type Match = {
   end: number;
   /** The matched text. */
   text: string;
+  /** Pattern name (if provided at construction). */
+  name?: string;
 };
 
 /**
@@ -25,24 +41,25 @@ export type Match = {
  *
  * Compiles multiple regex patterns into a single
  * automaton. Guaranteed O(m * n) — no catastrophic
- * backtracking. Uses Rust regex syntax.
+ * backtracking. Uses Rust regex syntax for string
+ * patterns (no lookaheads/backreferences).
+ *
+ * @example
+ * ```ts
+ * // Simple
+ * new RegexSet([/\d{8}/, "\\+?\\d{9,12}"]);
+ *
+ * // Named
+ * new RegexSet([
+ *   { pattern: /\d{8}/, name: "ico" },
+ *   { pattern: /\d{2}\.\d{2}\.\d{4}/, name: "date" },
+ * ]);
+ * // match.name === "date"
+ * ```
  */
 export declare class RegexSet {
-  /**
-   * Accepts strings (Rust regex syntax) or
-   * `RegExp` objects (JS flags converted
-   * automatically).
-   *
-   * @example
-   * ```ts
-   * new RegexSet([
-   *   /\d{2}\.\d{2}\.\d{4}/,  // RegExp
-   *   "\\+?\\d{9,12}",         // string
-   * ]);
-   * ```
-   */
   constructor(
-    patterns: (string | RegExp)[],
+    patterns: PatternEntry[],
     options?: Options,
   );
 
