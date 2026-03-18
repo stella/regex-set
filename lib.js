@@ -125,9 +125,31 @@ function regexpToRust(re) {
  * Does NOT apply boundary conversion — that's
  * handled in the constructor based on options.
  */
+/**
+ * Convert inline (?i), (?im), (?is), (?ims) flags
+ * in string patterns to use -u (ASCII case folding).
+ * Without -u, Rust (?i) enables Unicode case folding
+ * which explodes DFA state count.
+ */
+function scopeInlineFlags(src) {
+  // Match (?[ims]+) at start or anywhere in pattern
+  return src.replace(
+    /\(\?([ims]+)\)/g,
+    (_, flags) => {
+      if (flags.includes("i")) {
+        return `(?${flags}-u)`;
+      }
+      return `(?${flags})`;
+    },
+  );
+}
+
 function normalizeEntry(p, i) {
   if (typeof p === "string") {
-    return { pattern: p, name: undefined };
+    return {
+      pattern: scopeInlineFlags(p),
+      name: undefined,
+    };
   }
   if (p instanceof RegExp) {
     return {

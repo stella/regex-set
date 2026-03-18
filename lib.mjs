@@ -109,9 +109,24 @@ function regexpToRust(re) {
 /**
  * Normalize a pattern entry to { pattern, name }.
  */
+function scopeInlineFlags(src) {
+  return src.replace(
+    /\(\?([ims]+)\)/g,
+    (_, flags) => {
+      if (flags.includes("i")) {
+        return `(?${flags}-u)`;
+      }
+      return `(?${flags})`;
+    },
+  );
+}
+
 function normalizeEntry(p, i) {
   if (typeof p === "string") {
-    return { pattern: p, name: undefined };
+    return {
+      pattern: scopeInlineFlags(p),
+      name: undefined,
+    };
   }
   if (p instanceof RegExp) {
     return {
