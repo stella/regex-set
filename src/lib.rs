@@ -110,9 +110,11 @@ fn check_word_boundary(
 
 /// Fast byte scan: does the haystack contain any
 /// script that needs UAX#29 segmentation?
-/// Checks for Thai, Lao, Myanmar, Khmer, CJK
-/// byte ranges in UTF-8.
 fn needs_segmenter(haystack: &str) -> bool {
+  // SIMD-optimized: pure ASCII never needs it.
+  if haystack.is_ascii() {
+    return false;
+  }
   let bytes = haystack.as_bytes();
   let mut i = 0;
   while i < bytes.len() {
@@ -169,42 +171,67 @@ fn needs_segmenter(haystack: &str) -> bool {
   false
 }
 
-/// Compute UAX#29 word boundary byte positions.
+/// Bit set for O(1) word boundary lookups.
+/// For a 34KB document: 547 u64 values = 4.3KB.
+struct BoundaryBitSet {
+  bits: Vec<u64>,
+}
+
+impl BoundaryBitSet {
+  fn new(len: usize) -> Self {
+    Self {
+      bits: vec![0u64; (len + 63) / 64],
+    }
+  }
+
+  fn set(&mut self, pos: usize) {
+    if pos < self.bits.len() * 64 {
+      self.bits[pos / 64] |= 1u64 << (pos % 64);
+    }
+  }
+
+  fn contains(&self, pos: usize) -> bool {
+    pos < self.bits.len() * 64
+      && self.bits[pos / 64]
+        & (1u64 << (pos % 64))
+        != 0
+  }
+}
+
+/// Compute UAX#29 word boundaries as a bit set.
+/// No sort needed: unicode_word_indices returns
+/// positions in order. O(1) lookup per position.
 fn compute_uax29_boundaries(
   haystack: &str,
-) -> Vec<usize> {
+) -> BoundaryBitSet {
   use unicode_segmentation::UnicodeSegmentation;
-  let mut boundaries = Vec::new();
+  let mut bs = BoundaryBitSet::new(
+    haystack.len() + 1,
+  );
+  bs.set(0);
+  bs.set(haystack.len());
   for (offset, word) in
     haystack.unicode_word_indices()
   {
-    boundaries.push(offset);
-    boundaries.push(offset + word.len());
+    bs.set(offset);
+    bs.set(offset + word.len());
   }
-  boundaries.push(0);
-  boundaries.push(haystack.len());
-  boundaries.sort_unstable();
-  boundaries.dedup();
-  boundaries
+  bs
 }
 
-/// Boundary checker that can use either inline
-/// is_alphanumeric or pre-computed UAX#29 set.
+/// Boundary checker: inline is_alphanumeric or
+/// pre-computed UAX#29 bit set.
 enum BoundaryMode {
-  /// Fast: inline char check.
   Inline { unicode: bool },
-  /// UAX#29: lookup in pre-computed set.
-  Segmenter { boundaries: Vec<usize> },
+  Segmenter { bitset: BoundaryBitSet },
 }
 
 impl BoundaryMode {
   fn is_boundary(&self, pos: usize) -> bool {
     match self {
-      BoundaryMode::Segmenter { boundaries } => {
-        boundaries.binary_search(&pos).is_ok()
+      BoundaryMode::Segmenter { bitset } => {
+        bitset.contains(pos)
       }
-      // Inline mode doesn't use this method —
-      // it calls check_word_boundary directly.
       BoundaryMode::Inline { .. } => {
         unreachable!()
       }
@@ -938,7 +965,7 @@ impl RegexSet {
 
     if unicode && needs_segmenter(haystack) {
       BoundaryMode::Segmenter {
-        boundaries: compute_uax29_boundaries(
+        bitset: compute_uax29_boundaries(
           haystack,
         ),
       }
