@@ -1,11 +1,19 @@
 {
   "name": "@stll/regex-set-linux-x64-musl",
-  "version": "0.1.0",
-  "os": ["linux"],
-  "cpu": ["x64"],
+  "version": "0.2.0",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
   "main": "regex-set.linux-x64-musl.node",
-  "files": ["regex-set.linux-x64-musl.node"],
-  "libc": ["musl"],
+  "files": [
+    "regex-set.linux-x64-musl.node"
+  ],
+  "libc": [
+    "musl"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",

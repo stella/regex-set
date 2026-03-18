@@ -1,11 +1,16 @@
 {
   "name": "@stll/regex-set-darwin-x64",
-  "version": "0.1.0",
-  "os": ["darwin"],
-  "cpu": ["x64"],
+  "version": "0.2.0",
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "x64"
+  ],
   "main": "regex-set.darwin-x64.node",
-  "files": ["regex-set.darwin-x64.node"],
-  
+  "files": [
+    "regex-set.darwin-x64.node"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
