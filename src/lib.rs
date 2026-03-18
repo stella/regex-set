@@ -701,6 +701,11 @@ struct PatternInfo {
   verifier: Verifier,
   boundaries: EdgeBoundaries,
   unicode_wb: bool,
+  /// Individual regex for this pattern's core,
+  /// used to find shadowed matches when the
+  /// multi-DFA rejects a match at a position
+  /// where this pattern also matches.
+  individual: MetaRegex,
 }
 
 struct FallbackPattern {
@@ -805,13 +810,15 @@ impl RegexSet {
           ))
         })?;
 
-      if MetaRegex::new(&core).is_ok() {
+      if let Ok(individual) = MetaRegex::new(&core)
+      {
         cores.push(core);
         info.push(PatternInfo {
           original_index: i as u32,
           verifier,
           boundaries: eb,
           unicode_wb,
+          individual,
         });
       } else {
         // Core doesn't compile in MetaRegex.
@@ -868,6 +875,44 @@ impl RegexSet {
 
   // ── Internal methods (operate on &str) ──────
 
+  /// Check individual patterns at a position where
+  /// the multi-DFA's winning match was rejected.
+  /// Returns Some((pattern_idx, start, end)) if any
+  /// pattern matches and passes verification.
+  fn find_shadowed(
+    &self,
+    haystack: &str,
+    at: usize,
+    skip: usize, // DFA pattern index to skip
+  ) -> Option<(u32, usize, usize)> {
+    for (idx, pi) in self.info.iter().enumerate() {
+      if idx == skip {
+        continue;
+      }
+      let input =
+        Input::new(haystack).range(at..);
+      if let Some(m) = pi.individual.find(input) {
+        if m.start() == at
+          && match_passes(
+            haystack,
+            m.start(),
+            m.end(),
+            &pi.verifier,
+            &pi.boundaries,
+            pi.unicode_wb,
+          )
+        {
+          return Some((
+            pi.original_index,
+            m.start(),
+            m.end(),
+          ));
+        }
+      }
+    }
+    None
+  }
+
   fn _is_match(&self, haystack: &str) -> bool {
     if let Some(ref multi) = self.multi {
       let mut pos = 0;
@@ -876,8 +921,8 @@ impl RegexSet {
           Input::new(haystack).range(pos..);
         match multi.find(input) {
           Some(m) => {
-            let pi =
-              &self.info[m.pattern().as_usize()];
+            let dfa_idx = m.pattern().as_usize();
+            let pi = &self.info[dfa_idx];
             if match_passes(
               haystack,
               m.start(),
@@ -888,8 +933,18 @@ impl RegexSet {
             ) {
               return true;
             }
-            // Rejected: retry from start+1 to
-            // find shadowed matches.
+            // DFA winner rejected — check other
+            // patterns at this position.
+            if self
+              .find_shadowed(
+                haystack,
+                m.start(),
+                dfa_idx,
+              )
+              .is_some()
+            {
+              return true;
+            }
             pos = m.start() + 1;
           }
           None => break,
@@ -937,8 +992,8 @@ impl RegexSet {
           Input::new(haystack).range(pos..);
         match multi.find(input) {
           Some(m) => {
-            let pi =
-              &self.info[m.pattern().as_usize()];
+            let dfa_idx = m.pattern().as_usize();
+            let pi = &self.info[dfa_idx];
             if match_passes(
               haystack,
               m.start(),
@@ -953,6 +1008,15 @@ impl RegexSet {
                 m.end(),
               ));
               pos = m.end().max(pos + 1);
+            } else if let Some(alt) = self
+              .find_shadowed(
+                haystack,
+                m.start(),
+                dfa_idx,
+              )
+            {
+              all.push(alt);
+              pos = alt.2.max(pos + 1);
             } else {
               pos = m.start() + 1;
             }
@@ -1121,8 +1185,8 @@ impl RegexSet {
           Input::new(haystack.as_str()).range(pos..);
         match multi.find(input) {
           Some(m) => {
-            let pi =
-              &self.info[m.pattern().as_usize()];
+            let dfa_idx = m.pattern().as_usize();
+            let pi = &self.info[dfa_idx];
             if match_passes(
               &haystack,
               m.start(),
@@ -1137,6 +1201,19 @@ impl RegexSet {
                 result.push(idx as u32);
               }
               pos = m.end().max(pos + 1);
+            } else if let Some(alt) = self
+              .find_shadowed(
+                &haystack,
+                m.start(),
+                dfa_idx,
+              )
+            {
+              let idx = alt.0 as usize;
+              if !seen[idx] {
+                seen[idx] = true;
+                result.push(idx as u32);
+              }
+              pos = alt.2.max(pos + 1);
             } else {
               pos = m.start() + 1;
             }
@@ -1206,8 +1283,8 @@ impl RegexSet {
           Input::new(haystack.as_str()).range(pos..);
         match multi.find(input) {
           Some(m) => {
-            let pi =
-              &self.info[m.pattern().as_usize()];
+            let dfa_idx = m.pattern().as_usize();
+            let pi = &self.info[dfa_idx];
             if match_passes(
               &haystack,
               m.start(),
@@ -1222,6 +1299,19 @@ impl RegexSet {
                 m.end(),
               ));
               pos = m.end().max(pos + 1);
+            } else if let Some(alt) = self
+              .find_shadowed(
+                &haystack,
+                m.start(),
+                dfa_idx,
+              )
+            {
+              all.push((
+                alt.0 as usize,
+                alt.1,
+                alt.2,
+              ));
+              pos = alt.2.max(pos + 1);
             } else {
               pos = m.start() + 1;
             }
