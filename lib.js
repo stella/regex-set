@@ -121,7 +121,7 @@ function regexpToRust(re) {
     }
   }
 
-  return `${leading}(?${flags}-u:${src})${trailing}`;
+  return `${leading}(?${flags}-u:${scopeInlineFlags(src)})${trailing}`;
 }
 
 /**
@@ -131,15 +131,49 @@ function regexpToRust(re) {
  * which explodes DFA state count on non-ASCII text.
  */
 function scopeInlineFlags(src) {
-  return src.replace(
-    /\(\?([ims]+)([:)])/g,
-    (_, flags, close) => {
-      if (flags.includes("i")) {
-        return `(?${flags}-u${close}`;
+  let result = "";
+  let inClass = false;
+  let i = 0;
+  while (i < src.length) {
+    if (src[i] === "\\" && i + 1 < src.length) {
+      result += src[i] + src[i + 1];
+      i += 2;
+      continue;
+    }
+    if (src[i] === "[") inClass = true;
+    if (src[i] === "]") inClass = false;
+    // Match (?flags) or (?flags: outside [...]
+    if (
+      !inClass &&
+      src[i] === "(" &&
+      src[i + 1] === "?"
+    ) {
+      let j = i + 2;
+      let flags = "";
+      while (
+        j < src.length &&
+        "ims".includes(src[j])
+      ) {
+        flags += src[j];
+        j++;
       }
-      return `(?${flags}${close}`;
-    },
-  );
+      if (
+        flags.length > 0 &&
+        (src[j] === ")" || src[j] === ":")
+      ) {
+        if (flags.includes("i")) {
+          result += `(?${flags}-u${src[j]}`;
+        } else {
+          result += `(?${flags}${src[j]}`;
+        }
+        i = j + 1;
+        continue;
+      }
+    }
+    result += src[i];
+    i++;
+  }
+  return result;
 }
 
 /**
