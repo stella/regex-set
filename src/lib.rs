@@ -164,8 +164,7 @@ fn needs_segmenter(haystack: &str) -> bool {
         || (0x1780..=0x17FF).contains(&cp) // Khmer
         || (0x3040..=0x30FF).contains(&cp) // Kana
         || (0x3400..=0x9FFF).contains(&cp) // CJK
-        || (0xAC00..=0xD7AF).contains(&cp)
-      // Hangul
+        || (0xAC00..=0xD7AF).contains(&cp) // Hangul
       {
         return true;
       }
@@ -518,8 +517,7 @@ fn build_verifier(
     extract_leading_lookbehind(&core)
   {
     if is_simple_char_class(&content) {
-      let class = CharClass::from_str(&content)
-        .map_err(|e| e.clone())?;
+      let class = CharClass::from_str(&content)?;
       pre = Some(CharCheck { class, negated });
       core = rest;
     }
@@ -529,8 +527,7 @@ fn build_verifier(
     extract_trailing_lookahead(&core)
   {
     if is_simple_char_class(&content) {
-      let class = CharClass::from_str(&content)
-        .map_err(|e| e.clone())?;
+      let class = CharClass::from_str(&content)?;
       post = Some(CharCheck { class, negated });
       core = rest;
     }
@@ -1068,7 +1065,8 @@ impl RegexSet {
     // literal patterns (each scanned independently).
     let sources = u8::from(self.fast_multi.is_some())
       + u8::from(self.slow_multi.is_some())
-      + (self.fallbacks.len().min(2) as u8);
+      + u8::try_from(self.fallbacks.len().min(2))
+        .unwrap_or(2);
     let needs_sort = sources > 1 && all.len() > 1;
     (all, needs_sort)
   }
