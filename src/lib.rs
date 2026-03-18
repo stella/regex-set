@@ -797,19 +797,25 @@ struct FallbackPattern {
 /// byte_start, byte_end).
 type RawMatch = (u32, usize, usize);
 
+/// Patterns split into two DFAs: fast (find_iter)
+/// and slow (manual loop with shadowed check).
+/// This prevents 2 lookahead patterns from forcing
+/// all 15 other patterns onto the slow path.
 #[napi]
 pub struct RegexSet {
-  multi: Option<MetaRegex>,
-  info: Vec<PatternInfo>,
+  /// Fast DFA: patterns with Verifier::None and
+  /// no \B boundaries. Uses find_iter (single pass).
+  fast_multi: Option<MetaRegex>,
+  fast_info: Vec<PatternInfo>,
+  /// Slow DFA: patterns with verifiers or \B.
+  /// Uses manual loop with shadowed check.
+  slow_multi: Option<MetaRegex>,
+  slow_info: Vec<PatternInfo>,
+  /// Fancy-regex fallback patterns.
   fallbacks: Vec<FallbackPattern>,
   pattern_count: u32,
   has_boundaryless_pattern: bool,
-  /// True if patterns have different boundary
-  /// configs (e.g., \b vs \B). When true, a
-  /// boundary rejection for one pattern doesn't
-  /// imply all patterns fail at that position.
   has_heterogeneous_boundaries: bool,
-  needs_slow_path: bool,
 }
 
 #[napi]
@@ -841,8 +847,10 @@ impl RegexSet {
       patterns
     };
 
-    let mut cores: Vec<String> = Vec::new();
-    let mut info: Vec<PatternInfo> = Vec::new();
+    let mut fast_cores: Vec<String> = Vec::new();
+    let mut fast_info: Vec<PatternInfo> = Vec::new();
+    let mut slow_cores: Vec<String> = Vec::new();
+    let mut slow_info: Vec<PatternInfo> = Vec::new();
     let mut fallbacks: Vec<FallbackPattern> =
       Vec::new();
 
@@ -866,14 +874,32 @@ impl RegexSet {
 
       if let Ok(individual) = MetaRegex::new(&core)
       {
-        cores.push(core);
-        info.push(PatternInfo {
-          original_index: i as u32,
-          verifier,
-          boundaries: eb,
-          unicode_wb,
-          individual,
-        });
+        // Split: verifiers or \B → slow path,
+        // everything else → fast path.
+        let needs_slow =
+          !matches!(&verifier, Verifier::None)
+            || eb.leading_big_b
+            || eb.trailing_big_b;
+
+        if needs_slow {
+          slow_cores.push(core);
+          slow_info.push(PatternInfo {
+            original_index: i as u32,
+            verifier,
+            boundaries: eb,
+            unicode_wb,
+            individual,
+          });
+        } else {
+          fast_cores.push(core);
+          fast_info.push(PatternInfo {
+            original_index: i as u32,
+            verifier,
+            boundaries: eb,
+            unicode_wb,
+            individual,
+          });
+        }
       } else {
         let re = match verifier {
           Verifier::Complex(re) => re,
@@ -897,28 +923,32 @@ impl RegexSet {
       }
     }
 
-    let multi = if cores.is_empty() {
-      None
-    } else {
-      let refs: Vec<&str> =
-        cores.iter().map(|s| s.as_str()).collect();
-      Some(MetaRegex::new_many(&refs).map_err(
-        |e| {
-          Error::from_reason(format!(
-            "Failed to compile regex: {e}"
-          ))
-        },
-      )?)
-    };
+    let build_multi =
+      |cores: &[String]| -> Option<MetaRegex> {
+        if cores.is_empty() {
+          return None;
+        }
+        let refs: Vec<&str> =
+          cores.iter().map(|s| s.as_str()).collect();
+        MetaRegex::new_many(&refs).ok()
+      };
 
-    let has_boundaryless_pattern =
-      info.iter().any(|pi| !pi.boundaries.has_any());
+    let fast_multi = build_multi(&fast_cores);
+    let slow_multi = build_multi(&slow_cores);
+
+    let all_info: Vec<&PatternInfo> = fast_info
+      .iter()
+      .chain(slow_info.iter())
+      .collect();
+    let has_boundaryless_pattern = all_info
+      .iter()
+      .any(|pi| !pi.boundaries.has_any());
     let has_heterogeneous_boundaries =
-      if info.len() < 2 {
+      if all_info.len() < 2 {
         false
       } else {
-        let first = &info[0].boundaries;
-        info.iter().any(|pi| {
+        let first = &all_info[0].boundaries;
+        all_info.iter().any(|pi| {
           pi.boundaries.leading_b
             != first.leading_b
             || pi.boundaries.trailing_b
@@ -929,20 +959,16 @@ impl RegexSet {
               != first.trailing_big_b
         })
       };
-    let needs_slow_path = info.iter().any(|pi| {
-      !matches!(&pi.verifier, Verifier::None)
-        || pi.boundaries.leading_big_b
-        || pi.boundaries.trailing_big_b
-    });
 
     Ok(Self {
-      multi,
-      info,
+      fast_multi,
+      fast_info,
+      slow_multi,
+      slow_info,
       fallbacks,
       pattern_count,
       has_boundaryless_pattern,
       has_heterogeneous_boundaries,
-      needs_slow_path,
     })
   }
 
@@ -958,19 +984,20 @@ impl RegexSet {
   /// single source of truth for match logic —
   /// is_match, find_iter, which_match, and
   /// replace_all all delegate here.
-  /// Determine the boundary mode for a haystack.
-  /// If unicodeBoundaries is on and the text has
-  /// Thai/CJK/Lao/Khmer/Myanmar, use UAX#29.
-  /// Otherwise use fast inline checks.
+
   fn boundary_mode(
     &self,
     haystack: &str,
   ) -> BoundaryMode {
-    let any_boundaries = self.info.iter().any(
-      |pi| pi.boundaries.has_any(),
-    ) || self.fallbacks.iter().any(|fb| {
-      fb.boundaries.has_any()
-    });
+    let any_boundaries = self
+      .fast_info
+      .iter()
+      .chain(self.slow_info.iter())
+      .any(|pi| pi.boundaries.has_any())
+      || self
+        .fallbacks
+        .iter()
+        .any(|fb| fb.boundaries.has_any());
 
     if !any_boundaries {
       return BoundaryMode::Inline {
@@ -978,10 +1005,10 @@ impl RegexSet {
       };
     }
 
-    // Check if any pattern uses unicode boundaries
     let unicode = self
-      .info
+      .fast_info
       .first()
+      .or(self.slow_info.first())
       .map(|pi| pi.unicode_wb)
       .unwrap_or(false);
 
@@ -1003,79 +1030,78 @@ impl RegexSet {
     let mut all: Vec<RawMatch> = Vec::new();
     let mode = self.boundary_mode(haystack);
 
-    if let Some(ref multi) = self.multi {
-      if !self.needs_slow_path {
-        for m in multi.find_iter(haystack) {
-          let pi =
-            &self.info[m.pattern().as_usize()];
-          if !pi.boundaries.has_any()
-            || pi.boundaries.check_with_mode(
+    // Fast DFA: single-pass find_iter (no verifiers).
+    if let Some(ref multi) = self.fast_multi {
+      for m in multi.find_iter(haystack) {
+        let pi =
+          &self.fast_info[m.pattern().as_usize()];
+        if !pi.boundaries.has_any()
+          || pi.boundaries.check_with_mode(
+            haystack,
+            m.start(),
+            m.end(),
+            &mode,
+          )
+        {
+          all.push((
+            pi.original_index,
+            m.start(),
+            m.end(),
+          ));
+        }
+      }
+    }
+
+    // Slow DFA: manual loop with shadowed check.
+    if let Some(ref multi) = self.slow_multi {
+      let mut pos = 0;
+      while pos <= haystack.len() {
+        let input =
+          Input::new(haystack).range(pos..);
+        match multi.find(input) {
+          Some(m) => {
+            let dfa_idx = m.pattern().as_usize();
+            let pi = &self.slow_info[dfa_idx];
+            match check_match(
               haystack,
               m.start(),
               m.end(),
+              &pi.verifier,
+              &pi.boundaries,
               &mode,
-            )
-          {
-            all.push((
-              pi.original_index,
-              m.start(),
-              m.end(),
-            ));
-          }
-        }
-      } else {
-        // Slow path: manual loop with shadowed
-        // match recovery on verifier rejection.
-        let mut pos = 0;
-        while pos <= haystack.len() {
-          let input =
-            Input::new(haystack).range(pos..);
-          match multi.find(input) {
-            Some(m) => {
-              let dfa_idx =
-                m.pattern().as_usize();
-              let pi = &self.info[dfa_idx];
-              match check_match(
-                haystack,
-                m.start(),
-                m.end(),
-                &pi.verifier,
-                &pi.boundaries,
-                &mode,
-              ) {
-                Ok(()) => {
-                  all.push((
-                    pi.original_index,
+            ) {
+              Ok(()) => {
+                all.push((
+                  pi.original_index,
+                  m.start(),
+                  m.end(),
+                ));
+                pos = m.end().max(pos + 1);
+              }
+              Err(ref rej)
+                if self
+                  .needs_shadowed_check(rej) =>
+              {
+                if let Some(alt) = self
+                  .find_shadowed_slow(
+                    haystack,
                     m.start(),
-                    m.end(),
-                  ));
-                  pos = m.end().max(pos + 1);
-                }
-                Err(ref rej)
-                  if self
-                    .needs_shadowed_check(rej) =>
+                    dfa_idx,
+                    &mode,
+                  )
                 {
-                  if let Some(alt) = self
-                    .find_shadowed(
-                      haystack,
-                      m.start(),
-                      dfa_idx,
-                      &mode,
-                    )
-                  {
-                    all.push(alt);
-                    pos = alt.2.max(pos + 1);
-                  } else {
-                    pos = m.start() + 1;
-                  }
-                }
-                Err(_) => {
+                  all.push(alt);
+                  pos = alt.2.max(pos + 1);
+                } else {
                   pos = m.start() + 1;
                 }
               }
+              Err(_) => {
+                pos = m.start() + 1;
+              }
             }
-            None => break,
           }
+          None => break,
         }
       }
     }
@@ -1133,14 +1159,16 @@ impl RegexSet {
     selected
   }
 
-  fn find_shadowed(
+  fn find_shadowed_slow(
     &self,
     haystack: &str,
     at: usize,
     skip: usize,
     mode: &BoundaryMode,
   ) -> Option<RawMatch> {
-    for (idx, pi) in self.info.iter().enumerate() {
+    for (idx, pi) in
+      self.slow_info.iter().enumerate()
+    {
       if idx == skip {
         continue;
       }
@@ -1187,66 +1215,68 @@ impl RegexSet {
   fn _is_match(&self, haystack: &str) -> bool {
     let mode = self.boundary_mode(haystack);
 
-    if let Some(ref multi) = self.multi {
-      if !self.needs_slow_path {
-        for m in multi.find_iter(haystack) {
-          let pi =
-            &self.info[m.pattern().as_usize()];
-          if !pi.boundaries.has_any()
-            || pi.boundaries.check_with_mode(
-              haystack,
-              m.start(),
-              m.end(),
-              &mode,
-            )
-          {
-            return true;
-          }
-        }
-      } else {
-        let mut pos = 0;
-        while pos <= haystack.len() {
-          let input =
-            Input::new(haystack).range(pos..);
-          match multi.find(input) {
-            Some(m) => {
-              let dfa_idx =
-                m.pattern().as_usize();
-              let pi = &self.info[dfa_idx];
-              match check_match(
-                haystack,
-                m.start(),
-                m.end(),
-                &pi.verifier,
-                &pi.boundaries,
-                &mode,
-              ) {
-                Ok(()) => return true,
-                Err(ref rej)
-                  if self
-                    .needs_shadowed_check(rej) =>
-                {
-                  if self
-                    .find_shadowed(
-                      haystack,
-                      m.start(),
-                      dfa_idx,
-                      &mode,
-                    )
-                    .is_some()
-                  {
-                    return true;
-                  }
-                }
-                Err(_) => {}
-              }
-              pos = m.start() + 1;
-            }
-            None => break,
-          }
+    // Fast DFA
+    if let Some(ref multi) = self.fast_multi {
+      for m in multi.find_iter(haystack) {
+        let pi =
+          &self.fast_info[m.pattern().as_usize()];
+        if !pi.boundaries.has_any()
+          || pi.boundaries.check_with_mode(
+            haystack,
+            m.start(),
+            m.end(),
+            &mode,
+          )
+        {
+          return true;
         }
       }
     }
+
+    // Slow DFA
+    if let Some(ref multi) = self.slow_multi {
+      let mut pos = 0;
+      while pos <= haystack.len() {
+        let input =
+          Input::new(haystack).range(pos..);
+        match multi.find(input) {
+          Some(m) => {
+            let dfa_idx = m.pattern().as_usize();
+            let pi = &self.slow_info[dfa_idx];
+            match check_match(
+              haystack,
+              m.start(),
+              m.end(),
+              &pi.verifier,
+              &pi.boundaries,
+              &mode,
+            ) {
+              Ok(()) => return true,
+              Err(ref rej)
+                if self
+                  .needs_shadowed_check(rej) =>
+              {
+                if self
+                  .find_shadowed_slow(
+                    haystack,
+                    m.start(),
+                    dfa_idx,
+                    &mode,
+                  )
+                  .is_some()
+                {
+                  return true;
+                }
+              }
+              Err(_) => {}
+            }
+            pos = m.start() + 1;
+          }
+          None => break,
+        }
+      }
+    }
+
     for fb in &self.fallbacks {
       let mut pos = 0;
       while pos <= haystack.len() {
