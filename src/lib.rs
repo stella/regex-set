@@ -58,12 +58,6 @@ fn byte_span_utf16_len(bytes: &[u8]) -> u32 {
 }
 
 // ─── Word boundary verification ─────────────
-//
-// Instead of embedding \b in the DFA (which causes
-// a 10x slowdown for Unicode mode), we strip edge
-// \b from patterns and verify boundaries inline
-// after each match. Two char lookups per boundary,
-// O(1) per match, zero DFA overhead.
 
 fn is_word_char_unicode(ch: char) -> bool {
   ch.is_alphanumeric() || ch == '_'
@@ -74,8 +68,6 @@ fn is_word_char_ascii(ch: char) -> bool {
 }
 
 /// Check word boundary at a byte position.
-/// A boundary exists when the "word-ness" of the
-/// char before and after the position differ.
 fn check_word_boundary(
   haystack: &str,
   byte_pos: usize,
@@ -90,8 +82,10 @@ fn check_word_boundary(
   let before = if byte_pos == 0 {
     false
   } else {
-    let ch =
-      haystack[..byte_pos].chars().next_back().unwrap();
+    let ch = haystack[..byte_pos]
+      .chars()
+      .next_back()
+      .unwrap();
     is_wc(ch)
   };
   let after = if byte_pos >= haystack.len() {
@@ -105,11 +99,7 @@ fn check_word_boundary(
 }
 
 /// Strip leading/trailing `\b` or `\B` from a
-/// pattern string. Returns (core, edge_boundaries).
-///
-/// Only strips unescaped `\b`/`\B` at the very
-/// edges. Mid-pattern boundaries are left for the
-/// regex engine.
+/// pattern string.
 fn strip_edge_boundaries(
   pattern: &str,
 ) -> (String, EdgeBoundaries) {
@@ -132,9 +122,8 @@ fn strip_edge_boundaries(
     start += 2;
   }
 
-  // Trailing \b or \B (check it's not \\b).
-  // Count consecutive backslashes before the final
-  // char: odd = word boundary, even = escaped.
+  // Trailing \b or \B. Count consecutive
+  // backslashes: odd = boundary, even = escaped.
   if end - start >= 2
     && (bytes[end - 1] == b'b'
       || bytes[end - 1] == b'B')
@@ -146,8 +135,6 @@ fn strip_edge_boundaries(
       num_bs += 1;
       k -= 1;
     }
-    // num_bs = extra backslashes before the one at
-    // end-2. Odd extra = the \ is escaped (\\b).
     if num_bs % 2 == 0 {
       if bytes[end - 1] == b'b' {
         eb.trailing_b = true;
@@ -177,7 +164,6 @@ impl EdgeBoundaries {
       || self.trailing_big_b
   }
 
-  /// Verify all edge boundaries for a match.
   fn check(
     &self,
     haystack: &str,
@@ -218,61 +204,36 @@ impl EdgeBoundaries {
 }
 
 // ─── Inline lookaround checks ────────────────
-//
-// Instead of calling fancy-regex on a window for
-// every match, classify the lookaround assertion
-// and inline it as a direct char check (~1ns vs
-// ~1μs per match).
 
-/// A fast inline check that replaces fancy-regex
-/// verification for simple lookaround assertions.
 enum Verifier {
-  /// No verification needed.
   None,
-  /// Inline char check (covers 90%+ of real
-  /// lookaround patterns).
   Inline(InlineCheck),
-  /// Complex lookaround: use fancy-regex on a
-  /// small window.
   Complex(fancy_regex::Regex),
 }
 
-/// Inline boundary check for a single char.
 struct InlineCheck {
-  /// Check before match start.
   pre: Option<CharCheck>,
-  /// Check after match end.
   post: Option<CharCheck>,
 }
 
-/// A single character assertion.
-/// Fast character classifier — avoids regex
-/// dispatch overhead by using native Rust functions.
 enum CharClass {
-  /// `\d` or `[0-9]`
   Digit,
-  /// `\w` or `[a-zA-Z0-9_]`
   WordChar,
-  /// `\s` or `[\t\n\r ]`
   Whitespace,
-  /// `\p{L}` or `\p{Alphabetic}`
   Alpha,
-  /// `\p{N}` or `\p{Numeric}`
   Numeric,
-  /// Fallback: compiled regex for unknown classes
   Regex(regex::Regex),
 }
 
 impl CharClass {
   fn matches_char(&self, ch: char) -> bool {
     match self {
-      // Unicode-aware to match Rust regex semantics
       CharClass::Digit => ch.is_numeric(),
       CharClass::WordChar => {
         ch.is_alphanumeric()
           || ch == '_'
-          || ch == '\u{200C}' // ZWJ
-          || ch == '\u{200D}' // ZWNJ
+          || ch == '\u{200C}'
+          || ch == '\u{200D}'
       }
       CharClass::Whitespace => ch.is_whitespace(),
       CharClass::Alpha => ch.is_alphabetic(),
@@ -284,7 +245,6 @@ impl CharClass {
     }
   }
 
-  /// Parse a char class from the assertion content.
   fn from_str(
     s: &str,
   ) -> std::result::Result<Self, String> {
@@ -325,11 +285,7 @@ impl CharCheck {
     }
     let ch = haystack[pos..].chars().next().unwrap();
     let matches = self.class.matches_char(ch);
-    if self.negated {
-      !matches
-    } else {
-      matches
-    }
+    if self.negated { !matches } else { matches }
   }
 
   fn test_before(
@@ -343,33 +299,8 @@ impl CharCheck {
     let ch =
       haystack[..pos].chars().next_back().unwrap();
     let matches = self.class.matches_char(ch);
-    if self.negated {
-      !matches
-    } else {
-      matches
-    }
+    if self.negated { !matches } else { matches }
   }
-}
-
-fn char_len_at(s: &str, pos: usize) -> usize {
-  let b = s.as_bytes()[pos];
-  if b < 0x80 {
-    1
-  } else if b < 0xE0 {
-    2
-  } else if b < 0xF0 {
-    3
-  } else {
-    4
-  }
-}
-
-fn prev_char_start(s: &str, pos: usize) -> usize {
-  let mut i = pos - 1;
-  while i > 0 && !s.is_char_boundary(i) {
-    i -= 1;
-  }
-  i
 }
 
 // ─── Lookaround parsing ──────────────────────
@@ -381,8 +312,6 @@ fn has_lookaround(pattern: &str) -> bool {
     || pattern.contains("(?<!")
 }
 
-/// Extract leading lookbehind assertion content.
-/// Returns (content, is_negated, rest_of_pattern).
 fn extract_leading_lookbehind(
   pattern: &str,
 ) -> Option<(String, bool, String)> {
@@ -394,7 +323,6 @@ fn extract_leading_lookbehind(
     } else {
       return None;
     };
-
   let end = find_matching_paren(pattern, 0)?;
   let content =
     pattern[prefix.len()..end].to_string();
@@ -402,14 +330,11 @@ fn extract_leading_lookbehind(
   Some((content, negated, rest))
 }
 
-/// Extract trailing lookahead assertion content.
-/// Returns (rest_of_pattern, content, is_negated).
 fn extract_trailing_lookahead(
   pattern: &str,
 ) -> Option<(String, String, bool)> {
   let start = find_last_lookahead_start(pattern)?;
-  let end = pattern.len() - 1; // last ')'
-
+  let end = pattern.len() - 1;
   let prefix_len = if &pattern[start..start + 3]
     == "(?!"
   {
@@ -419,7 +344,6 @@ fn extract_trailing_lookahead(
   } else {
     return None;
   };
-
   let negated = &pattern[start + 2..start + 3] == "!";
   let content =
     pattern[start + prefix_len..end].to_string();
@@ -427,10 +351,6 @@ fn extract_trailing_lookahead(
   Some((rest, content, negated))
 }
 
-/// Check if a char-class content string is
-/// "simple" (matches a single character). Simple
-/// means: no quantifiers, no alternation, no
-/// groups.
 fn is_simple_char_class(content: &str) -> bool {
   !content.contains('*')
     && !content.contains('+')
@@ -441,7 +361,6 @@ fn is_simple_char_class(content: &str) -> bool {
     && CharClass::from_str(content).is_ok()
 }
 
-/// Build a Verifier from a pattern's lookaround.
 fn build_verifier(
   pattern: &str,
 ) -> std::result::Result<(String, Verifier), String>
@@ -457,37 +376,28 @@ fn build_verifier(
   let mut pre: Option<CharCheck> = None;
   let mut post: Option<CharCheck> = None;
 
-  // Extract leading lookbehind.
   if let Some((content, negated, rest)) =
     extract_leading_lookbehind(&core)
   {
     if is_simple_char_class(&content) {
       let class = CharClass::from_str(&content)
         .map_err(|e| format!("{e}"))?;
-      pre = Some(CharCheck {
-        class,
-        negated,
-      });
+      pre = Some(CharCheck { class, negated });
       core = rest;
     }
   }
 
-  // Extract trailing lookahead.
   if let Some((rest, content, negated)) =
     extract_trailing_lookahead(&core)
   {
     if is_simple_char_class(&content) {
       let class = CharClass::from_str(&content)
         .map_err(|e| format!("{e}"))?;
-      post = Some(CharCheck {
-        class,
-        negated,
-      });
+      post = Some(CharCheck { class, negated });
       core = rest;
     }
   }
 
-  // Check if all lookaround was inlined.
   if !has_lookaround(&core)
     && (pre.is_some() || post.is_some())
   {
@@ -497,12 +407,9 @@ fn build_verifier(
     ));
   }
 
-  // Still has lookaround (complex or nested).
-  // Fall back to fancy-regex.
-  //
+  // Complex lookaround → fancy-regex fallback.
   // ascii_boundary_for_fancy() expresses ASCII \b
-  // as lookaround on [a-zA-Z0-9_], so both paths
-  // use identical ASCII word boundary semantics.
+  // as lookaround on [a-zA-Z0-9_].
   let core_stripped =
     strip_lookaround_str(pattern);
   let fancy_pat = ascii_boundary_for_fancy(pattern);
@@ -547,8 +454,7 @@ impl Verifier {
         let window =
           &haystack[ctx_start..ctx_end];
         let offset = start - ctx_start;
-        // Must match exactly at offset, not at
-        // a later position in the window.
+        // Must match exactly at offset.
         re.find_from_pos(window, offset)
           .ok()
           .flatten()
@@ -676,13 +582,8 @@ fn ceil_char_boundary(
   i
 }
 
-/// ASCII word-char class for fancy-regex, which
-/// does not support `(?-u:...)`.
 const W: &str = "[a-zA-Z0-9_]";
 
-/// Replace `(?-u:\b)` / `(?-u:\B)` with
-/// ASCII-equivalent lookaround expressions that
-/// fancy-regex understands.
 fn ascii_boundary_for_fancy(s: &str) -> String {
   let b = format!(
     "(?:(?<={W})(?!{W})|(?<!{W})(?={W}))",
@@ -694,6 +595,34 @@ fn ascii_boundary_for_fancy(s: &str) -> String {
     .replace("(?-u:\\B)", &big_b)
 }
 
+// ─── Match checking ─────────────────────────
+
+enum Rejection {
+  Boundary,
+  Verifier,
+}
+
+fn check_match(
+  haystack: &str,
+  start: usize,
+  end: usize,
+  verifier: &Verifier,
+  boundaries: &EdgeBoundaries,
+  unicode_wb: bool,
+) -> std::result::Result<(), Rejection> {
+  if boundaries.has_any()
+    && !boundaries.check(
+      haystack, start, end, unicode_wb,
+    )
+  {
+    return Err(Rejection::Boundary);
+  }
+  if !verifier.check(haystack, start, end) {
+    return Err(Rejection::Verifier);
+  }
+  Ok(())
+}
+
 // ─── Engine ───────────────────────────────────
 
 struct PatternInfo {
@@ -701,10 +630,6 @@ struct PatternInfo {
   verifier: Verifier,
   boundaries: EdgeBoundaries,
   unicode_wb: bool,
-  /// Individual regex for this pattern's core,
-  /// used to find shadowed matches when the
-  /// multi-DFA rejects a match at a position
-  /// where this pattern also matches.
   individual: MetaRegex,
 }
 
@@ -715,58 +640,18 @@ struct FallbackPattern {
   unicode_wb: bool,
 }
 
+/// A verified match: (original_pattern_index,
+/// byte_start, byte_end).
+type RawMatch = (u32, usize, usize);
+
 #[napi]
 pub struct RegexSet {
   multi: Option<MetaRegex>,
   info: Vec<PatternInfo>,
   fallbacks: Vec<FallbackPattern>,
   pattern_count: u32,
-  /// True if any multi-DFA pattern has no boundary
-  /// requirement. When false, boundary rejections
-  /// are position-symmetric and find_shadowed can
-  /// be skipped entirely for boundary failures.
   has_boundaryless_pattern: bool,
-  /// True when the fast find_iter path can't be
-  /// used: patterns have verifiers (need shadowed
-  /// check) or \B boundaries (need sub-match retry
-  /// since \B passes inside greedy matches).
   needs_slow_path: bool,
-}
-
-/// Match rejection reason — determines whether
-/// find_shadowed is needed.
-enum Rejection {
-  /// Boundary failed (position-symmetric: all
-  /// patterns with same boundaries also fail).
-  Boundary,
-  /// Verifier failed (pattern-specific: other
-  /// patterns may pass at this position).
-  Verifier,
-}
-
-/// Check all conditions for a match.
-/// Returns Ok(()) on pass, Err(Rejection) on fail.
-fn check_match(
-  haystack: &str,
-  start: usize,
-  end: usize,
-  verifier: &Verifier,
-  boundaries: &EdgeBoundaries,
-  unicode_wb: bool,
-) -> std::result::Result<(), Rejection> {
-  // Check boundaries first (cheap, shared).
-  if boundaries.has_any()
-    && !boundaries.check(
-      haystack, start, end, unicode_wb,
-    )
-  {
-    return Err(Rejection::Boundary);
-  }
-  // Check verifier (pattern-specific).
-  if !verifier.check(haystack, start, end) {
-    return Err(Rejection::Verifier);
-  }
-  Ok(())
 }
 
 #[napi]
@@ -787,9 +672,6 @@ impl RegexSet {
 
     let pattern_count = patterns.len() as u32;
 
-    // wholeWords wrapping: only add (?-u:\b) in
-    // ASCII mode. In Unicode mode, boundaries are
-    // verified inline (no DFA overhead).
     let wrapped: Vec<String> = if whole_words
       && !unicode_wb
     {
@@ -807,18 +689,9 @@ impl RegexSet {
       Vec::new();
 
     for (i, p) in wrapped.iter().enumerate() {
-      // Strip edge \b/\B and record boundary flags.
-      // In Unicode mode: strip raw \b from patterns.
-      // In ASCII mode: patterns have (?-u:\b) from
-      // JS, which MetaRegex handles natively — but
-      // we still strip for consistency with the
-      // verify-inline approach.
       let (stripped, mut eb) =
         strip_edge_boundaries(p);
 
-      // wholeWords in Unicode mode: force both
-      // word boundaries. Clear any \B flags to
-      // avoid contradictory boundary requirements.
       if whole_words && unicode_wb {
         eb.leading_b = true;
         eb.trailing_b = true;
@@ -844,9 +717,6 @@ impl RegexSet {
           individual,
         });
       } else {
-        // Core doesn't compile in MetaRegex.
-        // Reuse fancy-regex from build_verifier
-        // if available, otherwise compile fresh.
         let re = match verifier {
           Verifier::Complex(re) => re,
           _ => {
@@ -906,18 +776,157 @@ impl RegexSet {
     self.pattern_count
   }
 
-  // ── Internal methods (operate on &str) ──────
+  // ── Core match collection (single source) ──
 
-  /// Check individual patterns at a position where
-  /// the multi-DFA's winning match was rejected.
-  /// Returns Some((pattern_idx, start, end)) if any
-  /// pattern matches and passes verification.
+  /// Collect all verified matches from both the
+  /// multi-DFA and fallback patterns. This is the
+  /// single source of truth for match logic —
+  /// is_match, find_iter, which_match, and
+  /// replace_all all delegate here.
+  fn collect_matches(
+    &self,
+    haystack: &str,
+  ) -> Vec<RawMatch> {
+    let mut all: Vec<RawMatch> = Vec::new();
+
+    if let Some(ref multi) = self.multi {
+      if !self.needs_slow_path {
+        // Fast path: single-pass find_iter scan
+        // with inline boundary filter. Valid when
+        // no verifiers and no \B boundaries.
+        for m in multi.find_iter(haystack) {
+          let pi =
+            &self.info[m.pattern().as_usize()];
+          if !pi.boundaries.has_any()
+            || pi.boundaries.check(
+              haystack,
+              m.start(),
+              m.end(),
+              pi.unicode_wb,
+            )
+          {
+            all.push((
+              pi.original_index,
+              m.start(),
+              m.end(),
+            ));
+          }
+        }
+      } else {
+        // Slow path: manual loop with shadowed
+        // match recovery on verifier rejection.
+        let mut pos = 0;
+        while pos <= haystack.len() {
+          let input =
+            Input::new(haystack).range(pos..);
+          match multi.find(input) {
+            Some(m) => {
+              let dfa_idx =
+                m.pattern().as_usize();
+              let pi = &self.info[dfa_idx];
+              match check_match(
+                haystack,
+                m.start(),
+                m.end(),
+                &pi.verifier,
+                &pi.boundaries,
+                pi.unicode_wb,
+              ) {
+                Ok(()) => {
+                  all.push((
+                    pi.original_index,
+                    m.start(),
+                    m.end(),
+                  ));
+                  pos = m.end().max(pos + 1);
+                }
+                Err(ref rej)
+                  if self
+                    .needs_shadowed_check(rej) =>
+                {
+                  if let Some(alt) = self
+                    .find_shadowed(
+                      haystack,
+                      m.start(),
+                      dfa_idx,
+                    )
+                  {
+                    all.push(alt);
+                    pos = alt.2.max(pos + 1);
+                  } else {
+                    pos = m.start() + 1;
+                  }
+                }
+                Err(_) => {
+                  pos = m.start() + 1;
+                }
+              }
+            }
+            None => break,
+          }
+        }
+      }
+    }
+
+    // Fallback patterns (fancy-regex).
+    for fb in &self.fallbacks {
+      let mut pos = 0;
+      while pos <= haystack.len() {
+        match fb.regex.find_from_pos(haystack, pos)
+        {
+          Ok(Some(m)) => {
+            let passes = !fb.boundaries.has_any()
+              || fb.boundaries.check(
+                haystack,
+                m.start(),
+                m.end(),
+                fb.unicode_wb,
+              );
+            if passes {
+              all.push((
+                fb.original_index,
+                m.start(),
+                m.end(),
+              ));
+              pos = m.end().max(pos + 1);
+            } else {
+              pos = m.start() + 1;
+            }
+          }
+          _ => break,
+        }
+      }
+    }
+
+    all
+  }
+
+  /// Sort matches and select non-overlapping.
+  fn select_non_overlapping(
+    all: &mut Vec<RawMatch>,
+  ) -> Vec<RawMatch> {
+    all.sort_by(|a, b| {
+      a.1
+        .cmp(&b.1)
+        .then_with(|| (b.2 - b.1).cmp(&(a.2 - a.1)))
+    });
+    let mut selected: Vec<RawMatch> = Vec::new();
+    let mut last_end: usize = 0;
+    for &(pat, start, end) in all.iter() {
+      if start >= last_end {
+        selected.push((pat, start, end));
+        last_end = end;
+      }
+    }
+    selected
+  }
+
   fn find_shadowed(
     &self,
     haystack: &str,
     at: usize,
-    skip: usize, // DFA pattern index to skip
-  ) -> Option<(u32, usize, usize)> {
+    skip: usize,
+  ) -> Option<RawMatch> {
     for (idx, pi) in self.info.iter().enumerate() {
       if idx == skip {
         continue;
@@ -947,11 +956,6 @@ impl RegexSet {
     None
   }
 
-  /// Should we check for shadowed matches after
-  /// a rejection? Only for verifier rejections,
-  /// or boundary rejections when some pattern
-  /// has no boundaries (could pass where others
-  /// fail).
   fn needs_shadowed_check(
     &self,
     rejection: &Rejection,
@@ -964,11 +968,12 @@ impl RegexSet {
     }
   }
 
+  // ── Internal methods ──────────────────────
+
   fn _is_match(&self, haystack: &str) -> bool {
+    // Early exit: check multi-DFA first.
     if let Some(ref multi) = self.multi {
       if !self.needs_slow_path {
-        // Fast path: no verifiers, only boundary
-        // checks. find_iter is a single-pass scan.
         for m in multi.find_iter(haystack) {
           let pi =
             &self.info[m.pattern().as_usize()];
@@ -984,8 +989,6 @@ impl RegexSet {
           }
         }
       } else {
-        // Slow path: verifiers present, need
-        // manual loop with shadowed check.
         let mut pos = 0;
         while pos <= haystack.len() {
           let input =
@@ -1044,8 +1047,6 @@ impl RegexSet {
             if passes {
               return true;
             }
-            // Advance by 1 on boundary failure to
-            // not skip overlapping candidates.
             pos = m.start() + 1;
           }
           _ => break,
@@ -1059,135 +1060,14 @@ impl RegexSet {
     &self,
     haystack: &str,
   ) -> Uint32Array {
-    let mut all: Vec<(u32, usize, usize)> =
-      Vec::new();
-
-    if let Some(ref multi) = self.multi {
-      if !self.needs_slow_path {
-        // Fast path: single-pass scan.
-        for m in multi.find_iter(haystack) {
-          let pi =
-            &self.info[m.pattern().as_usize()];
-          if !pi.boundaries.has_any()
-            || pi.boundaries.check(
-              haystack,
-              m.start(),
-              m.end(),
-              pi.unicode_wb,
-            )
-          {
-            all.push((
-              pi.original_index,
-              m.start(),
-              m.end(),
-            ));
-          }
-        }
-      } else {
-        // Slow path: manual loop with shadowed.
-        let mut pos = 0;
-        while pos <= haystack.len() {
-          let input =
-            Input::new(haystack).range(pos..);
-          match multi.find(input) {
-            Some(m) => {
-              let dfa_idx =
-                m.pattern().as_usize();
-              let pi = &self.info[dfa_idx];
-              match check_match(
-                haystack,
-                m.start(),
-                m.end(),
-                &pi.verifier,
-                &pi.boundaries,
-                pi.unicode_wb,
-              ) {
-                Ok(()) => {
-                  all.push((
-                    pi.original_index,
-                    m.start(),
-                    m.end(),
-                  ));
-                  pos = m.end().max(pos + 1);
-                }
-                Err(ref rej)
-                  if self
-                    .needs_shadowed_check(rej) =>
-                {
-                  if let Some(alt) = self
-                    .find_shadowed(
-                      haystack,
-                      m.start(),
-                      dfa_idx,
-                    )
-                  {
-                    all.push(alt);
-                    pos = alt.2.max(pos + 1);
-                  } else {
-                    pos = m.start() + 1;
-                  }
-                }
-                Err(_) => {
-                  pos = m.start() + 1;
-                }
-              }
-            }
-            None => break,
-          }
-        }
-      }
-    }
-
-    for fb in &self.fallbacks {
-      let mut pos = 0;
-      while pos <= haystack.len() {
-        match fb.regex.find_from_pos(haystack, pos)
-        {
-          Ok(Some(m)) => {
-            let passes = !fb.boundaries.has_any()
-              || fb.boundaries.check(
-                haystack,
-                m.start(),
-                m.end(),
-                fb.unicode_wb,
-              );
-            if passes {
-              all.push((
-                fb.original_index,
-                m.start(),
-                m.end(),
-              ));
-              pos = m.end().max(pos + 1);
-            } else {
-              pos = m.start() + 1;
-            }
-          }
-          _ => break,
-        }
-      }
-    }
+    let mut all = self.collect_matches(haystack);
 
     if all.is_empty() {
       return Uint32Array::new(Vec::new());
     }
 
-    // Sort by start, longest first at ties.
-    all.sort_by(|a, b| {
-      a.1
-        .cmp(&b.1)
-        .then_with(|| (b.2 - b.1).cmp(&(a.2 - a.1)))
-    });
-
-    // Greedily select non-overlapping.
-    let mut selected: Vec<(u32, usize, usize)> =
-      Vec::new();
-    let mut last_end: usize = 0;
-    for &(pat, start, end) in &all {
-      if start >= last_end {
-        selected.push((pat, start, end));
-        last_end = end;
-      }
-    }
+    let selected =
+      Self::select_non_overlapping(&mut all);
 
     // Pack with UTF-16 offsets.
     if haystack.is_ascii() {
@@ -1236,8 +1116,6 @@ impl RegexSet {
     self._is_match(&haystack)
   }
 
-  /// Zero-copy variant: accepts Buffer (no string
-  /// copy across FFI boundary).
   #[napi(js_name = "_isMatchBuf")]
   pub fn is_match_buf(
     &self,
@@ -1262,7 +1140,6 @@ impl RegexSet {
     self._find_iter_packed(&haystack)
   }
 
-  /// Zero-copy variant: accepts Buffer.
   #[napi(js_name = "_findIterPackedBuf")]
   pub fn find_iter_packed_buf(
     &self,
@@ -1284,121 +1161,17 @@ impl RegexSet {
     &self,
     haystack: String,
   ) -> Vec<u32> {
+    let all = self.collect_matches(&haystack);
     let mut seen = vec![
       false;
       self.pattern_count as usize
     ];
     let mut result = Vec::new();
-
-    if let Some(ref multi) = self.multi {
-      if !self.needs_slow_path {
-        for m in multi.find_iter(&haystack) {
-          let pi =
-            &self.info[m.pattern().as_usize()];
-          if !pi.boundaries.has_any()
-            || pi.boundaries.check(
-              &haystack,
-              m.start(),
-              m.end(),
-              pi.unicode_wb,
-            )
-          {
-            let idx = pi.original_index as usize;
-            if !seen[idx] {
-              seen[idx] = true;
-              result.push(idx as u32);
-            }
-          }
-        }
-      } else {
-        let mut pos = 0;
-        while pos <= haystack.len() {
-          let input = Input::new(
-            haystack.as_str(),
-          )
-          .range(pos..);
-          match multi.find(input) {
-            Some(m) => {
-              let dfa_idx =
-                m.pattern().as_usize();
-              let pi = &self.info[dfa_idx];
-              match check_match(
-                &haystack,
-                m.start(),
-                m.end(),
-                &pi.verifier,
-                &pi.boundaries,
-                pi.unicode_wb,
-              ) {
-                Ok(()) => {
-                  let idx =
-                    pi.original_index as usize;
-                  if !seen[idx] {
-                    seen[idx] = true;
-                    result.push(idx as u32);
-                  }
-                  pos = m.end().max(pos + 1);
-                }
-                Err(ref rej)
-                  if self
-                    .needs_shadowed_check(rej) =>
-                {
-                  if let Some(alt) = self
-                    .find_shadowed(
-                      &haystack,
-                      m.start(),
-                      dfa_idx,
-                    )
-                  {
-                    let idx = alt.0 as usize;
-                    if !seen[idx] {
-                      seen[idx] = true;
-                      result.push(idx as u32);
-                    }
-                    pos = alt.2.max(pos + 1);
-                  } else {
-                    pos = m.start() + 1;
-                  }
-                }
-                Err(_) => {
-                  pos = m.start() + 1;
-                }
-              }
-            }
-            None => break,
-          }
-        }
-      }
-    }
-
-    for fb in &self.fallbacks {
-      let idx = fb.original_index as usize;
+    for (pat, _, _) in all {
+      let idx = pat as usize;
       if !seen[idx] {
-        let mut pos = 0;
-        while pos <= haystack.len() {
-          match fb
-            .regex
-            .find_from_pos(&haystack, pos)
-          {
-            Ok(Some(m)) => {
-              let passes =
-                !fb.boundaries.has_any()
-                  || fb.boundaries.check(
-                    &haystack,
-                    m.start(),
-                    m.end(),
-                    fb.unicode_wb,
-                  );
-              if passes {
-                seen[idx] = true;
-                result.push(idx as u32);
-                break;
-              }
-              pos = m.start() + 1;
-            }
-            _ => break,
-          }
-        }
+        seen[idx] = true;
+        result.push(pat);
       }
     }
     result
@@ -1420,138 +1193,19 @@ impl RegexSet {
       )));
     }
 
-    // Collect all verified matches.
-    let mut all: Vec<(usize, usize, usize)> =
-      Vec::new();
-
-    if let Some(ref multi) = self.multi {
-      if !self.needs_slow_path {
-        for m in multi.find_iter(&haystack) {
-          let pi =
-            &self.info[m.pattern().as_usize()];
-          if !pi.boundaries.has_any()
-            || pi.boundaries.check(
-              &haystack,
-              m.start(),
-              m.end(),
-              pi.unicode_wb,
-            )
-          {
-            all.push((
-              pi.original_index as usize,
-              m.start(),
-              m.end(),
-            ));
-          }
-        }
-      } else {
-        let mut pos = 0;
-        while pos <= haystack.len() {
-          let input = Input::new(
-            haystack.as_str(),
-          )
-          .range(pos..);
-          match multi.find(input) {
-            Some(m) => {
-              let dfa_idx =
-                m.pattern().as_usize();
-              let pi = &self.info[dfa_idx];
-              match check_match(
-                &haystack,
-                m.start(),
-                m.end(),
-                &pi.verifier,
-                &pi.boundaries,
-                pi.unicode_wb,
-              ) {
-                Ok(()) => {
-                  all.push((
-                    pi.original_index as usize,
-                    m.start(),
-                    m.end(),
-                  ));
-                  pos = m.end().max(pos + 1);
-                }
-                Err(ref rej)
-                  if self
-                    .needs_shadowed_check(rej) =>
-                {
-                  if let Some(alt) = self
-                    .find_shadowed(
-                      &haystack,
-                      m.start(),
-                      dfa_idx,
-                    )
-                  {
-                    all.push((
-                      alt.0 as usize,
-                      alt.1,
-                      alt.2,
-                    ));
-                    pos = alt.2.max(pos + 1);
-                  } else {
-                    pos = m.start() + 1;
-                  }
-                }
-                Err(_) => {
-                  pos = m.start() + 1;
-                }
-              }
-            }
-            None => break,
-          }
-        }
-      }
-    }
-
-    for fb in &self.fallbacks {
-      let mut pos = 0;
-      while pos <= haystack.len() {
-        match fb.regex.find_from_pos(&haystack, pos)
-        {
-          Ok(Some(m)) => {
-            let passes = !fb.boundaries.has_any()
-              || fb.boundaries.check(
-                &haystack,
-                m.start(),
-                m.end(),
-                fb.unicode_wb,
-              );
-            if passes {
-              all.push((
-                fb.original_index as usize,
-                m.start(),
-                m.end(),
-              ));
-              pos = m.end().max(pos + 1);
-            } else {
-              pos = m.start() + 1;
-            }
-          }
-          _ => break,
-        }
-      }
-    }
-
-    all.sort_by(|a, b| {
-      a.1
-        .cmp(&b.1)
-        .then_with(|| (b.2 - b.1).cmp(&(a.2 - a.1)))
-    });
+    let mut all = self.collect_matches(&haystack);
+    let selected =
+      Self::select_non_overlapping(&mut all);
 
     let mut result = String::with_capacity(
       haystack.len(),
     );
     let mut last: usize = 0;
-    let mut last_end: usize = 0;
 
-    for (pat, start, end) in all {
-      if start >= last_end {
-        result.push_str(&haystack[last..start]);
-        result.push_str(&replacements[pat]);
-        last = end;
-        last_end = end;
-      }
+    for (pat, start, end) in selected {
+      result.push_str(&haystack[last..start]);
+      result.push_str(&replacements[pat as usize]);
+      last = end;
     }
     result.push_str(&haystack[last..]);
     Ok(result)
