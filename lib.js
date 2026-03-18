@@ -14,9 +14,6 @@ function unpack(packed, haystack, names) {
     const idx = packed[i];
     const s = packed[i + 1];
     const e = packed[i + 2];
-    // Lazy text: defer haystack.slice until
-    // accessed. Saves 811 string allocations
-    // when caller only needs positions.
     const m = {
       pattern: idx,
       start: s,

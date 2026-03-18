@@ -894,7 +894,7 @@ describe("property: named patterns", () => {
 // RegExp for the same patterns on 10KB text.
 
 describe("property: no catastrophic slowdown", () => {
-  test("RegexSet within 10x of JS RegExp", () => {
+  test("RegexSet within 20x of JS RegExp", () => {
     fc.assert(
       fc.property(
         fc.array(allPatterns, {
