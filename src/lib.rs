@@ -797,14 +797,68 @@ struct FallbackPattern {
 /// byte_start, byte_end).
 type RawMatch = (u32, usize, usize);
 
-/// Patterns split into two DFAs: fast (find_iter)
-/// and slow (manual loop with shadowed check).
-/// This prevents 2 lookahead patterns from forcing
-/// all 15 other patterns onto the slow path.
+/// Check if a regex pattern is a pure literal
+/// (no metacharacters). If so, return the bytes.
+fn extract_literal(pattern: &str) -> Option<Vec<u8>> {
+  let bytes = pattern.as_bytes();
+  for &b in bytes {
+    match b {
+      b'\\' | b'.' | b'^' | b'$' | b'*' | b'+'
+      | b'?' | b'{' | b'}' | b'(' | b')' | b'['
+      | b']' | b'|' => return None,
+      _ => {}
+    }
+  }
+  if bytes.is_empty() {
+    return None;
+  }
+  Some(bytes.to_vec())
+}
+
+/// SIMD-accelerated literal search using memchr.
+/// Uses single-byte memchr (NEON on ARM, SSE2/AVX2
+/// on x86) as prefilter, then verifies remaining
+/// bytes. ~30GB/s scan + cheap verification.
+fn find_literal_matches(
+  haystack: &[u8],
+  needle: &[u8],
+  pattern_index: u32,
+) -> Vec<RawMatch> {
+  if needle.is_empty() {
+    return Vec::new();
+  }
+  let first = needle[0];
+  let needle_len = needle.len();
+  let mut results = Vec::new();
+
+  for pos in memchr::memchr_iter(first, haystack) {
+    if pos + needle_len <= haystack.len()
+      && haystack[pos..pos + needle_len] == *needle
+    {
+      results.push((
+        pattern_index,
+        pos,
+        pos + needle_len,
+      ));
+    }
+  }
+  results
+}
+
+struct LiteralPattern {
+  original_index: u32,
+  needle: Vec<u8>,
+  boundaries: EdgeBoundaries,
+  unicode_wb: bool,
+}
+
 #[napi]
 pub struct RegexSet {
-  /// Fast DFA: patterns with Verifier::None and
-  /// no \B boundaries. Uses find_iter (single pass).
+  /// SIMD-accelerated literal patterns (memchr).
+  /// Bypasses DFA entirely for pure literals.
+  literals: Vec<LiteralPattern>,
+  /// Fast DFA: regex patterns with Verifier::None
+  /// and no \B boundaries.
   fast_multi: Option<MetaRegex>,
   fast_info: Vec<PatternInfo>,
   /// Slow DFA: patterns with verifiers or \B.
@@ -847,6 +901,8 @@ impl RegexSet {
       patterns
     };
 
+    let mut literals: Vec<LiteralPattern> =
+      Vec::new();
     let mut fast_cores: Vec<String> = Vec::new();
     let mut fast_info: Vec<PatternInfo> = Vec::new();
     let mut slow_cores: Vec<String> = Vec::new();
@@ -960,6 +1016,7 @@ impl RegexSet {
       };
 
     Ok(Self {
+      literals,
       fast_multi,
       fast_info,
       slow_multi,
@@ -989,10 +1046,14 @@ impl RegexSet {
     haystack: &str,
   ) -> BoundaryMode {
     let any_boundaries = self
-      .fast_info
+      .literals
       .iter()
-      .chain(self.slow_info.iter())
-      .any(|pi| pi.boundaries.has_any())
+      .any(|l| l.boundaries.has_any())
+      || self
+        .fast_info
+        .iter()
+        .chain(self.slow_info.iter())
+        .any(|pi| pi.boundaries.has_any())
       || self
         .fallbacks
         .iter()
@@ -1005,10 +1066,11 @@ impl RegexSet {
     }
 
     let unicode = self
-      .fast_info
+      .literals
       .first()
-      .or(self.slow_info.first())
-      .map(|pi| pi.unicode_wb)
+      .map(|l| l.unicode_wb)
+      .or(self.fast_info.first().map(|pi| pi.unicode_wb))
+      .or(self.slow_info.first().map(|pi| pi.unicode_wb))
       .unwrap_or(false);
 
     if unicode && needs_segmenter(haystack) {
@@ -1032,6 +1094,25 @@ impl RegexSet {
   ) -> (Vec<RawMatch>, bool) {
     let mut all: Vec<RawMatch> = Vec::new();
     let mode = self.boundary_mode(haystack);
+    let haystack_bytes = haystack.as_bytes();
+
+    // Literal patterns: SIMD-accelerated memchr.
+    for lit in &self.literals {
+      let mut matches = find_literal_matches(
+        haystack_bytes,
+        &lit.needle,
+        lit.original_index,
+      );
+      // Apply boundary filter if needed.
+      if lit.boundaries.has_any() {
+        matches.retain(|&(_, start, end)| {
+          lit.boundaries.check_with_mode(
+            haystack, start, end, &mode,
+          )
+        });
+      }
+      all.extend(matches);
+    }
 
     // Fast DFA: single-pass find_iter.
     // Checks boundaries + inline verifiers (None
@@ -1150,9 +1231,15 @@ impl RegexSet {
     // Sort only needed when multiple sources
     // contributed matches. Fast DFA find_iter
     // already returns matches in position order.
-    let needs_sort = (self.slow_multi.is_some()
-      || !self.fallbacks.is_empty())
-      && all.len() > 1;
+    // Sort when multiple sources contributed.
+    // Sort needed when matches come from multiple
+    // sources (interleaved positions) or multiple
+    // literal patterns (each scanned independently).
+    let sources = (self.literals.len().min(2) as u8)
+      + (self.fast_multi.is_some() as u8)
+      + (self.slow_multi.is_some() as u8)
+      + (!self.fallbacks.is_empty() as u8);
+    let needs_sort = sources > 1 && all.len() > 1;
     (all, needs_sort)
   }
 
@@ -1231,6 +1318,26 @@ impl RegexSet {
 
   fn _is_match(&self, haystack: &str) -> bool {
     let mode = self.boundary_mode(haystack);
+    let haystack_bytes = haystack.as_bytes();
+
+    // Literals: SIMD memchr (fastest path).
+    for lit in &self.literals {
+      let first = lit.needle[0];
+      for pos in
+        memchr::memchr_iter(first, haystack_bytes)
+      {
+        let end = pos + lit.needle.len();
+        if end <= haystack_bytes.len()
+          && haystack_bytes[pos..end] == *lit.needle
+          && (!lit.boundaries.has_any()
+            || lit.boundaries.check_with_mode(
+              haystack, pos, end, &mode,
+            ))
+        {
+          return true;
+        }
+      }
+    }
 
     // Fast DFA
     if let Some(ref multi) = self.fast_multi {

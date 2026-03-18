@@ -24,6 +24,7 @@ napi = { version = "3", default-features = false, features = [
 ] }
 napi-derive = "3"
 unicode-segmentation = "1"
+memchr = "2"
 
 [build-dependencies]
 napi-build = "2"

@@ -18,14 +18,7 @@ function unpack(packed, haystack, names) {
       pattern: idx,
       start: s,
       end: e,
-      get text() {
-        const t = haystack.slice(s, e);
-        Object.defineProperty(this, "text", {
-          value: t,
-          enumerable: true,
-        });
-        return t;
-      },
+      text: haystack.slice(s, e),
     };
     if (names && names[idx] !== undefined)
       m.name = names[idx];
