@@ -374,6 +374,25 @@ describe("named patterns", () => {
     ]);
     expect(rs.patternCount).toBe(2);
   });
+
+  test("invalid pattern type in NamedPattern throws", () => {
+    expect(
+      () => new RegexSet([{ pattern: 42, name: "x" }]),
+    ).toThrow(/must be a string or RegExp/);
+    expect(
+      () => new RegexSet([{ pattern: null, name: "x" }]),
+    ).toThrow(/must be a string or RegExp/);
+  });
+
+  test("invalid name type in NamedPattern throws", () => {
+    expect(
+      () => new RegexSet([{ pattern: "a", name: 42 }]),
+    ).toThrow(/must be a string/);
+    expect(
+      () =>
+        new RegexSet([{ pattern: "a", name: ["x"] }]),
+    ).toThrow(/must be a string/);
+  });
 });
 
 // ─── Same Match type as aho-corasick ──────────
