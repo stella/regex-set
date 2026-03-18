@@ -394,6 +394,48 @@ describe("property: wholeWords", () => {
   });
 });
 
+// ─── Property 8b: option × feature cross ─────
+//
+// Every combination of options (wholeWords,
+// unicodeBoundaries) × pattern features (\b, \B,
+// lookaround) must compile and not panic/UB.
+
+const allOptions = fc.constantFrom(
+  {},
+  { wholeWords: true },
+  { unicodeBoundaries: true },
+  { wholeWords: true, unicodeBoundaries: true },
+);
+
+describe("property: option × feature cross", () => {
+  test("all option combos × pattern features compile", () => {
+    fc.assert(
+      fc.property(
+        fc.array(featurePattern, {
+          minLength: 1,
+          maxLength: 5,
+        }),
+        allOptions,
+        hay,
+        (pats, opts, h) => {
+          // Must not throw or panic
+          const rs = new RegexSet(pats, opts);
+          const matches = rs.findIter(h);
+          expect(rs.isMatch(h)).toBe(
+            matches.length > 0,
+          );
+          for (const m of matches) {
+            expect(h.slice(m.start, m.end)).toBe(
+              m.text,
+            );
+          }
+        },
+      ),
+      PARAMS,
+    );
+  });
+});
+
 // ─── Property 9: unicodeBoundaries ──────────
 //
 // When unicodeBoundaries is true, \b must treat
