@@ -12,13 +12,20 @@ function unpack(packed, haystack, names) {
   const matches = new Array(len / 3);
   for (let i = 0, j = 0; i < len; i += 3, j++) {
     const idx = packed[i];
-    const start = packed[i + 1];
-    const end = packed[i + 2];
+    const s = packed[i + 1];
+    const e = packed[i + 2];
     const m = {
       pattern: idx,
-      start,
-      end,
-      text: haystack.slice(start, end),
+      start: s,
+      end: e,
+      get text() {
+        const t = haystack.slice(s, e);
+        Object.defineProperty(this, "text", {
+          value: t,
+          enumerable: true,
+        });
+        return t;
+      },
     };
     if (names && names[idx] !== undefined)
       m.name = names[idx];

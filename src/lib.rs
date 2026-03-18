@@ -1022,10 +1022,14 @@ impl RegexSet {
     }
   }
 
+  /// Collect all verified matches. Returns
+  /// (matches, needs_sort). When only the fast DFA
+  /// produced matches, they're already in order —
+  /// skip the sort.
   fn collect_matches(
     &self,
     haystack: &str,
-  ) -> Vec<RawMatch> {
+  ) -> (Vec<RawMatch>, bool) {
     let mut all: Vec<RawMatch> = Vec::new();
     let mode = self.boundary_mode(haystack);
 
@@ -1143,7 +1147,13 @@ impl RegexSet {
       }
     }
 
-    all
+    // Sort only needed when multiple sources
+    // contributed matches. Fast DFA find_iter
+    // already returns matches in position order.
+    let needs_sort = (self.slow_multi.is_some()
+      || !self.fallbacks.is_empty())
+      && all.len() > 1;
+    (all, needs_sort)
   }
 
   /// Sort matches and select non-overlapping.
@@ -1319,14 +1329,18 @@ impl RegexSet {
     &self,
     haystack: &str,
   ) -> Uint32Array {
-    let mut all = self.collect_matches(haystack);
+    let (mut all, needs_sort) =
+      self.collect_matches(haystack);
 
     if all.is_empty() {
       return Uint32Array::new(Vec::new());
     }
 
-    let selected =
-      Self::select_non_overlapping(&mut all);
+    let selected = if needs_sort {
+      Self::select_non_overlapping(&mut all)
+    } else {
+      all
+    };
 
     // Pack with UTF-16 offsets.
     if haystack.is_ascii() {
@@ -1420,7 +1434,7 @@ impl RegexSet {
     &self,
     haystack: String,
   ) -> Vec<u32> {
-    let all = self.collect_matches(&haystack);
+    let (all, _) = self.collect_matches(&haystack);
     let mut seen = vec![
       false;
       self.pattern_count as usize
@@ -1452,9 +1466,13 @@ impl RegexSet {
       )));
     }
 
-    let mut all = self.collect_matches(&haystack);
-    let selected =
-      Self::select_non_overlapping(&mut all);
+    let (mut all, needs_sort) =
+      self.collect_matches(&haystack);
+    let selected = if needs_sort {
+      Self::select_non_overlapping(&mut all)
+    } else {
+      all
+    };
 
     let mut result = String::with_capacity(
       haystack.len(),
