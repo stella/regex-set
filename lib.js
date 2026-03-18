@@ -91,6 +91,15 @@ function normalizeEntry(p, i) {
     p !== null &&
     "pattern" in p
   ) {
+    if (
+      typeof p.pattern !== "string" &&
+      !(p.pattern instanceof RegExp)
+    ) {
+      throw new TypeError(
+        `Pattern at index ${i}: "pattern" ` +
+          "field must be a string or RegExp",
+      );
+    }
     const inner =
       p.pattern instanceof RegExp
         ? normalizeEntry(p.pattern, i)
