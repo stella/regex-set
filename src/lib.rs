@@ -328,12 +328,13 @@ fn build_verifier(
   // support (?-u:\b). Revert to Unicode \b.
   //
   // NOTE: This means \b uses ASCII semantics on
-  // the MetaRegex path but Unicode semantics on
-  // the fancy-regex fallback. The divergence only
+  // the MetaRegex path (matching JS behavior) but
+  // Unicode semantics on the fancy-regex fallback
+  // (diverging from JS). The divergence only
   // affects patterns that combine \b with complex
   // lookaround AND match near non-ASCII word chars
-  // (e.g., accented letters). This matches the JS
-  // RegExp \b behavior for ASCII text.
+  // (e.g., accented letters). For ASCII-only text
+  // both paths behave identically.
   let core_stripped =
     strip_lookaround_str(pattern);
   let fancy_pat = revert_ascii_boundaries(pattern);
