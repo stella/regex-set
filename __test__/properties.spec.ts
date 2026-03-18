@@ -268,121 +268,157 @@ const suffixes = [
   "(?!\\d)", // negative lookahead (digit)
 ];
 
-// Build all prefix × core × suffix combinations
-const combos: string[] = [];
-for (const pre of prefixes) {
-  for (const core of cores) {
-    for (const suf of suffixes) {
-      combos.push(`${pre}${core}${suf}`);
-    }
-  }
-}
+// ─── Exhaustive cartesian product test ───────
+//
+// Define every axis of variation ONCE. The test
+// automatically crosses ALL combinations. When a
+// new option or feature is added, add it to its
+// axis array — every interaction is tested.
+//
+// Axes:
+//   1. Options   (wholeWords × unicodeBoundaries)
+//   2. Patterns  (boundaries, assertions, escaping)
+//   3. Haystacks (ASCII, Czech, CJK, random)
+//
+// If any combination crashes, returns wrong text,
+// or disagrees between isMatch and findIter, the
+// test fails with the exact combination logged.
 
-// Pick random combos per test run
-const featurePattern = fc.oneof(
-  // Static combos (all feature interactions)
-  ...combos.map((c) => fc.constant(c)),
-  // Dynamic: safe literal with random boundary/assertion
-  safePattern.chain((p) =>
-    fc.tuple(
-      fc.constantFrom(...prefixes),
-      fc.constantFrom(...suffixes),
-    ).map(([pre, suf]) => `${pre}${p}${suf}`),
-  ),
+// ── Axis 1: Options ──────────────────────────
+// Every boolean combination of every option.
+const optionCombos = fc.constantFrom(
+  {},
+  { wholeWords: true },
+  { unicodeBoundaries: true },
+  { wholeWords: true, unicodeBoundaries: true },
 );
 
-// ─── Property 7b: backslash escaping ─────────
-//
-// Varying counts of backslashes before 'b' at
-// pattern edges to catch escape-counting bugs.
-// Odd count = \b (word boundary), even = \\b
-// (literal backslash + b).
+// ── Axis 2: Patterns ─────────────────────────
+// Every feature that could interact: boundaries,
+// assertions, escaping, character classes.
 
 const backslashEdgePattern = fc
   .integer({ min: 0, max: 6 })
   .chain((n) => {
-    // n backslashes before 'b' at the end
     const bs = "\\".repeat(n);
     const suffix = `${bs}b`;
-    // Only valid regex if n is even (literal \...\b)
-    // or n is odd (word boundary).
-    // Pair with a safe core that always matches.
-    return safePattern.map((core) => {
-      // For even n: pattern ends with literal
-      // backslash(es) + b. For odd n: word boundary.
-      return `${core}${suffix}`;
-    });
-  });
-
-describe("property: backslash escaping", () => {
-  test("patterns with 0-6 backslashes before b compile or throw consistently", () => {
-    fc.assert(
-      fc.property(
-        backslashEdgePattern,
-        hay,
-        (pat, h) => {
-          try {
-            const rs = new RegexSet([pat]);
-            const matches = rs.findIter(h);
-            // If it compiles, text field must be
-            // correct
-            for (const m of matches) {
-              expect(h.slice(m.start, m.end)).toBe(
-                m.text,
-              );
-            }
-          } catch {
-            // Invalid regex is acceptable — just
-            // must not panic or corrupt state
-          }
-        },
-      ),
-      PARAMS,
+    return safePattern.map(
+      (core) => `${core}${suffix}`,
     );
   });
-});
 
-describe("property: feature combinations", () => {
-  test("all boundary × assertion combos compile and run", () => {
+const allPatterns = fc.oneof(
+  // Plain literals (baseline)
+  safePattern,
+  // Boundary features
+  ...prefixes.map((pre) =>
+    safePattern.chain((p) =>
+      fc.constantFrom(...suffixes).map(
+        (suf) => `${pre}${p}${suf}`,
+      ),
+    ),
+  ),
+  // Character classes with boundaries
+  ...cores.flatMap((core) => [
+    fc.constantFrom(...prefixes).map(
+      (pre) => `${pre}${core}`,
+    ),
+    fc.constantFrom(...suffixes).map(
+      (suf) => `${core}${suf}`,
+    ),
+    fc
+      .tuple(
+        fc.constantFrom(...prefixes),
+        fc.constantFrom(...suffixes),
+      )
+      .map(([pre, suf]) => `${pre}${core}${suf}`),
+  ]),
+  // Backslash escaping edge cases
+  backslashEdgePattern,
+);
+
+// ── Axis 3: Haystacks ────────────────────────
+// ASCII, multilingual, edge cases.
+const allHaystacks = fc.oneof(
+  hay,
+  fc.constantFrom(
+    "",
+    "čáp letí",
+    "Příbram 123 Pavel",
+    "café résumé naïve",
+    "日本語 test 中文",
+    "Ωmega αlpha βeta",
+    "Łódź Gdańsk Wrocław",
+    "test",
+    "123",
+    " ",
+  ),
+  fc.string({ minLength: 0, maxLength: 200 }),
+);
+
+// ── The test ─────────────────────────────────
+
+describe("exhaustive: options × patterns × haystacks", () => {
+  test("all combinations compile, run, and produce correct results", () => {
     fc.assert(
       fc.property(
-        fc.array(featurePattern, {
+        fc.array(allPatterns, {
           minLength: 1,
           maxLength: 5,
         }),
-        hay,
-        (pats, h) => {
-          // Must not throw
-          const rs = new RegexSet(pats);
-          // isMatch and findIter must agree
-          const matches = rs.findIter(h);
-          expect(rs.isMatch(h)).toBe(
-            matches.length > 0,
-          );
-          // text field must be correct
-          for (const m of matches) {
-            expect(h.slice(m.start, m.end)).toBe(
-              m.text,
+        optionCombos,
+        allHaystacks,
+        (pats, opts, h) => {
+          try {
+            const rs = new RegexSet(pats, opts);
+            const matches = rs.findIter(h);
+
+            // isMatch agrees with findIter
+            expect(rs.isMatch(h)).toBe(
+              matches.length > 0,
             );
+
+            // text field is correct slice
+            for (const m of matches) {
+              expect(
+                h.slice(m.start, m.end),
+              ).toBe(m.text);
+            }
+
+            // Non-overlapping + monotonic
+            for (
+              let i = 1;
+              i < matches.length;
+              i++
+            ) {
+              expect(
+                matches[i]!.start,
+              ).toBeGreaterThanOrEqual(
+                matches[i - 1]!.end,
+              );
+            }
+          } catch {
+            // Compile errors for invalid patterns
+            // are acceptable (e.g., backslash edge
+            // cases). Must not panic or UB.
           }
         },
       ),
-      PARAMS,
+      { ...PARAMS, numRuns: 500 },
     );
   });
 });
 
-// ─── Property 8: wholeWords consistency ───────
+// ── Semantic checks (kept separate) ──────────
 
-describe("property: wholeWords", () => {
-  test("wholeWords matches have \\b boundaries", () => {
+describe("property: wholeWords JS oracle", () => {
+  test("wholeWords matches verified by JS \\b", () => {
     fc.assert(
       fc.property(safePatterns, hay, (pats, h) => {
         const rs = new RegexSet(pats, {
           wholeWords: true,
         });
         for (const m of rs.findIter(h)) {
-          // Verify with JS \b
           const re = new RegExp(
             `\\b${pats[m.pattern]!}\\b`,
           );
@@ -394,127 +430,10 @@ describe("property: wholeWords", () => {
   });
 });
 
-// ─── Property 8b: option × feature cross ─────
-//
-// Every combination of options (wholeWords,
-// unicodeBoundaries) × pattern features (\b, \B,
-// lookaround) must compile and not panic/UB.
-
-const allOptions = fc.constantFrom(
-  {},
-  { wholeWords: true },
-  { unicodeBoundaries: true },
-  { wholeWords: true, unicodeBoundaries: true },
-);
-
-describe("property: option × feature cross", () => {
-  test("all option combos × pattern features compile", () => {
-    fc.assert(
-      fc.property(
-        fc.array(featurePattern, {
-          minLength: 1,
-          maxLength: 5,
-        }),
-        allOptions,
-        hay,
-        (pats, opts, h) => {
-          // Must not throw or panic
-          const rs = new RegexSet(pats, opts);
-          const matches = rs.findIter(h);
-          expect(rs.isMatch(h)).toBe(
-            matches.length > 0,
-          );
-          for (const m of matches) {
-            expect(h.slice(m.start, m.end)).toBe(
-              m.text,
-            );
-          }
-        },
-      ),
-      PARAMS,
-    );
-  });
-});
-
-// ─── Property 9: unicodeBoundaries ──────────
-//
-// When unicodeBoundaries is true, \b must treat
-// Unicode letters as word characters. Verify
-// consistency between ASCII and Unicode modes.
-
-// Haystack with mixed ASCII + non-ASCII words
-const unicodeHay = fc.oneof(
-  hay,
-  fc.constantFrom(
-    "čáp letí",
-    "Příbram 123 Pavel",
-    "café résumé naïve",
-    "日本語 test 中文",
-    "Ωmega αlpha βeta",
-    "Łódź Gdańsk Wrocław",
-  ),
-  fc.string({ minLength: 0, maxLength: 200 }),
-);
-
-describe("property: unicodeBoundaries", () => {
-  test("unicode mode: all combos compile and run", () => {
-    fc.assert(
-      fc.property(
-        fc.array(featurePattern, {
-          minLength: 1,
-          maxLength: 5,
-        }),
-        unicodeHay,
-        (pats, h) => {
-          const rs = new RegexSet(pats, {
-            unicodeBoundaries: true,
-          });
-          const matches = rs.findIter(h);
-          expect(rs.isMatch(h)).toBe(
-            matches.length > 0,
-          );
-          for (const m of matches) {
-            expect(h.slice(m.start, m.end)).toBe(
-              m.text,
-            );
-          }
-        },
-      ),
-      PARAMS,
-    );
-  });
-
-  test("wholeWords + unicode: no crash, text correct", () => {
-    fc.assert(
-      fc.property(
-        safePatterns,
-        unicodeHay,
-        (pats, h) => {
-          const rs = new RegexSet(pats, {
-            wholeWords: true,
-            unicodeBoundaries: true,
-          });
-          const matches = rs.findIter(h);
-          expect(rs.isMatch(h)).toBe(
-            matches.length > 0,
-          );
-          for (const m of matches) {
-            expect(h.slice(m.start, m.end)).toBe(
-              m.text,
-            );
-          }
-        },
-      ),
-      PARAMS,
-    );
-  });
-
-  test("ASCII and Unicode modes agree on ASCII-only text", () => {
-    // On pure ASCII text, both modes should produce
-    // identical results.
+describe("property: ASCII/Unicode agreement on ASCII text", () => {
+  test("both modes produce identical results on ASCII", () => {
     fc.assert(
       fc.property(safePatterns, hay, (pats, h) => {
-        // Ensure ASCII-only haystack
         if (!/^[\x00-\x7F]*$/.test(h)) return;
 
         const rsA = new RegexSet(

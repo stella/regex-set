@@ -291,7 +291,7 @@ bun install
 # Build native module (requires Rust toolchain)
 bun run build
 
-# Run tests (47 unit + 16 property)
+# Run tests (47 unit + 12 property)
 bun test
 bun run test:props
 
