@@ -463,27 +463,16 @@ const backslashEdgePattern = fc
 // RegExp objects with flag combinations.
 // Tests (?i-u), (?m), (?s) conversion and
 // their interaction with all features.
-const regexpPatterns = fc.oneof(
-  safePattern.map((p) => new RegExp(p, "i")),
-  safePattern.map((p) => new RegExp(p, "m")),
-  safePattern.map((p) => new RegExp(p, "im")),
-  ...cores.map((core) =>
-    fc.constant(new RegExp(core, "i")),
-  ),
-  // Alternation with /i (the exact pattern
-  // shape that caused the DFA state explosion)
-  fc.constant(
-    new RegExp("(?:foo|bar|baz|qux)", "i"),
-  ),
-  fc.constant(
-    new RegExp("(?:Jan|Feb|Mar|Apr)", "i"),
-  ),
+// ── Axis 5: Flags ────────────────────────────
+// Every flag combination as a proper axis that
+// crosses with all patterns. "" = no flags (string).
+const allFlags = fc.constantFrom(
+  "", "i", "m", "s", "im", "is", "ms", "ims",
 );
 
-const allPatterns = fc.oneof(
-  // Plain literals (baseline)
+// Base patterns (string form, no flags).
+const basePatterns = fc.oneof(
   safePattern,
-  // Boundary features
   ...prefixes.map((pre) =>
     safePattern.chain((p) =>
       fc.constantFrom(...suffixes).map(
@@ -491,7 +480,6 @@ const allPatterns = fc.oneof(
       ),
     ),
   ),
-  // Character classes with boundaries
   ...cores.flatMap((core) => [
     fc.constantFrom(...prefixes).map(
       (pre) => `${pre}${core}`,
@@ -506,11 +494,23 @@ const allPatterns = fc.oneof(
       )
       .map(([pre, suf]) => `${pre}${core}${suf}`),
   ]),
-  // Backslash escaping edge cases
   backslashEdgePattern,
-  // RegExp with flags (/i, /m, /im)
-  regexpPatterns,
 );
+
+// All patterns: base patterns × flags.
+// "" flags = string pattern, non-empty = RegExp.
+// This is the TRUE cartesian product over all axes.
+const allPatterns: fc.Arbitrary<string | RegExp> =
+  basePatterns.chain((pat) =>
+    allFlags.map((flags) => {
+      if (!flags) return pat;
+      try {
+        return new RegExp(pat, flags);
+      } catch {
+        return pat; // invalid regex with flags → use as string
+      }
+    }),
+  );
 
 // ── Axis 3: Haystacks ────────────────────────
 // ASCII, multilingual, edge cases.
@@ -527,6 +527,10 @@ const allHaystacks = fc.oneof(
     "test",
     "123",
     " ",
+    // Multiline text (for /m + ^/$ tests)
+    "foo\nbar\nbaz",
+    "line1\nTEST\nline3",
+    "abc\n123\ndef",
   ),
   fc.string({ minLength: 0, maxLength: 200 }),
 );
