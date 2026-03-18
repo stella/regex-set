@@ -106,6 +106,15 @@ function normalizeEntry(p, i) {
         : {
             pattern: asciiBoundaries(p.pattern),
           };
+    if (
+      p.name !== undefined &&
+      typeof p.name !== "string"
+    ) {
+      throw new TypeError(
+        `Pattern at index ${i}: "name" ` +
+          "field must be a string",
+      );
+    }
     return {
       pattern: inner.pattern,
       name: p.name,
