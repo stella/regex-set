@@ -251,9 +251,15 @@ describe("property: oracle vs JS RegExp", () => {
  * Returns null if the pattern uses Rust-only syntax.
  */
 function toJsRegExp(
-  pat: string,
+  pat: string | RegExp,
 ): RegExp | null {
   try {
+    if (pat instanceof RegExp) {
+      return new RegExp(
+        pat.source,
+        pat.flags + "g",
+      );
+    }
     return new RegExp(pat, "g");
   } catch {
     return null;
@@ -351,13 +357,21 @@ describe("property: JS oracle on feature patterns", () => {
           // assertions (\b, \B, lookahead, lookbehind)
           // since those can't be verified on the
           // isolated text slice.
-          const hasContext = (p: string) =>
-            /\\[bB]/.test(p) ||
-            /\(\?[=!<]/.test(p);
+          const hasContext = (p: string | RegExp) => {
+            const s =
+              p instanceof RegExp ? p.source : p;
+            return (
+              /\\[bB]/.test(s) ||
+              /\(\?[=!<]/.test(s)
+            );
+          };
 
           for (const m of real) {
             const pat = pats[m.pattern]!;
             if (hasContext(pat)) continue;
+            // Skip RegExp objects — their Rust
+            // conversion ((?i-u)...) isn't valid JS.
+            if (pat instanceof RegExp) continue;
             const re = new RegExp(pat);
             expect(re.test(m.text)).toBe(true);
           }
@@ -446,6 +460,26 @@ const backslashEdgePattern = fc
     );
   });
 
+// RegExp objects with flag combinations.
+// Tests (?i-u), (?m), (?s) conversion and
+// their interaction with all features.
+const regexpPatterns = fc.oneof(
+  safePattern.map((p) => new RegExp(p, "i")),
+  safePattern.map((p) => new RegExp(p, "m")),
+  safePattern.map((p) => new RegExp(p, "im")),
+  ...cores.map((core) =>
+    fc.constant(new RegExp(core, "i")),
+  ),
+  // Alternation with /i (the exact pattern
+  // shape that caused the DFA state explosion)
+  fc.constant(
+    new RegExp("(?:foo|bar|baz|qux)", "i"),
+  ),
+  fc.constant(
+    new RegExp("(?:Jan|Feb|Mar|Apr)", "i"),
+  ),
+);
+
 const allPatterns = fc.oneof(
   // Plain literals (baseline)
   safePattern,
@@ -474,6 +508,8 @@ const allPatterns = fc.oneof(
   ]),
   // Backslash escaping edge cases
   backslashEdgePattern,
+  // RegExp with flags (/i, /m, /im)
+  regexpPatterns,
 );
 
 // ── Axis 3: Haystacks ────────────────────────
@@ -842,6 +878,71 @@ describe("property: named patterns", () => {
         },
       ),
       PARAMS,
+    );
+  });
+});
+
+// ─── Performance property ───────────────────
+//
+// Catches catastrophic DFA state explosions (like
+// the (?i) Unicode case folding bug). Verifies
+// RegexSet isn't more than 10x slower than JS
+// RegExp for the same patterns on 10KB text.
+
+describe("property: no catastrophic slowdown", () => {
+  test("RegexSet within 10x of JS RegExp", () => {
+    fc.assert(
+      fc.property(
+        fc.array(allPatterns, {
+          minLength: 1,
+          maxLength: 5,
+        }),
+        optionCombos,
+        (pats, opts) => {
+          const jsRegs: (RegExp | null)[] =
+            pats.map(toJsRegExp);
+          if (jsRegs.some((r) => r === null))
+            return;
+
+          let rs;
+          try {
+            rs = new RegexSet(pats, opts);
+          } catch {
+            return;
+          }
+
+          const h =
+            "Ing. Jan Novák test 123 foo bar " +
+            "email@test.cz 29.5.2026 850315/0007 ";
+          const text = h.repeat(
+            Math.ceil((10 * 1024) / h.length),
+          );
+
+          const t0 = performance.now();
+          rs.findIter(text);
+          const rsTime = performance.now() - t0;
+
+          const t1 = performance.now();
+          for (const re of jsRegs) {
+            re!.lastIndex = 0;
+            let m;
+            while ((m = re!.exec(text)) !== null) {
+              if (m[0]!.length === 0) {
+                re!.lastIndex++;
+              }
+            }
+          }
+          const jsTime = performance.now() - t1;
+
+          // RS should not be more than 10x slower
+          if (jsTime > 0.1) {
+            expect(rsTime / jsTime).toBeLessThan(
+              10,
+            );
+          }
+        },
+      ),
+      { ...PARAMS, numRuns: 100 },
     );
   });
 });
