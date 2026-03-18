@@ -1,6 +1,6 @@
 {
   "name": "@stll/regex-set",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "NAPI-RS bindings to Rust regex-automata for multi-pattern regex matching in Node.js/Bun",
   "license": "MIT",
   "repository": {
@@ -84,11 +84,11 @@
     "node": ">= 18"
   },
   "optionalDependencies": {
-    "@stll/regex-set-darwin-arm64": "0.2.0",
-    "@stll/regex-set-darwin-x64": "0.2.0",
-    "@stll/regex-set-linux-arm64-gnu": "0.2.0",
-    "@stll/regex-set-linux-x64-gnu": "0.2.0",
-    "@stll/regex-set-linux-x64-musl": "0.2.0",
-    "@stll/regex-set-win32-x64-msvc": "0.2.0"
+    "@stll/regex-set-darwin-arm64": "0.3.0",
+    "@stll/regex-set-darwin-x64": "0.3.0",
+    "@stll/regex-set-linux-arm64-gnu": "0.3.0",
+    "@stll/regex-set-linux-x64-gnu": "0.3.0",
+    "@stll/regex-set-linux-x64-musl": "0.3.0",
+    "@stll/regex-set-win32-x64-msvc": "0.3.0"
   }
 }
