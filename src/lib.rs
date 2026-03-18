@@ -324,11 +324,13 @@ fn build_verifier(
   }
 
   // Still has lookaround (complex or nested).
-  // Fall back to fancy-regex.
+  // Fall back to fancy-regex, which does not
+  // support (?-u:\b). Revert to Unicode \b.
   let core_stripped =
     strip_lookaround_str(pattern);
+  let fancy_pat = revert_ascii_boundaries(pattern);
   let verifier =
-    fancy_regex::Regex::new(pattern)
+    fancy_regex::Regex::new(&fancy_pat)
       .map_err(|e| format!("{e}"))?;
 
   Ok((core_stripped, Verifier::Complex(verifier)))
@@ -494,6 +496,14 @@ fn ceil_char_boundary(
   i
 }
 
+/// Revert `(?-u:\b)` / `(?-u:\B)` back to `\b` /
+/// `\B` for fancy-regex, which does not support
+/// the `(?-u:...)` Unicode-disable syntax.
+fn revert_ascii_boundaries(s: &str) -> String {
+  s.replace("(?-u:\\b)", "\\b")
+    .replace("(?-u:\\B)", "\\B")
+}
+
 // ─── Engine ───────────────────────────────────
 
 struct PatternInfo {
@@ -557,12 +567,16 @@ impl RegexSet {
         });
       } else {
         // Core doesn't compile; full fallback.
-        let re = fancy_regex::Regex::new(p)
-          .map_err(|e| {
-            Error::from_reason(format!(
-              "Failed to compile pattern {i}: {e}"
-            ))
-          })?;
+        // fancy-regex doesn't support (?-u:\b).
+        let fancy_pat =
+          revert_ascii_boundaries(p);
+        let re =
+          fancy_regex::Regex::new(&fancy_pat)
+            .map_err(|e| {
+              Error::from_reason(format!(
+                "Failed to compile pattern {i}: {e}"
+              ))
+            })?;
         fallbacks.push(FallbackPattern {
           original_index: i as u32,
           regex: re,

@@ -234,7 +234,95 @@ describe("property: oracle vs JS RegExp", () => {
   });
 });
 
-// ─── Property 7: wholeWords consistency ───────
+// ─── Property 7: feature combination ──────────
+//
+// The safe literal patterns above never exercise
+// regex features like \b, lookaround, or char
+// classes. This property generates patterns that
+// combine these features to catch interaction bugs
+// (e.g., \b + lookahead broke fancy-regex fallback).
+
+// Combinatorial feature generator: every combo of
+// prefix boundary × core pattern × suffix assertion
+// to catch interaction bugs between features.
+
+const prefixes = [
+  "", // none
+  "\\b", // word boundary
+  "\\B", // non-word boundary
+  "(?<![a-z])", // negative lookbehind
+  "(?<=\\s)", // positive lookbehind
+  "(?<!\\d)", // negative lookbehind (digit)
+];
+
+const cores = [
+  ...["[a-z]+", "\\d+", "\\w+", "[A-Z][a-z]+"],
+  // also use a random safe literal
+];
+
+const suffixes = [
+  "", // none
+  "\\b", // word boundary
+  "\\B", // non-word boundary
+  "(?![a-z])", // negative lookahead
+  "(?=\\s)", // positive lookahead
+  "(?!\\d)", // negative lookahead (digit)
+];
+
+// Build all prefix × core × suffix combinations
+const combos: string[] = [];
+for (const pre of prefixes) {
+  for (const core of cores) {
+    for (const suf of suffixes) {
+      combos.push(`${pre}${core}${suf}`);
+    }
+  }
+}
+
+// Pick random combos per test run
+const featurePattern = fc.oneof(
+  // Static combos (all feature interactions)
+  ...combos.map((c) => fc.constant(c)),
+  // Dynamic: safe literal with random boundary/assertion
+  safePattern.chain((p) =>
+    fc.tuple(
+      fc.constantFrom(...prefixes),
+      fc.constantFrom(...suffixes),
+    ).map(([pre, suf]) => `${pre}${p}${suf}`),
+  ),
+);
+
+describe("property: feature combinations", () => {
+  test("all boundary × assertion combos compile and run", () => {
+    fc.assert(
+      fc.property(
+        fc.array(featurePattern, {
+          minLength: 1,
+          maxLength: 5,
+        }),
+        hay,
+        (pats, h) => {
+          // Must not throw
+          const rs = new RegexSet(pats);
+          // isMatch and findIter must agree
+          const matches = rs.findIter(h);
+          expect(rs.isMatch(h)).toBe(
+            matches.length > 0,
+          );
+          // text field must be correct
+          for (const m of matches) {
+            expect(h.slice(m.start, m.end)).toBe(
+              m.text,
+            );
+          }
+        },
+      ),
+      PARAMS,
+    );
+  });
+});
+
+// ─── Property 8: wholeWords consistency ───────
 
 describe("property: wholeWords", () => {
   test("wholeWords matches have \\b boundaries", () => {

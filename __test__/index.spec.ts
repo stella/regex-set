@@ -307,6 +307,36 @@ describe("ascii word boundary", () => {
     expect(elapsed).toBeLessThan(500);
   });
 
+  test("\\b + lookahead combination works", () => {
+    // Regression: (?-u:\b) broke fancy-regex fallback
+    const rs = new RegexSet([
+      String.raw`\b\d{3}(?!\d)\b`,
+    ]);
+    const matches = rs.findIter("abc 123 def 4567");
+    expect(matches).toHaveLength(1);
+    expect(matches[0]!.text).toBe("123");
+    // 4567 should NOT match (lookahead rejects)
+  });
+
+  test("\\b + lookbehind combination works", () => {
+    const rs = new RegexSet([
+      String.raw`(?<!\d)\d{3}\b`,
+    ]);
+    const matches = rs.findIter("abc 123 def 4567");
+    expect(matches).toHaveLength(1);
+    expect(matches[0]!.text).toBe("123");
+  });
+
+  test("\\b + lookahead in phone pattern", () => {
+    // The exact pattern from the bug report
+    const rs = new RegexSet([
+      String.raw`\b(?:[2-578]\d|60)\d[\s.\-]?\d{3}[\s.\-]?\d{3}(?!\d)\b`,
+    ]);
+    expect(rs.isMatch("601 234 567")).toBe(true);
+    expect(rs.isMatch("601234567")).toBe(true);
+    expect(rs.isMatch("6012345678")).toBe(false);
+  });
+
   test("wholeWords perf: uses ASCII boundary", () => {
     const rs = new RegexSet(["test"], {
       wholeWords: true,
