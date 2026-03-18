@@ -169,27 +169,27 @@ Run locally:
 
 | Size | @stll/regex-set | JS RegExp | Speedup |
 | --- | --- | --- | --- |
-| 0.6 KB | **3 μs** | 5 μs | 1.5x |
-| 16 KB | **56 μs** | 117 μs | 2.1x |
-| 27 KB | **92 μs** | 230 μs | 2.5x |
-| 63 KB | **249 μs** | 551 μs | 2.2x |
+| 0.6 KB | **4 μs** | 5 μs | 1.3x |
+| 16 KB | **63 μs** | 115 μs | 1.8x |
+| 27 KB | **107 μs** | 218 μs | 2.0x |
+| 63 KB | **300 μs** | 550 μs | 1.8x |
 
 ### Anonymization workload (20 patterns)
 
 | Size | @stll/regex-set | JS RegExp | Speedup |
 | --- | --- | --- | --- |
-| 0.6 KB | **3 μs** | 8 μs | 2.8x |
-| 16 KB | **63 μs** | 217 μs | 3.4x |
-| 27 KB | **114 μs** | 353 μs | 3.1x |
-| 63 KB | **279 μs** | 921 μs | 3.3x |
+| 0.6 KB | **3 μs** | 7 μs | 2.4x |
+| 16 KB | **97 μs** | 189 μs | 1.9x |
+| 27 KB | **149 μs** | 321 μs | 2.2x |
+| 63 KB | **387 μs** | 934 μs | 2.4x |
 
 ### Unicode boundaries (zero overhead)
 
-| Mode | 63 KB document | vs JS |
+| Mode | 20 patterns, 27 KB | vs JS |
 | --- | --- | --- |
-| ASCII `\b` (default) | 279 μs | 3.3x faster |
-| Unicode `\b` | 322 μs | 2.9x faster |
-| JS RegExp | 921 μs | baseline |
+| ASCII `\b` (default) | 149 μs | 2.2x faster |
+| Unicode `\b` | 119 μs | 3.1x faster |
+| JS RegExp (20 passes) | 363 μs | baseline |
 
 ### Backtracking resistance
 
