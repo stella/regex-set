@@ -327,17 +327,13 @@ fn build_verifier(
   // Fall back to fancy-regex, which does not
   // support (?-u:\b). Revert to Unicode \b.
   //
-  // NOTE: This means \b uses ASCII semantics on
-  // the MetaRegex path (matching JS behavior) but
-  // Unicode semantics on the fancy-regex fallback
-  // (diverging from JS). The divergence only
-  // affects patterns that combine \b with complex
-  // lookaround AND match near non-ASCII word chars
-  // (e.g., accented letters). For ASCII-only text
-  // both paths behave identically.
+  // ascii_boundary_for_fancy() expresses ASCII \b
+  // as lookaround on [a-zA-Z0-9_], so both paths
+  // use identical ASCII word boundary semantics
+  // (matching JS \b behavior).
   let core_stripped =
     strip_lookaround_str(pattern);
-  let fancy_pat = revert_ascii_boundaries(pattern);
+  let fancy_pat = ascii_boundary_for_fancy(pattern);
   let verifier =
     fancy_regex::Regex::new(&fancy_pat)
       .map_err(|e| format!("{e}"))?;
@@ -505,12 +501,29 @@ fn ceil_char_boundary(
   i
 }
 
-/// Revert `(?-u:\b)` / `(?-u:\B)` back to `\b` /
-/// `\B` for fancy-regex, which does not support
-/// the `(?-u:...)` Unicode-disable syntax.
-fn revert_ascii_boundaries(s: &str) -> String {
-  s.replace("(?-u:\\b)", "\\b")
-    .replace("(?-u:\\B)", "\\B")
+/// ASCII word-char class for fancy-regex, which
+/// does not support `(?-u:...)`.
+const W: &str = "[a-zA-Z0-9_]";
+
+/// Replace `(?-u:\b)` / `(?-u:\B)` with
+/// ASCII-equivalent lookaround expressions that
+/// fancy-regex understands. This preserves ASCII
+/// word boundary semantics (matching JS `\b`)
+/// instead of falling back to Unicode `\b`.
+///
+/// `\b` ≡ boundary between word and non-word:
+///   (?:(?<=[W])(?![W])|(?<![W])(?=[W]))
+/// `\B` ≡ non-boundary (both same class):
+///   (?:(?<=[W])(?=[W])|(?<![W])(?![W]))
+fn ascii_boundary_for_fancy(s: &str) -> String {
+  let b = format!(
+    "(?:(?<={W})(?!{W})|(?<!{W})(?={W}))",
+  );
+  let big_b = format!(
+    "(?:(?<={W})(?={W})|(?<!{W})(?!{W}))",
+  );
+  s.replace("(?-u:\\b)", &b)
+    .replace("(?-u:\\B)", &big_b)
 }
 
 // ─── Engine ───────────────────────────────────
@@ -583,7 +596,7 @@ impl RegexSet {
           Verifier::Complex(re) => re,
           _ => {
             let fancy_pat =
-              revert_ascii_boundaries(p);
+              ascii_boundary_for_fancy(p);
             fancy_regex::Regex::new(&fancy_pat)
               .map_err(|e| {
                 Error::from_reason(format!(
