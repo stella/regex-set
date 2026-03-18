@@ -188,7 +188,7 @@ Run locally:
 
 | Size | @stll/regex-set | JS RegExp | Speedup |
 | --- | --- | --- | --- |
-| 0.6 KB | **5 μs** | 9 μs | 1.7x |
+| 0.6 KB | **5 μs** | 9 μs | 1.8x |
 | 16 KB | **80 μs** | 265 μs | 3.3x |
 | 27 KB | **152 μs** | 448 μs | 2.9x |
 | 63 KB | **467 μs** | 1016 μs | 2.2x |
@@ -197,8 +197,8 @@ Run locally:
 
 | Pattern | Input | @stll/regex-set | JS RegExp |
 | --- | --- | --- | --- |
-| `(a+)+b` | `"a" × 26 + "X"` | **0.76 ms** | hangs |
-| `.*.*=.*` | `"x" × 30 + "=" + "y" × 30` | **0.06 ms** | hangs |
+| `(a+)+b` | `"a" × 30 + "X"` | **0.12 ms** | hangs |
+| `.*.*=.*` | `"x" × 30 + "=" + "y" × 30` | **0.25 ms** | hangs |
 
 All match counts verified against JS RegExp.
 For pure literal patterns, use
