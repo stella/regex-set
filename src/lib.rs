@@ -326,6 +326,14 @@ fn build_verifier(
   // Still has lookaround (complex or nested).
   // Fall back to fancy-regex, which does not
   // support (?-u:\b). Revert to Unicode \b.
+  //
+  // NOTE: This means \b uses ASCII semantics on
+  // the MetaRegex path but Unicode semantics on
+  // the fancy-regex fallback. The divergence only
+  // affects patterns that combine \b with complex
+  // lookaround AND match near non-ASCII word chars
+  // (e.g., accented letters). This matches the JS
+  // RegExp \b behavior for ASCII text.
   let core_stripped =
     strip_lookaround_str(pattern);
   let fancy_pat = revert_ascii_boundaries(pattern);
@@ -566,17 +574,23 @@ impl RegexSet {
           verifier,
         });
       } else {
-        // Core doesn't compile; full fallback.
-        // fancy-regex doesn't support (?-u:\b).
-        let fancy_pat =
-          revert_ascii_boundaries(p);
-        let re =
-          fancy_regex::Regex::new(&fancy_pat)
-            .map_err(|e| {
-              Error::from_reason(format!(
-                "Failed to compile pattern {i}: {e}"
-              ))
-            })?;
+        // Core doesn't compile in MetaRegex.
+        // Reuse the fancy-regex from build_verifier
+        // if it already compiled one (Complex path),
+        // otherwise compile fresh.
+        let re = match verifier {
+          Verifier::Complex(re) => re,
+          _ => {
+            let fancy_pat =
+              revert_ascii_boundaries(p);
+            fancy_regex::Regex::new(&fancy_pat)
+              .map_err(|e| {
+                Error::from_reason(format!(
+                  "Failed to compile pattern {i}: {e}"
+                ))
+              })?
+          }
+        };
         fallbacks.push(FallbackPattern {
           original_index: i as u32,
           regex: re,

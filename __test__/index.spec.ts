@@ -318,9 +318,11 @@ describe("ascii word boundary", () => {
     // 4567 should NOT match (lookahead rejects)
   });
 
-  test("\\b + lookbehind combination works", () => {
+  test("\\b + lookbehind + lookahead works", () => {
+    // Both assertions prevent inline extraction,
+    // forcing the fancy-regex fallback path.
     const rs = new RegexSet([
-      String.raw`(?<!\d)\d{3}\b`,
+      String.raw`\b(?<!\d)\d{3}(?!\d)\b`,
     ]);
     const matches = rs.findIter("abc 123 def 4567");
     expect(matches).toHaveLength(1);
