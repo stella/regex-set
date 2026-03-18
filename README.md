@@ -162,48 +162,43 @@ Corpora:
 Run locally:
 `bun run bench:download && bun run bench`
 
-### Large documents
+### Large documents (academic corpora)
 
-| Scenario | @stll/regex-set | node-re2 | JS RegExp |
+| Scenario | @stll/regex-set | JS RegExp | Speedup |
 | --- | --- | --- | --- |
-| mariomka 6.2 MB (3 patterns) | **20 ms** | 129 ms | 84 ms |
-| Bible 4 MB (5 patterns) | **21 ms** | 114 ms | 58 ms |
-| Bible 4 MB (10 patterns) | **14 ms** | 205 ms | 102 ms |
-| Twain 16 MB (word boundary) | **15 ms** | 72 ms | 55 ms |
-| Twain 16 MB (suffix match) | **26 ms** | 121 ms | 100 ms |
+| mariomka 6.2 MB (3 patterns) | **20 ms** | 112 ms | 5.5x |
+| Bible 4 MB (5 multi-pattern) | **17 ms** | 122 ms | 7.0x |
+| Bible 4 MB (3 + lookaround) | **47 ms** | 82 ms | 1.8x |
+| Twain 16 MB (word boundary) | **17 ms** | 72 ms | 4.1x |
+| Twain 16 MB (alternation) | **12 ms** | 44 ms | 3.7x |
+| Twain 16 MB (suffix match) | **24 ms** | 142 ms | 5.8x |
 
-### Small documents (4 patterns)
+### Production PII patterns (13 patterns + lookaround)
 
 | Size | @stll/regex-set | JS RegExp | Speedup |
 | --- | --- | --- | --- |
-| 0.6 KB | **4 μs** | 5 μs | 1.3x |
-| 16 KB | **63 μs** | 115 μs | 1.8x |
-| 27 KB | **107 μs** | 218 μs | 2.0x |
-| 63 KB | **300 μs** | 550 μs | 1.8x |
+| 8 KB | **0.09 ms** | 0.12 ms | 1.3x |
+| 16 KB | **0.15 ms** | 0.23 ms | 1.5x |
+| 32 KB | **0.28 ms** | 0.44 ms | 1.6x |
+| 64 KB | **0.63 ms** | 0.98 ms | 1.6x |
+| 128 KB | **1.17 ms** | 1.79 ms | 1.5x |
+| 256 KB | **2.30 ms** | 3.47 ms | 1.5x |
 
-### Anonymization workload (20 patterns)
+### Real Czech contracts (20 anonymization patterns)
 
 | Size | @stll/regex-set | JS RegExp | Speedup |
 | --- | --- | --- | --- |
-| 0.6 KB | **3 μs** | 7 μs | 2.4x |
-| 16 KB | **97 μs** | 189 μs | 1.9x |
-| 27 KB | **149 μs** | 321 μs | 2.2x |
-| 63 KB | **387 μs** | 934 μs | 2.4x |
-
-### Unicode boundaries (zero overhead)
-
-| Mode | 20 patterns, 27 KB | vs JS |
-| --- | --- | --- |
-| ASCII `\b` (default) | 149 μs | 2.2x faster |
-| Unicode `\b` | 119 μs | 3.1x faster |
-| JS RegExp (20 passes) | 363 μs | baseline |
+| 0.6 KB | **5 μs** | 9 μs | 1.7x |
+| 16 KB | **80 μs** | 265 μs | 3.3x |
+| 27 KB | **152 μs** | 448 μs | 2.9x |
+| 63 KB | **467 μs** | 1016 μs | 2.2x |
 
 ### Backtracking resistance
 
 | Pattern | Input | @stll/regex-set | JS RegExp |
 | --- | --- | --- | --- |
-| `(a+)+b` | `"a" × 30 + "X"` | **0.04 ms** | hangs |
-| `.*.*=.*` | `"x" × 30 + "=" + "y" × 30` | **0.23 ms** | hangs |
+| `(a+)+b` | `"a" × 26 + "X"` | **0.76 ms** | hangs |
+| `.*.*=.*` | `"x" × 30 + "=" + "y" × 30` | **0.06 ms** | hangs |
 
 All match counts verified against JS RegExp.
 For pure literal patterns, use
@@ -298,7 +293,7 @@ bun install
 # Build native module (requires Rust toolchain)
 bun run build
 
-# Run tests (47 unit + 17 property)
+# Run tests (49 unit + 17 property)
 bun test
 bun run test:props
 
