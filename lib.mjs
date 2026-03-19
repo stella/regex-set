@@ -112,11 +112,68 @@ function regexpToRust(re) {
  * Convert inline (?i) flags to (?i-u) for ASCII
  * case folding. Handles bare and scoped groups.
  *
+ * Bare (?i) at the start of a pattern is converted
+ * to a scoped group (?i-u:...) with edge \b pulled
+ * outside, matching the RegExp path behaviour. This
+ * prevents -u from affecting \b word boundary
+ * semantics (which should remain Unicode when
+ * unicodeBoundaries is true).
+ *
  * NOTE: -u also disables Unicode character classes
  * (\w, \d, \s become ASCII-only), matching the
  * behaviour of regexpToRust() for /i RegExps.
  */
 function scopeInlineFlags(src) {
+  // Handle bare (?i...) at the start: convert to
+  // scoped (?i-u:...) with edge \b/\B outside.
+  const leadingBare = src.match(
+    /^\(\?([ims]+)\)/,
+  );
+  if (leadingBare && leadingBare[1].includes("i")) {
+    const flags = leadingBare[1];
+    let rest = src.slice(leadingBare[0].length);
+
+    // Strip edge \b/\B
+    let leading = "";
+    let trailing = "";
+    if (rest.startsWith("\\b")) {
+      leading = "\\b";
+      rest = rest.slice(2);
+    } else if (rest.startsWith("\\B")) {
+      leading = "\\B";
+      rest = rest.slice(2);
+    }
+    if (rest.length >= 2) {
+      const last = rest[rest.length - 1];
+      if (last === "b" || last === "B") {
+        let bs = 0;
+        let k = rest.length - 2;
+        while (k >= 0 && rest[k] === "\\") {
+          bs++;
+          k--;
+        }
+        if (bs > 0 && bs % 2 === 1) {
+          trailing = "\\" + last;
+          rest = rest.slice(0, -2);
+        }
+      }
+    }
+
+    // Scope the flags and recurse for any nested
+    // inline flags in the content.
+    const inner = scopeInnerFlags(rest);
+    return `${leading}(?${flags}-u:${inner})${trailing}`;
+  }
+
+  return scopeInnerFlags(src);
+}
+
+/**
+ * Replace inline (?i) / (?i:...) groups with -u
+ * variants. Does not handle leading bare flags
+ * (that's done by scopeInlineFlags above).
+ */
+function scopeInnerFlags(src) {
   let result = "";
   let inClass = false;
   let i = 0;
