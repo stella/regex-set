@@ -491,6 +491,23 @@ describe("(?i) string + \\b parity", () => {
     // Digits before the (?i) are not affected
     expect(rs.isMatch("AB.januar")).toBe(false);
   });
+
+  test("(?i-s:...) combined flags get -u scoping", () => {
+    // (?i-s:...) enables i, disables s — should
+    // also get -u for ASCII case folding.
+    const rs = new RegexSet(["(?i-s:januar)"]);
+    expect(rs.isMatch("JANUAR")).toBe(true);
+    expect(rs.isMatch("januar")).toBe(true);
+  });
+
+  test("bare (?i-s) at start gets -u scoping", () => {
+    const rs = new RegexSet(
+      ["(?i-s)\\bjanuar\\b"],
+      { unicodeBoundaries: true },
+    );
+    expect(rs.isMatch("Januar")).toBe(true);
+    expect(rs.isMatch("JANUAR")).toBe(true);
+  });
 });
 
 // ─── Heterogeneous boundary shadowing ────────

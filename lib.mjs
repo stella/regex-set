@@ -131,10 +131,11 @@ function scopeInlineFlags(src) {
   // Handle bare (?i...) at the start: convert to
   // scoped (?i-u:...) with edge \b/\B outside.
   const leadingBare = src.match(
-    /^\(\?([ims]+)\)/,
+    /^\(\?([ims]+)(?:-([imsu]+))?\)/,
   );
   if (leadingBare && leadingBare[1].includes("i")) {
-    const flags = leadingBare[1];
+    const enable = leadingBare[1];
+    const disable = leadingBare[2] || "";
     let rest = src.slice(leadingBare[0].length);
 
     // Strip edge \b/\B
@@ -166,7 +167,10 @@ function scopeInlineFlags(src) {
     // Scope the flags and recurse for any nested
     // inline flags in the content.
     const inner = scopeInnerFlags(rest);
-    return `${leading}(?${flags}-u:${inner})${trailing}`;
+    const merged = disable.includes("u")
+      ? disable
+      : disable + "u";
+    return `${leading}(?${enable}-${merged}:${inner})${trailing}`;
   }
 
   return scopeInnerFlags(src);
@@ -195,22 +199,40 @@ function scopeInnerFlags(src) {
       src[i + 1] === "?"
     ) {
       let j = i + 2;
-      let flags = "";
+      let enable = "";
       while (
         j < src.length &&
         "ims".includes(src[j])
       ) {
-        flags += src[j];
+        enable += src[j];
         j++;
       }
+      // Handle disable part: (?i-s) or (?i-s:...)
+      let disable = "";
+      if (j < src.length && src[j] === "-") {
+        j++; // skip -
+        while (
+          j < src.length &&
+          "imsu".includes(src[j])
+        ) {
+          disable += src[j];
+          j++;
+        }
+      }
       if (
-        flags.length > 0 &&
+        enable.length > 0 &&
         (src[j] === ")" || src[j] === ":")
       ) {
-        if (flags.includes("i")) {
-          result += `(?${flags}-u${src[j]}`;
+        if (enable.includes("i")) {
+          // Add -u, merging with existing disable
+          const merged = disable.includes("u")
+            ? disable
+            : disable + "u";
+          result += `(?${enable}-${merged}${src[j]}`;
+        } else if (disable.length > 0) {
+          result += `(?${enable}-${disable}${src[j]}`;
         } else {
-          result += `(?${flags}${src[j]}`;
+          result += `(?${enable}${src[j]}`;
         }
         i = j + 1;
         continue;
