@@ -285,9 +285,14 @@ fn has_internal_boundary(pattern: &str) -> bool {
 /// `(?-u:\b)` / `(?-u:\B)` to prevent DFA state
 /// explosion. Skips character classes where `\b`
 /// means backspace.
+///
+/// Uses string slices (not byte→char casts) to
+/// preserve multi-byte UTF-8 characters correctly.
 fn ascii_internal_boundaries(pattern: &str) -> String {
-  let mut result = String::with_capacity(pattern.len());
+  let mut result =
+    String::with_capacity(pattern.len() + 32);
   let bytes = pattern.as_bytes();
+  let mut seg_start = 0;
   let mut in_class = false;
   let mut i = 0;
   while i < bytes.len() {
@@ -295,15 +300,15 @@ fn ascii_internal_boundaries(pattern: &str) -> String {
       let next = bytes[i + 1];
       if !in_class && (next == b'b' || next == b'B')
       {
+        result.push_str(&pattern[seg_start..i]);
         result.push_str("(?-u:\\");
-        result.push(next as char);
+        result.push(next as char); // b/B are ASCII
         result.push(')');
         i += 2;
+        seg_start = i;
         continue;
       }
-      // Escaped char — emit as-is
-      result.push(bytes[i] as char);
-      result.push(bytes[i + 1] as char);
+      // Skip escaped pair
       i += 2;
       continue;
     }
@@ -313,10 +318,19 @@ fn ascii_internal_boundaries(pattern: &str) -> String {
     if bytes[i] == b']' {
       in_class = false;
     }
-    result.push(bytes[i] as char);
     i += 1;
   }
+  result.push_str(&pattern[seg_start..]);
   result
+}
+
+/// Check if a pattern contains any non-ASCII bytes.
+/// When true, internal `\b` cannot be safely replaced
+/// with `(?-u:\b)` because ASCII word boundaries
+/// don't recognise non-ASCII word characters (é, ü,
+/// etc.), causing false negatives.
+fn has_non_ascii(pattern: &str) -> bool {
+  !pattern.is_ascii()
 }
 
 /// Strip leading/trailing `\b` or `\B` from a
@@ -917,7 +931,14 @@ impl RegexSet {
       // Replace with (?-u:\b) for the DFA core, and
       // verify matches against the individual pattern
       // (which keeps Unicode \b semantics).
-      let internal_b = has_internal_boundary(&core);
+      //
+      // Skip the optimization if the pattern contains
+      // non-ASCII characters: ASCII \b doesn't recognise
+      // non-ASCII word characters, so it would miss
+      // matches at Unicode word boundaries (false
+      // negatives that verification can't recover).
+      let internal_b = has_internal_boundary(&core)
+        && !has_non_ascii(&core);
       let dfa_core = if internal_b {
         ascii_internal_boundaries(&core)
       } else {
