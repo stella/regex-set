@@ -250,6 +250,75 @@ impl BoundaryMode {
   }
 }
 
+/// Check if a pattern has internal `\b` or `\B`
+/// (i.e., not at the edges). These cause DFA state
+/// explosion when combined with large alternations
+/// in a multi-pattern DFA.
+fn has_internal_boundary(pattern: &str) -> bool {
+  let bytes = pattern.as_bytes();
+  let mut in_class = false;
+  let mut i = 0;
+  while i < bytes.len() {
+    if bytes[i] == b'\\' && i + 1 < bytes.len() {
+      if !in_class
+        && (bytes[i + 1] == b'b'
+          || bytes[i + 1] == b'B')
+      {
+        return true;
+      }
+      // Skip escaped char
+      i += 2;
+      continue;
+    }
+    if bytes[i] == b'[' {
+      in_class = true;
+    }
+    if bytes[i] == b']' {
+      in_class = false;
+    }
+    i += 1;
+  }
+  false
+}
+
+/// Replace internal `\b` / `\B` with
+/// `(?-u:\b)` / `(?-u:\B)` to prevent DFA state
+/// explosion. Skips character classes where `\b`
+/// means backspace.
+fn ascii_internal_boundaries(pattern: &str) -> String {
+  let mut result = String::with_capacity(pattern.len());
+  let bytes = pattern.as_bytes();
+  let mut in_class = false;
+  let mut i = 0;
+  while i < bytes.len() {
+    if bytes[i] == b'\\' && i + 1 < bytes.len() {
+      let next = bytes[i + 1];
+      if !in_class && (next == b'b' || next == b'B')
+      {
+        result.push_str("(?-u:\\");
+        result.push(next as char);
+        result.push(')');
+        i += 2;
+        continue;
+      }
+      // Escaped char — emit as-is
+      result.push(bytes[i] as char);
+      result.push(bytes[i + 1] as char);
+      i += 2;
+      continue;
+    }
+    if bytes[i] == b'[' {
+      in_class = true;
+    }
+    if bytes[i] == b']' {
+      in_class = false;
+    }
+    result.push(bytes[i] as char);
+    i += 1;
+  }
+  result
+}
+
 /// Strip leading/trailing `\b` or `\B` from a
 /// pattern string.
 fn strip_edge_boundaries(
@@ -719,20 +788,35 @@ fn check_match(
   haystack: &str,
   start: usize,
   end: usize,
-  verifier: &Verifier,
-  boundaries: &EdgeBoundaries,
+  pi: &PatternInfo,
   mode: &BoundaryMode,
 ) -> std::result::Result<(), Rejection> {
-  if boundaries.has_any()
-    && !boundaries
+  if pi.boundaries.has_any()
+    && !pi
+      .boundaries
       .check_with_mode(haystack, start, end, mode)
   {
     return Err(Rejection::Boundary);
   }
-  if !verifier.check(haystack, start, end) {
+  if !pi.verifier.check(haystack, start, end) {
     return Err(Rejection::Verifier);
   }
-  Ok(())
+  // Internal \b was replaced with (?-u:\b) in the
+  // multi-DFA. Verify the match against the individual
+  // pattern which has the original Unicode \b.
+  if pi.has_internal_b {
+    let input = Input::new(haystack).range(start..);
+    match pi.individual.find(input) {
+      Some(m)
+        if m.start() == start && m.end() == end =>
+      {
+        Ok(())
+      }
+      _ => Err(Rejection::Verifier),
+    }
+  } else {
+    Ok(())
+  }
 }
 
 // ─── Engine ───────────────────────────────────
@@ -742,6 +826,11 @@ struct PatternInfo {
   verifier: Verifier,
   boundaries: EdgeBoundaries,
   individual: MetaRegex,
+  /// Pattern had internal `\b`/`\B` replaced with
+  /// `(?-u:\b)` in the multi-DFA. Matches must be
+  /// verified against `individual` (which has the
+  /// original Unicode `\b`).
+  has_internal_b: bool,
 }
 
 struct FallbackPattern {
@@ -823,30 +912,46 @@ impl RegexSet {
           ))
         })?;
 
+      // Detect internal \b/\B that would cause DFA
+      // state explosion in the multi-pattern DFA.
+      // Replace with (?-u:\b) for the DFA core, and
+      // verify matches against the individual pattern
+      // (which keeps Unicode \b semantics).
+      let internal_b = has_internal_boundary(&core);
+      let dfa_core = if internal_b {
+        ascii_internal_boundaries(&core)
+      } else {
+        core.clone()
+      };
+
       if let Ok(individual) = MetaRegex::new(&core) {
-        // Any verifier or \B → slow path.
-        // Only Verifier::None goes to fast path
-        // because find_iter can't retry rejected
-        // positions for other patterns.
+        // Any verifier, \B, or internal \b → slow
+        // path. Only Verifier::None with no special
+        // boundaries goes to fast path, because
+        // find_iter can't retry rejected positions
+        // for other patterns.
         let needs_slow =
           !matches!(&verifier, Verifier::None)
             || eb.leading_big_b
-            || eb.trailing_big_b;
+            || eb.trailing_big_b
+            || internal_b;
         if needs_slow {
-          slow_cores.push(core);
+          slow_cores.push(dfa_core);
           slow_info.push(PatternInfo {
             original_index: i as u32,
             verifier,
             boundaries: eb,
             individual,
+            has_internal_b: internal_b,
           });
         } else {
-          fast_cores.push(core);
+          fast_cores.push(dfa_core);
           fast_info.push(PatternInfo {
             original_index: i as u32,
             verifier,
             boundaries: eb,
             individual,
+            has_internal_b: false,
           });
         }
       } else {
@@ -997,8 +1102,7 @@ impl RegexSet {
               haystack,
               m.start(),
               m.end(),
-              &pi.verifier,
-              &pi.boundaries,
+              pi,
               &mode,
             ) {
               Ok(()) => {
@@ -1109,8 +1213,7 @@ impl RegexSet {
             haystack,
             m.start(),
             m.end(),
-            &pi.verifier,
-            &pi.boundaries,
+            pi,
             mode,
           )
           .is_ok()
@@ -1176,8 +1279,7 @@ impl RegexSet {
               haystack,
               m.start(),
               m.end(),
-              &pi.verifier,
-              &pi.boundaries,
+              pi,
               &mode,
             ) {
               Ok(()) => return true,

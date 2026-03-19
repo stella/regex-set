@@ -544,6 +544,130 @@ describe("named patterns", () => {
   });
 });
 
+// ─── DFA explosion: internal \b + alternations ─
+
+describe("internal \\b DFA explosion", () => {
+  // Regression: combining a large alternation pattern
+  // with a pattern that has internal \b (not at edges)
+  // caused DFA state explosion: 0.3ms → 73ms.
+  //
+  // Root cause: edge \b is stripped by strip-and-verify,
+  // but internal \b (e.g. `(?:\bM\.|Mrs|...)`) stays
+  // in the DFA with Unicode mode, causing combinatorial
+  // state explosion with large alternation patterns.
+
+  const TITLES = [
+    "Ing\\.", "Mgr\\.", "JUDr\\.", "MUDr\\.",
+    "PhDr\\.", "RNDr\\.", "Bc\\.", "BcA\\.",
+    "ICDr\\.", "PaedDr\\.", "PhMr\\.", "ThDr\\.",
+    "RSDr\\.", "ThLic\\.", "ThMgr\\.",
+    "Dr\\.\\s*med\\.", "Dr\\.\\s*phil\\.",
+    "Dr\\.\\s*rer\\.\\s*nat\\.",
+    "Dr\\.\\s*rer\\.\\s*pol\\.",
+    "Dr\\.\\s*jur\\.", "Dr\\.\\s*oec\\.",
+    "Dr\\.\\s*Ing\\.", "Dr\\.\\s*techn\\.",
+    "Dr\\.\\s*med\\.\\s*dent\\.",
+    "Dr\\.\\s*med\\.\\s*vet\\.",
+    "Dr\\.\\s*theol\\.", "Dr\\.\\s*habil\\.",
+    "Dipl\\.-Ing\\.", "Dipl\\.-Kfm\\.",
+    "Dipl\\.-Betriebsw\\.",
+    "Dipl\\.-Wirt\\.-Ing\\.",
+    "Mag\\.\\s*rer\\.\\s*nat\\.",
+    "Mag\\.\\s*rer\\.\\s*soc\\.\\s*oec\\.",
+    "Mag\\.\\s*phil\\.", "Mag\\.\\s*iur\\.",
+    "Mag\\.\\s*theol\\.",
+    "Bakk\\.\\s*rer\\.\\s*nat\\.",
+    "ao\\.\\s*Univ\\.-Prof\\.",
+    "o\\.\\s*Univ\\.-Prof\\.",
+    "Priv\\.-Doz\\.", "PD", "RA",
+    "Prof\\.", "doc\\.", "as\\.\\s*prof\\.",
+    "Lic\\.\\s*iur\\.", "Lic\\.\\s*oec\\.",
+    "Lic\\.\\s*phil\\.", "Lic\\.\\s*theol\\.",
+    ...Array.from(
+      { length: 32 },
+      (_, i) => `Extra\\.\\s*Title${i}`,
+    ),
+  ];
+  const titleAlt = TITLES.join("|");
+  const bigAltPat =
+    `(?:${titleAlt})` +
+    `(?:\\s+(?:${titleAlt}))*` +
+    `\\s+[A-Z][a-z]+` +
+    `(?:\\s+[A-Z][a-z]+){0,2}`;
+  const ibanPat =
+    "\\b[A-Z]{2}\\d{2}\\s?" +
+    "[\\dA-Z]{4}\\s?[\\dA-Z]{4}" +
+    "\\s?[\\dA-Z]{4}\\s?[\\dA-Z]{4}" +
+    "\\s?[\\dA-Z]{0,14}\\b";
+  const internalBPat =
+    "(?:\\bM\\.|Mrs|Ms|Mr)" +
+    "\\.?\\s+[A-Z][a-z]+";
+
+  test("correctness: internal \\b pattern matches", () => {
+    const rs = new RegexSet([
+      bigAltPat,
+      internalBPat,
+      ibanPat,
+    ]);
+    const matches = rs.findIter(
+      "Ing. Smith and M. Jones here",
+    );
+    const texts = matches.map((m) => m.text);
+    expect(texts).toContain("Ing. Smith");
+    expect(texts).toContain("M. Jones");
+  });
+
+  test("correctness: internal \\b prevents false positive", () => {
+    const rs = new RegexSet([
+      bigAltPat,
+      internalBPat,
+      ibanPat,
+    ]);
+    // IBM. Smith should NOT match — \bM requires word
+    // boundary before M, but B is a word character.
+    const matches = rs.findIter("IBM. Smith here");
+    const texts = matches.map((m) => m.text);
+    expect(texts).not.toContain("M. Smith");
+  });
+
+  test("perf: no DFA explosion with internal \\b", () => {
+    const rs = new RegexSet([
+      bigAltPat,
+      internalBPat,
+      ibanPat,
+    ]);
+
+    // Warm up
+    rs.findIter("test");
+
+    // Mixed-content text with varied byte classes
+    // triggers cache misses in an exploded DFA.
+    const words = [
+      "Společnost", "zastoupená", "jednatelem",
+      "se sídlem", "IČO", "zapsaná", "v obchodním",
+      "rejstříku", "vedeném", "Krajským", "soudem",
+    ];
+    const text = Array.from(
+      { length: 5000 },
+      (_, i) => words[i % words.length],
+    ).join(" ");
+
+    const runs: number[] = [];
+    for (let i = 0; i < 10; i++) {
+      const t = performance.now();
+      rs.findIter(text);
+      runs.push(performance.now() - t);
+    }
+    runs.sort((a, b) => a - b);
+    const median = runs[5]!;
+
+    // Without fix: ~30ms on mixed Czech text.
+    // With fix: <5ms.
+    // Use 20ms threshold to avoid CI flakes.
+    expect(median).toBeLessThan(20);
+  });
+});
+
 // ─── Same Match type as aho-corasick ──────────
 
 describe("Match type compatibility", () => {
