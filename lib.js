@@ -129,6 +129,10 @@ function regexpToRust(re) {
  * (?i:...) flags to use -u (ASCII case folding).
  * Without -u, Rust (?i) enables Unicode case folding
  * which explodes DFA state count on non-ASCII text.
+ *
+ * NOTE: -u also disables Unicode character classes
+ * (\w, \d, \s become ASCII-only), matching the
+ * behaviour of regexpToRust() for /i RegExps.
  */
 function scopeInlineFlags(src) {
   let result = "";

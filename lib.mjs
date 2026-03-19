@@ -111,6 +111,10 @@ function regexpToRust(re) {
 /**
  * Convert inline (?i) flags to (?i-u) for ASCII
  * case folding. Handles bare and scoped groups.
+ *
+ * NOTE: -u also disables Unicode character classes
+ * (\w, \d, \s become ASCII-only), matching the
+ * behaviour of regexpToRust() for /i RegExps.
  */
 function scopeInlineFlags(src) {
   let result = "";
