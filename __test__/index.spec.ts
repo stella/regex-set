@@ -480,6 +480,17 @@ describe("(?i) string + \\b parity", () => {
     expect(rs.isMatch("Januar")).toBe(true);
     expect(rs.isMatch("januar")).toBe(true);
   });
+
+  test("mid-pattern bare (?i) gets -u scoping", () => {
+    // (?i) in the middle of a pattern sets case-
+    // insensitive mode for the rest of the pattern.
+    const rs = new RegexSet(["\\d{2}\\.(?i)januar"]);
+    expect(rs.isMatch("15.Januar")).toBe(true);
+    expect(rs.isMatch("15.JANUAR")).toBe(true);
+    expect(rs.isMatch("15.januar")).toBe(true);
+    // Digits before the (?i) are not affected
+    expect(rs.isMatch("AB.januar")).toBe(false);
+  });
 });
 
 // ─── Heterogeneous boundary shadowing ────────

@@ -72,10 +72,12 @@ function regexpToRust(re) {
   if (re.flags.includes("m")) flags += "m";
   if (re.flags.includes("s")) flags += "s";
 
+  // JS RegExp objects can't contain inline (?i) in
+  // .source — it's a SyntaxError. No need to run
+  // scopeInlineFlags here; it only matters for
+  // string patterns (handled in normalizeEntry).
   if (!flags) {
-    // No JS flags, but source might contain
-    // inline (?i) — scope those too.
-    return scopeInlineFlags(re.source);
+    return re.source;
   }
 
   // When /i is present, use -u for ASCII case folding
@@ -87,7 +89,7 @@ function regexpToRust(re) {
   //   \b outside: Unicode (default)
   //   content: ASCII case + \w/\d/\s (matches JS)
   if (!flags.includes("i")) {
-    return `(?${flags})${scopeInlineFlags(re.source)}`;
+    return `(?${flags})${re.source}`;
   }
 
   let src = re.source;
@@ -121,7 +123,7 @@ function regexpToRust(re) {
     }
   }
 
-  return `${leading}(?${flags}-u:${scopeInlineFlags(src)})${trailing}`;
+  return `${leading}(?${flags}-u:${src})${trailing}`;
 }
 
 /**
