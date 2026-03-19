@@ -70,7 +70,13 @@ function regexpToRust(re) {
   if (re.flags.includes("m")) flags += "m";
   if (re.flags.includes("s")) flags += "s";
 
-  if (!flags) return re.source;
+  // JS RegExp objects can't contain inline (?i) in
+  // .source — it's a SyntaxError. No need to run
+  // scopeInlineFlags here; it only matters for
+  // string patterns (handled in normalizeEntry).
+  if (!flags) {
+    return re.source;
+  }
 
   if (!flags.includes("i")) {
     return `(?${flags})${re.source}`;
@@ -107,11 +113,146 @@ function regexpToRust(re) {
 }
 
 /**
+ * Convert inline (?i) flags to (?i-u) for ASCII
+ * case folding. Handles bare and scoped groups.
+ *
+ * Bare (?i) at the start of a pattern is converted
+ * to a scoped group (?i-u:...) with edge \b pulled
+ * outside, matching the RegExp path behaviour. This
+ * prevents -u from affecting \b word boundary
+ * semantics (which should remain Unicode when
+ * unicodeBoundaries is true).
+ *
+ * NOTE: -u also disables Unicode character classes
+ * (\w, \d, \s become ASCII-only), matching the
+ * behaviour of regexpToRust() for /i RegExps.
+ */
+function scopeInlineFlags(src) {
+  // Handle bare (?i...) at the start: convert to
+  // scoped (?i-u:...) with edge \b/\B outside.
+  const leadingBare = src.match(
+    /^\(\?([ims]+)(?:-([imsu]+))?\)/,
+  );
+  if (leadingBare && leadingBare[1].includes("i")) {
+    const enable = leadingBare[1];
+    const disable = leadingBare[2] || "";
+    let rest = src.slice(leadingBare[0].length);
+
+    // Strip edge \b/\B
+    let leading = "";
+    let trailing = "";
+    if (rest.startsWith("\\b")) {
+      leading = "\\b";
+      rest = rest.slice(2);
+    } else if (rest.startsWith("\\B")) {
+      leading = "\\B";
+      rest = rest.slice(2);
+    }
+    if (rest.length >= 2) {
+      const last = rest[rest.length - 1];
+      if (last === "b" || last === "B") {
+        let bs = 0;
+        let k = rest.length - 2;
+        while (k >= 0 && rest[k] === "\\") {
+          bs++;
+          k--;
+        }
+        if (bs > 0 && bs % 2 === 1) {
+          trailing = "\\" + last;
+          rest = rest.slice(0, -2);
+        }
+      }
+    }
+
+    // Scope the flags and recurse for any nested
+    // inline flags in the content.
+    const inner = scopeInnerFlags(rest);
+    const merged = disable.includes("u")
+      ? disable
+      : disable + "u";
+    return `${leading}(?${enable}-${merged}:${inner})${trailing}`;
+  }
+
+  return scopeInnerFlags(src);
+}
+
+/**
+ * Replace inline (?i) / (?i:...) groups with -u
+ * variants. Does not handle leading bare flags
+ * (that's done by scopeInlineFlags above).
+ */
+function scopeInnerFlags(src) {
+  let result = "";
+  let inClass = false;
+  let i = 0;
+  while (i < src.length) {
+    if (src[i] === "\\" && i + 1 < src.length) {
+      result += src[i] + src[i + 1];
+      i += 2;
+      continue;
+    }
+    if (src[i] === "[") inClass = true;
+    if (src[i] === "]") inClass = false;
+    if (
+      !inClass &&
+      src[i] === "(" &&
+      src[i + 1] === "?"
+    ) {
+      let j = i + 2;
+      let enable = "";
+      while (
+        j < src.length &&
+        "ims".includes(src[j])
+      ) {
+        enable += src[j];
+        j++;
+      }
+      // Handle disable part: (?i-s) or (?i-s:...)
+      let disable = "";
+      if (j < src.length && src[j] === "-") {
+        j++; // skip -
+        while (
+          j < src.length &&
+          "imsu".includes(src[j])
+        ) {
+          disable += src[j];
+          j++;
+        }
+      }
+      if (
+        enable.length > 0 &&
+        (src[j] === ")" || src[j] === ":")
+      ) {
+        if (enable.includes("i")) {
+          // Add -u, merging with existing disable
+          const merged = disable.includes("u")
+            ? disable
+            : disable + "u";
+          result += `(?${enable}-${merged}${src[j]}`;
+        } else if (disable.length > 0) {
+          result += `(?${enable}-${disable}${src[j]}`;
+        } else {
+          result += `(?${enable}${src[j]}`;
+        }
+        i = j + 1;
+        continue;
+      }
+    }
+    result += src[i];
+    i++;
+  }
+  return result;
+}
+
+/**
  * Normalize a pattern entry to { pattern, name }.
  */
 function normalizeEntry(p, i) {
   if (typeof p === "string") {
-    return { pattern: p, name: undefined };
+    return {
+      pattern: scopeInlineFlags(p),
+      name: undefined,
+    };
   }
   if (p instanceof RegExp) {
     return {
@@ -136,7 +277,9 @@ function normalizeEntry(p, i) {
     const inner =
       p.pattern instanceof RegExp
         ? { pattern: regexpToRust(p.pattern) }
-        : { pattern: p.pattern };
+        : {
+            pattern: scopeInlineFlags(p.pattern),
+          };
     if (
       p.name !== undefined &&
       typeof p.name !== "string"

@@ -437,6 +437,79 @@ describe("unicodeBoundaries", () => {
   });
 });
 
+// ─── (?i) string patterns with \b ────────────
+
+describe("(?i) string + \\b parity", () => {
+  test("string (?i)\\b matches like RegExp /\\b/i", () => {
+    // Both paths should produce Unicode \b semantics
+    // when unicodeBoundaries is true.
+    const strRs = new RegexSet(
+      ["(?i)\\bjanuar\\b"],
+      { unicodeBoundaries: true },
+    );
+    const reRs = new RegexSet([/\bjanuar\b/i], {
+      unicodeBoundaries: true,
+    });
+
+    const text = "15. Januar 2025";
+    const strM = strRs.findIter(text);
+    const reM = reRs.findIter(text);
+
+    expect(strM).toHaveLength(1);
+    expect(reM).toHaveLength(1);
+    expect(strM[0]!.text).toBe("Januar");
+    expect(reM[0]!.text).toBe("Januar");
+  });
+
+  test("(?i)\\b preserves Unicode boundary semantics", () => {
+    // čáp is one word in Unicode — \b should not
+    // fire between á and p. If -u leaked to \b,
+    // it would fire (ASCII \b treats á as non-word).
+    const rs = new RegexSet(
+      ["(?i)\\bp\\b"],
+      { unicodeBoundaries: true },
+    );
+    // Should NOT match: čáp is one Unicode word
+    expect(rs.findIter("čáp")).toHaveLength(0);
+  });
+
+  test("(?i) without \\b still gets -u scoping", () => {
+    // Case-insensitive matching should work
+    const rs = new RegexSet(["(?i)januar"]);
+    expect(rs.isMatch("JANUAR")).toBe(true);
+    expect(rs.isMatch("Januar")).toBe(true);
+    expect(rs.isMatch("januar")).toBe(true);
+  });
+
+  test("mid-pattern bare (?i) gets -u scoping", () => {
+    // (?i) in the middle of a pattern sets case-
+    // insensitive mode for the rest of the pattern.
+    const rs = new RegexSet(["\\d{2}\\.(?i)januar"]);
+    expect(rs.isMatch("15.Januar")).toBe(true);
+    expect(rs.isMatch("15.JANUAR")).toBe(true);
+    expect(rs.isMatch("15.januar")).toBe(true);
+    // Digits before the (?i) are not affected
+    expect(rs.isMatch("AB.januar")).toBe(false);
+  });
+
+  test("(?i-s:...) combined flags get -u scoping", () => {
+    // (?i-s:...) enables i, disables s — should
+    // also get -u for ASCII case folding.
+    const rs = new RegexSet(["(?i-s:januar)"]);
+    expect(rs.isMatch("JANUAR")).toBe(true);
+    expect(rs.isMatch("januar")).toBe(true);
+  });
+
+  test("bare (?i-s) at start gets -u scoping", () => {
+    const rs = new RegexSet(
+      ["(?i-s)\\bjanuar\\b"],
+      { unicodeBoundaries: true },
+    );
+    expect(rs.isMatch("Januar")).toBe(true);
+    expect(rs.isMatch("JANUAR")).toBe(true);
+  });
+});
+
 // ─── Heterogeneous boundary shadowing ────────
 
 describe("heterogeneous boundaries", () => {
