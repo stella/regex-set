@@ -319,21 +319,67 @@ class RegexSet {
       (e) => e.name !== undefined,
     );
 
-    // When unicodeBoundaries is true, pass \b as-is
-    // to Rust (stripped + verified inline). When
-    // false, convert \b to (?-u:\b) for fast ASCII
-    // DFA matching.
     const unicode =
       options?.unicodeBoundaries ?? true;
-    const processed = unicode
-      ? entries.map((e) => e.pattern)
-      : entries.map((e) =>
-          asciiBoundaries(e.pattern),
+    const ci = options?.caseInsensitive ?? false;
+
+    let processed = entries.map((e) => e.pattern);
+
+    if (ci) {
+      processed = processed.map((p) => {
+        if (/^(?:\\[bB]|\(\?[ims]+(?:-[imsu]+)?\))*\(\?[ims]*i[ims]*-[imsu]*u/.test(p))
+          return p;
+        let src = p;
+        let flagPrefix = "";
+        const bareFlagMatch = src.match(
+          /^\(\?[ims]+(?:-[imsu]+)?\)/,
         );
+        if (bareFlagMatch) {
+          flagPrefix = bareFlagMatch[0];
+          src = src.slice(flagPrefix.length);
+        }
+        let leading = "";
+        let trailing = "";
+        if (src.startsWith("\\b")) {
+          leading = "\\b";
+          src = src.slice(2);
+        } else if (src.startsWith("\\B")) {
+          leading = "\\B";
+          src = src.slice(2);
+        }
+        if (src.length >= 2) {
+          const last = src[src.length - 1];
+          if (last === "b" || last === "B") {
+            let bs = 0;
+            let k = src.length - 2;
+            while (k >= 0 && src[k] === "\\") {
+              bs++;
+              k--;
+            }
+            if (bs > 0 && bs % 2 === 1) {
+              trailing = "\\" + last;
+              src = src.slice(0, -2);
+            }
+          }
+        }
+        return `${flagPrefix}${leading}(?i-u:${src})${trailing}`;
+      });
+    }
+
+    if (!unicode) {
+      processed = processed.map(asciiBoundaries);
+    }
+
+    const nativeOpts = options
+      ? { ...options }
+      : undefined;
+    if (nativeOpts) {
+      delete nativeOpts.caseInsensitive;
+    }
 
     this._inner = new NativeRegexSet(
       processed,
-      options,
+      nativeOpts,
     );
   }
 

@@ -20,6 +20,22 @@ export type Options = {
    * @default true
    */
   unicodeBoundaries?: boolean;
+  /**
+   * Case-insensitive matching. Wraps each pattern
+   * with `(?i-u:...)` for ASCII case folding.
+   * Uses `-u` to prevent DFA state explosion from
+   * Unicode case tables.
+   *
+   * Edge `\b`/`\B` boundaries and leading bare-flag
+   * prefixes (e.g. `(?m)`, `(?m-s)`) are extracted
+   * before wrapping so they remain outside the `-u`
+   * scope, preserving `unicodeBoundaries` semantics.
+   * Patterns already containing any `(?{flags}-u`
+   * group (from RegExp `/i`, inline `(?i)`, or
+   * `scopeInlineFlags`) are not double-wrapped.
+   * @default false
+   */
+  caseInsensitive?: boolean;
 };
 
 /** A named pattern entry. */
