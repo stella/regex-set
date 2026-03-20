@@ -332,7 +332,7 @@ class RegexSet {
         let src = p;
         let flagPrefix = "";
         const bareFlagMatch = src.match(
-          /^\(\?[ims]+\)/,
+          /^\(\?[ims]+(?:-[imsu]+)?\)/,
         );
         if (bareFlagMatch) {
           flagPrefix = bareFlagMatch[0];
