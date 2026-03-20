@@ -327,7 +327,7 @@ class RegexSet {
 
     if (ci) {
       processed = processed.map((p) => {
-        if (/\(\?[ims]*i[ims]*-[imsu]*u/.test(p))
+        if (/^(?:\\[bB]|\(\?[ims]+(?:-[imsu]+)?\))*\(\?[ims]*i[ims]*-[imsu]*u/.test(p))
           return p;
         let src = p;
         let flagPrefix = "";
