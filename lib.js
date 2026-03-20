@@ -330,6 +330,14 @@ class RegexSet {
         if (/\(\?[ims]*i[ims]*-[imsu]*u/.test(p))
           return p;
         let src = p;
+        let flagPrefix = "";
+        const bareFlagMatch = src.match(
+          /^\(\?[ims]+\)/,
+        );
+        if (bareFlagMatch) {
+          flagPrefix = bareFlagMatch[0];
+          src = src.slice(flagPrefix.length);
+        }
         let leading = "";
         let trailing = "";
         if (src.startsWith("\\b")) {
@@ -354,7 +362,7 @@ class RegexSet {
             }
           }
         }
-        return `${leading}(?i-u:${src})${trailing}`;
+        return `${flagPrefix}${leading}(?i-u:${src})${trailing}`;
       });
     }
 
