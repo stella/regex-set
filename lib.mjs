@@ -368,9 +368,17 @@ class RegexSet {
       processed = processed.map(asciiBoundaries);
     }
 
+    // Strip JS-only options before passing to native
+    const nativeOpts = options
+      ? { ...options }
+      : undefined;
+    if (nativeOpts) {
+      delete nativeOpts.caseInsensitive;
+    }
+
     this._inner = new NativeRegexSet(
       processed,
-      options,
+      nativeOpts,
     );
   }
 

@@ -370,9 +370,16 @@ class RegexSet {
       processed = processed.map(asciiBoundaries);
     }
 
+    const nativeOpts = options
+      ? { ...options }
+      : undefined;
+    if (nativeOpts) {
+      delete nativeOpts.caseInsensitive;
+    }
+
     this._inner = new NativeRegexSet(
       processed,
-      options,
+      nativeOpts,
     );
   }
 
