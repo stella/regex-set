@@ -20,6 +20,14 @@ export type Options = {
    * @default true
    */
   unicodeBoundaries?: boolean;
+  /**
+   * Case-insensitive matching. Wraps each pattern
+   * with `(?i-u:...)` for ASCII case folding.
+   * Uses `-u` to prevent DFA state explosion from
+   * Unicode case tables.
+   * @default false
+   */
+  caseInsensitive?: boolean;
 };
 
 /** A named pattern entry. */

@@ -319,17 +319,21 @@ class RegexSet {
       (e) => e.name !== undefined,
     );
 
-    // When unicodeBoundaries is true, pass \b as-is
-    // to Rust (stripped + verified inline). When
-    // false, convert \b to (?-u:\b) for fast ASCII
-    // DFA matching.
     const unicode =
       options?.unicodeBoundaries ?? true;
-    const processed = unicode
-      ? entries.map((e) => e.pattern)
-      : entries.map((e) =>
-          asciiBoundaries(e.pattern),
-        );
+    const ci = options?.caseInsensitive ?? false;
+
+    let processed = entries.map((e) => e.pattern);
+
+    if (ci) {
+      processed = processed.map(
+        (p) => `(?i-u:${p})`,
+      );
+    }
+
+    if (!unicode) {
+      processed = processed.map(asciiBoundaries);
+    }
 
     this._inner = new NativeRegexSet(
       processed,

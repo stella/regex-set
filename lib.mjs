@@ -310,11 +310,22 @@ class RegexSet {
 
     const unicode =
       options?.unicodeBoundaries ?? true;
-    const processed = unicode
-      ? entries.map((e) => e.pattern)
-      : entries.map((e) =>
-          asciiBoundaries(e.pattern),
-        );
+    const ci = options?.caseInsensitive ?? false;
+
+    let processed = entries.map((e) => e.pattern);
+
+    // Wrap with (?i-u:...) for case-insensitive
+    // matching. Uses ASCII case folding to prevent
+    // DFA state explosion from Unicode case tables.
+    if (ci) {
+      processed = processed.map(
+        (p) => `(?i-u:${p})`,
+      );
+    }
+
+    if (!unicode) {
+      processed = processed.map(asciiBoundaries);
+    }
 
     this._inner = new NativeRegexSet(
       processed,
