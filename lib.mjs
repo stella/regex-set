@@ -322,7 +322,7 @@ class RegexSet {
       processed = processed.map((p) => {
         // Skip patterns already wrapped by
         // regexpToRust or scopeInlineFlags.
-        if (p.includes("(?i-u:") || p.includes("(?i-u)"))
+        if (/\(\?[ims]*i[ims]*-[imsu]*u/.test(p))
           return p;
         // Extract edge \b/\B
         let src = p;

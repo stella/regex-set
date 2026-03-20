@@ -327,7 +327,7 @@ class RegexSet {
 
     if (ci) {
       processed = processed.map((p) => {
-        if (p.includes("(?i-u:") || p.includes("(?i-u)"))
+        if (/\(\?[ims]*i[ims]*-[imsu]*u/.test(p))
           return p;
         let src = p;
         let leading = "";
