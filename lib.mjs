@@ -315,12 +315,43 @@ class RegexSet {
     let processed = entries.map((e) => e.pattern);
 
     // Wrap with (?i-u:...) for case-insensitive
-    // matching. Uses ASCII case folding to prevent
-    // DFA state explosion from Unicode case tables.
+    // matching. Edge \b/\B are extracted first so
+    // they stay outside the -u scope (preserving
+    // Unicode word boundary semantics).
     if (ci) {
-      processed = processed.map(
-        (p) => `(?i-u:${p})`,
-      );
+      processed = processed.map((p) => {
+        // Skip patterns already wrapped by
+        // regexpToRust or scopeInlineFlags.
+        if (p.includes("(?i-u:") || p.includes("(?i-u)"))
+          return p;
+        // Extract edge \b/\B
+        let src = p;
+        let leading = "";
+        let trailing = "";
+        if (src.startsWith("\\b")) {
+          leading = "\\b";
+          src = src.slice(2);
+        } else if (src.startsWith("\\B")) {
+          leading = "\\B";
+          src = src.slice(2);
+        }
+        if (src.length >= 2) {
+          const last = src[src.length - 1];
+          if (last === "b" || last === "B") {
+            let bs = 0;
+            let k = src.length - 2;
+            while (k >= 0 && src[k] === "\\") {
+              bs++;
+              k--;
+            }
+            if (bs > 0 && bs % 2 === 1) {
+              trailing = "\\" + last;
+              src = src.slice(0, -2);
+            }
+          }
+        }
+        return `${leading}(?i-u:${src})${trailing}`;
+      });
     }
 
     if (!unicode) {

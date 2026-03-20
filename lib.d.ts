@@ -25,6 +25,13 @@ export type Options = {
    * with `(?i-u:...)` for ASCII case folding.
    * Uses `-u` to prevent DFA state explosion from
    * Unicode case tables.
+   *
+   * Edge `\b`/`\B` boundaries are extracted before
+   * wrapping so they remain outside the `-u` scope,
+   * preserving `unicodeBoundaries` semantics.
+   * Patterns already containing `(?i-u:...)` (e.g.,
+   * from RegExp `/i` or inline `(?i)`) are not
+   * double-wrapped.
    * @default false
    */
   caseInsensitive?: boolean;
