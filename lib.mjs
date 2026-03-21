@@ -109,7 +109,34 @@ function regexpToRust(re) {
     }
   }
 
-  return `${leading}(?${flags}-u:${src})${trailing}`;
+  const uFlag = needsAsciiMode(src) && !hasNonAscii(src)
+    ? "-u" : "";
+  return `${leading}(?${flags}${uFlag}:${src})${trailing}`;
+}
+
+/**
+ * Check if content uses character class shortcuts
+ * (\w, \W, \d, \D, \s, \S, \b, \B) that have
+ * Unicode-aware versions. Only these benefit from
+ * -u (ASCII-only mode). Literal strings like
+ * "dollars" produce identical DFAs with or without
+ * -u, so skipping -u for them is zero-cost.
+ */
+function needsAsciiMode(s) {
+  return /\\[wWdDsSbB]/.test(s);
+}
+
+/**
+ * Check if a string contains non-ASCII characters.
+ * When true, -u MUST NOT be added: regex-automata
+ * rejects (?-u) alongside non-ASCII content like
+ * [ÁČĎÉĚ] or literal złotych.
+ */
+function hasNonAscii(s) {
+  for (let i = 0; i < s.length; i++) {
+    if (s.charCodeAt(i) > 127) return true;
+  }
+  return false;
 }
 
 /**
@@ -167,10 +194,14 @@ function scopeInlineFlags(src) {
     // Scope the flags and recurse for any nested
     // inline flags in the content.
     const inner = scopeInnerFlags(rest);
-    const merged = disable.includes("u")
-      ? disable
-      : disable + "u";
-    return `${leading}(?${enable}-${merged}:${inner})${trailing}`;
+    // Only add -u when content uses char class
+    // shortcuts (\w, \d, \s) that benefit from it.
+    const addU = needsAsciiMode(rest)
+      && !hasNonAscii(rest)
+      && !disable.includes("u");
+    const merged = addU ? disable + "u" : disable;
+    const disablePart = merged ? `-${merged}` : "";
+    return `${leading}(?${enable}${disablePart}:${inner})${trailing}`;
   }
 
   return scopeInnerFlags(src);
@@ -224,11 +255,19 @@ function scopeInnerFlags(src) {
         (src[j] === ")" || src[j] === ":")
       ) {
         if (enable.includes("i")) {
-          // Add -u, merging with existing disable
-          const merged = disable.includes("u")
-            ? disable
-            : disable + "u";
-          result += `(?${enable}-${merged}${src[j]}`;
+          // For scoped groups (?i:content), don't add
+          // -u: literal strings produce identical DFAs
+          // with or without -u, and -u breaks when
+          // the overall pattern has non-ASCII chars.
+          // For bare flags (?i), the -u would apply to
+          // the rest of the pattern which might have
+          // \w/\d — but bare flags are handled by
+          // scopeInlineFlags, not here.
+          if (disable.length > 0) {
+            result += `(?${enable}-${disable}${src[j]}`;
+          } else {
+            result += `(?${enable}${src[j]}`;
+          }
         } else if (disable.length > 0) {
           result += `(?${enable}-${disable}${src[j]}`;
         } else {
@@ -360,7 +399,8 @@ class RegexSet {
             }
           }
         }
-        return `${flagPrefix}${leading}(?i-u:${src})${trailing}`;
+        const uFlag = hasNonAscii(src) ? "" : "-u";
+        return `${flagPrefix}${leading}(?i${uFlag}:${src})${trailing}`;
       });
     }
 
@@ -376,6 +416,15 @@ class RegexSet {
       delete nativeOpts.caseInsensitive;
     }
 
+    // DEBUG
+    if (processed.length > 0) {
+      for (let pi = 0; pi < Math.min(3, processed.length); pi++) {
+        const pp = typeof processed[pi] === "string" ? processed[pi] : processed[pi]?.pattern;
+        if (pp && pp.includes('-u')) {
+          console.error('DEBUG pattern', pi, '(len=' + pp.length + '):', pp.slice(0, 300));
+        }
+      }
+    }
     this._inner = new NativeRegexSet(
       processed,
       nativeOpts,
