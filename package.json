@@ -87,8 +87,6 @@
     "@stll/regex-set-darwin-arm64": "0.3.2",
     "@stll/regex-set-darwin-x64": "0.3.2",
     "@stll/regex-set-linux-arm64-gnu": "0.3.2",
-    "@stll/regex-set-linux-x64-gnu": "0.3.2",
-    "@stll/regex-set-linux-x64-musl": "0.3.2",
-    "@stll/regex-set-win32-x64-msvc": "0.3.2"
+    "@stll/regex-set-linux-x64-gnu": "0.3.2"
   }
 }
