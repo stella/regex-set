@@ -361,7 +361,7 @@ class RegexSet {
       processed = processed.map((p) => {
         // Skip patterns already wrapped by
         // regexpToRust or scopeInlineFlags.
-        if (/^(?:\\[bB]|\(\?[ims]+(?:-[imsu]+)?\))*\(\?[ims]*i[ims]*-[imsu]*u/.test(p))
+        if (/^(?:\\[bB]|\(\?[ims]+(?:-[imsu]+)?\))*\(\?[ims]*i[ims]*(?:-[imsu]+)?[:(]/.test(p))
           return p;
         // Strip leading bare-flag prefix (e.g. (?m),
         // (?ms)) before extracting edge \b.
