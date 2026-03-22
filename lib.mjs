@@ -399,7 +399,7 @@ class RegexSet {
             }
           }
         }
-        const uFlag = hasNonAscii(src) ? "" : "-u";
+        const uFlag = needsAsciiMode(src) && !hasNonAscii(src) ? "-u" : "";
         return `${flagPrefix}${leading}(?i${uFlag}:${src})${trailing}`;
       });
     }
@@ -416,15 +416,6 @@ class RegexSet {
       delete nativeOpts.caseInsensitive;
     }
 
-    // DEBUG
-    if (processed.length > 0) {
-      for (let pi = 0; pi < Math.min(3, processed.length); pi++) {
-        const pp = typeof processed[pi] === "string" ? processed[pi] : processed[pi]?.pattern;
-        if (pp && pp.includes('-u')) {
-          console.error('DEBUG pattern', pi, '(len=' + pp.length + '):', pp.slice(0, 300));
-        }
-      }
-    }
     this._inner = new NativeRegexSet(
       processed,
       nativeOpts,
