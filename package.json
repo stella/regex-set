@@ -52,9 +52,7 @@
       "x86_64-apple-darwin",
       "aarch64-apple-darwin",
       "x86_64-unknown-linux-gnu",
-      "aarch64-unknown-linux-gnu",
-      "x86_64-unknown-linux-musl",
-      "x86_64-pc-windows-msvc"
+      "aarch64-unknown-linux-gnu"
     ]
   },
   "scripts": {
@@ -87,8 +85,6 @@
     "@stll/regex-set-darwin-arm64": "0.3.2",
     "@stll/regex-set-darwin-x64": "0.3.2",
     "@stll/regex-set-linux-arm64-gnu": "0.3.2",
-    "@stll/regex-set-linux-x64-gnu": "0.3.2",
-    "@stll/regex-set-linux-x64-musl": "0.3.2",
-    "@stll/regex-set-win32-x64-msvc": "0.3.2"
+    "@stll/regex-set-linux-x64-gnu": "0.3.2"
   }
 }
