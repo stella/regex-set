@@ -1,12 +1,11 @@
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
-  entry: ["src/index.ts"],
+  entry: ["src/index.ts", "src/wasm.ts"],
   format: ["esm"],
-  dts: true,
-  unbundle: true,
+  dts: { resolve: true, autoAddExts: true },
   clean: true,
   sourcemap: true,
+  external: [/index\.js/, /regex-set\.wasi/],
   hash: false,
-  external: ["../index.js"],
 });
