@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { RegexSet } from "../src/lib";
+import { RegexSet } from "../src/index";
 
 describe("RegexSet", () => {
   test("basic matching", () => {

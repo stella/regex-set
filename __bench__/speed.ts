@@ -12,7 +12,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { RegexSet } from "../src/lib";
+import { RegexSet } from "../src/index";
 
 const CORPUS = join(__dirname, "corpus");
 const load = (f: string) =>

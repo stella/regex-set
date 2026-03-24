@@ -19,28 +19,17 @@
     "native",
     "rust"
   ],
-  "main": "dist/lib.js",
-  "module": "dist/lib.mjs",
-  "types": "dist/lib.d.ts",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "import": {
-        "types": "./dist/lib.d.mts",
-        "default": "./dist/lib.mjs"
-      },
-      "require": {
-        "types": "./dist/lib.d.ts",
-        "default": "./dist/lib.js"
-      }
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     }
-  },
-  "browser": {
-    "./dist/lib.js": "./lib.wasm.js",
-    "./dist/lib.mjs": "./lib.wasm.js"
   },
   "files": [
     "dist",
-    "lib.wasm.js",
     "index.js",
     "index.d.ts"
   ],
