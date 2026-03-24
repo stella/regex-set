@@ -7,5 +7,6 @@ export default defineConfig({
   unbundle: true,
   clean: true,
   sourcemap: true,
+  hash: false,
   external: ["../index.js"],
 });
