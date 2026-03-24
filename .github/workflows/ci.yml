@@ -10,8 +10,14 @@ on:
     branches: [main]
     tags: ["v*"]
   pull_request:
-    types: [opened, synchronize, reopened,
-            ready_for_review, labeled]
+    types:
+      [
+        opened,
+        synchronize,
+        reopened,
+        ready_for_review,
+        labeled,
+      ]
   workflow_dispatch:
 
 concurrency:
@@ -210,4 +216,3 @@ jobs:
           done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-

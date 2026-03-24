@@ -141,10 +141,7 @@ function asciiBoundaries(src: string): string {
   while (i < src.length) {
     if (src.charAt(i) === "\\" && i + 1 < src.length) {
       const next = src.charAt(i + 1);
-      if (
-        !inClass &&
-        (next === "b" || next === "B")
-      ) {
+      if (!inClass && (next === "b" || next === "B")) {
         result += `(?-u:\\${next})`;
         i += 2;
       } else {
@@ -211,9 +208,7 @@ function regexpToRust(re: RegExp): string {
   }
 
   const uFlag =
-    needsAsciiMode(src) && !hasNonAscii(src)
-      ? "-u"
-      : "";
+    needsAsciiMode(src) && !hasNonAscii(src) ? "-u" : "";
   return `${leading}(?${flags}${uFlag}:${src})${trailing}`;
 }
 
@@ -475,18 +470,14 @@ class RegexSet {
   private _names: (string | undefined)[];
   private _hasNames: boolean;
 
-  constructor(
-    patterns: PatternEntry[],
-    options?: Options,
-  ) {
+  constructor(patterns: PatternEntry[], options?: Options) {
     const entries = patterns.map(normalizeEntry);
     this._names = entries.map((e) => e.name);
     this._hasNames = entries.some(
       (e) => e.name !== undefined,
     );
 
-    const unicode =
-      options?.unicodeBoundaries ?? true;
+    const unicode = options?.unicodeBoundaries ?? true;
     const ci = options?.caseInsensitive ?? false;
 
     let processed = entries.map((e) => e.pattern);
@@ -573,17 +564,13 @@ class RegexSet {
 
   /** Returns `true` if any pattern matches. */
   isMatch(haystack: string): boolean {
-    return this._inner._isMatchBuf(
-      Buffer.from(haystack),
-    );
+    return this._inner._isMatchBuf(Buffer.from(haystack));
   }
 
   /** Find all non-overlapping matches. */
   findIter(haystack: string): Match[] {
     return unpack(
-      this._inner._findIterPackedBuf(
-        Buffer.from(haystack),
-      ),
+      this._inner._findIterPackedBuf(Buffer.from(haystack)),
       haystack,
       this._hasNames ? this._names : null,
     );
@@ -602,10 +589,7 @@ class RegexSet {
     haystack: string,
     replacements: string[],
   ): string {
-    return this._inner.replaceAll(
-      haystack,
-      replacements,
-    );
+    return this._inner.replaceAll(haystack, replacements);
   }
 }
 

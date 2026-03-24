@@ -77,9 +77,7 @@ const jsRegexBench = (
 const N = 3;
 
 console.log("=".repeat(65));
-console.log(
-  " @stll/regex-set benchmark",
-);
+console.log(" @stll/regex-set benchmark");
 console.log("=".repeat(65));
 
 // ─── 1. mariomka: Email, URI, IPv4 ───────────
@@ -181,9 +179,7 @@ jsRegexBench(
 );
 
 // Pattern 12: suffix matching
-const rsTwain12 = new RegexSet([
-  "[a-zA-Z]+ing",
-]);
+const rsTwain12 = new RegexSet(["[a-zA-Z]+ing"]);
 bench(
   "#12 suffix: [a-zA-Z]+ing",
   () => rsTwain12.findIter(twain).length,
@@ -226,9 +222,7 @@ jsRegexBench(
 
 // ─── 4. Catastrophic backtracking resistance ─
 
-console.log(
-  "\n### Catastrophic backtracking resistance\n",
-);
+console.log("\n### Catastrophic backtracking resistance\n");
 
 // (a+)+$ on "aaa...X" — hangs JS, instant in Rust
 const evil = "a".repeat(25) + "X";
@@ -244,8 +238,7 @@ console.log(
 
 // Cloudflare ReDoS pattern (simplified)
 const cfPattern = ".*.*=.*";
-const cfInput =
-  "x".repeat(30) + "=" + "y".repeat(30);
+const cfInput = "x".repeat(30) + "=" + "y".repeat(30);
 const rsCf = new RegexSet([cfPattern]);
 const t2 = performance.now();
 rsCf.isMatch(cfInput);
