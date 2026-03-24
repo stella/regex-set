@@ -9,7 +9,7 @@
 crate for Node.js and Bun.
 
 Multi-pattern regex matching in a single pass.
-Guaranteed O(m * n) — no catastrophic backtracking.
+Guaranteed O(m \* n) — no catastrophic backtracking.
 Built on the same regex engine that powers
 [ripgrep](https://github.com/BurntSushi/ripgrep).
 
@@ -36,9 +36,9 @@ Prebuilt binaries are available for:
 import { RegexSet } from "@stll/regex-set";
 
 const rs = new RegexSet([
-  "\\d{2}\\.\\d{2}\\.\\d{4}",  // dates
-  "\\+?\\d{9,12}",              // phones
-  "[A-Z]{2}\\d{6}",             // IDs
+  "\\d{2}\\.\\d{2}\\.\\d{4}", // dates
+  "\\+?\\d{9,12}", // phones
+  "[A-Z]{2}\\d{6}", // IDs
   "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+", // emails
 ]);
 
@@ -57,10 +57,12 @@ rs.isMatch("call +420123456789"); // true
 rs.whichMatch("call +420123456789"); // [1]
 
 // Replace all matches
-rs.replaceAll(
-  "Born 15.03.1990, phone +420123456789",
-  ["[DATE]", "[PHONE]", "[ID]", "[EMAIL]"],
-);
+rs.replaceAll("Born 15.03.1990, phone +420123456789", [
+  "[DATE]",
+  "[PHONE]",
+  "[ID]",
+  "[EMAIL]",
+]);
 // "Born [DATE], phone [PHONE]"
 ```
 
@@ -137,7 +139,7 @@ Lookahead and lookbehind are supported:
 
 ```typescript
 const rs = new RegexSet([
-  "(?<!\\p{L})IČO:\\s*[0-9]{8}",  // lookbehind
+  "(?<!\\p{L})IČO:\\s*[0-9]{8}", // lookbehind
   "[0-9]{6}/[0-9]{3,4}(?![0-9])", // lookahead
 ]);
 ```
@@ -164,41 +166,41 @@ Run locally:
 
 ### Large documents (academic corpora)
 
-| Scenario | @stll/regex-set | JS RegExp | Speedup |
-| --- | --- | --- | --- |
-| mariomka 6.2 MB (3 patterns) | **20 ms** | 112 ms | 5.5x |
-| Bible 4 MB (5 multi-pattern) | **17 ms** | 122 ms | 7.0x |
-| Bible 4 MB (3 + lookaround) | **47 ms** | 82 ms | 1.8x |
-| Twain 16 MB (word boundary) | **17 ms** | 72 ms | 4.1x |
-| Twain 16 MB (alternation) | **12 ms** | 44 ms | 3.7x |
-| Twain 16 MB (suffix match) | **24 ms** | 142 ms | 5.8x |
+| Scenario                     | @stll/regex-set | JS RegExp | Speedup |
+| ---------------------------- | --------------- | --------- | ------- |
+| mariomka 6.2 MB (3 patterns) | **20 ms**       | 112 ms    | 5.5x    |
+| Bible 4 MB (5 multi-pattern) | **17 ms**       | 122 ms    | 7.0x    |
+| Bible 4 MB (3 + lookaround)  | **47 ms**       | 82 ms     | 1.8x    |
+| Twain 16 MB (word boundary)  | **17 ms**       | 72 ms     | 4.1x    |
+| Twain 16 MB (alternation)    | **12 ms**       | 44 ms     | 3.7x    |
+| Twain 16 MB (suffix match)   | **24 ms**       | 142 ms    | 5.8x    |
 
 ### Production PII patterns (13 patterns + lookaround)
 
-| Size | @stll/regex-set | JS RegExp | Speedup |
-| --- | --- | --- | --- |
-| 8 KB | **0.09 ms** | 0.12 ms | 1.3x |
-| 16 KB | **0.15 ms** | 0.23 ms | 1.5x |
-| 32 KB | **0.28 ms** | 0.44 ms | 1.6x |
-| 64 KB | **0.63 ms** | 0.98 ms | 1.6x |
-| 128 KB | **1.17 ms** | 1.79 ms | 1.5x |
-| 256 KB | **2.30 ms** | 3.47 ms | 1.5x |
+| Size   | @stll/regex-set | JS RegExp | Speedup |
+| ------ | --------------- | --------- | ------- |
+| 8 KB   | **0.09 ms**     | 0.12 ms   | 1.3x    |
+| 16 KB  | **0.15 ms**     | 0.23 ms   | 1.5x    |
+| 32 KB  | **0.28 ms**     | 0.44 ms   | 1.6x    |
+| 64 KB  | **0.63 ms**     | 0.98 ms   | 1.6x    |
+| 128 KB | **1.17 ms**     | 1.79 ms   | 1.5x    |
+| 256 KB | **2.30 ms**     | 3.47 ms   | 1.5x    |
 
 ### Real Czech contracts (20 anonymization patterns)
 
-| Size | @stll/regex-set | JS RegExp | Speedup |
-| --- | --- | --- | --- |
-| 0.6 KB | **5 μs** | 9 μs | 1.8x |
-| 16 KB | **80 μs** | 265 μs | 3.3x |
-| 27 KB | **152 μs** | 448 μs | 2.9x |
-| 63 KB | **467 μs** | 1016 μs | 2.2x |
+| Size   | @stll/regex-set | JS RegExp | Speedup |
+| ------ | --------------- | --------- | ------- |
+| 0.6 KB | **5 μs**        | 9 μs      | 1.8x    |
+| 16 KB  | **80 μs**       | 265 μs    | 3.3x    |
+| 27 KB  | **152 μs**      | 448 μs    | 2.9x    |
+| 63 KB  | **467 μs**      | 1016 μs   | 2.2x    |
 
 ### Backtracking resistance
 
-| Pattern | Input | @stll/regex-set | JS RegExp |
-| --- | --- | --- | --- |
-| `(a+)+b` | `"a" × 30 + "X"` | **0.12 ms** | hangs |
-| `.*.*=.*` | `"x" × 30 + "=" + "y" × 30` | **0.25 ms** | hangs |
+| Pattern   | Input                       | @stll/regex-set | JS RegExp |
+| --------- | --------------------------- | --------------- | --------- |
+| `(a+)+b`  | `"a" × 30 + "X"`            | **0.12 ms**     | hangs     |
+| `.*.*=.*` | `"x" × 30 + "=" + "y" × 30` | **0.25 ms**     | hangs     |
 
 All match counts verified against JS RegExp.
 For pure literal patterns, use
@@ -217,14 +219,14 @@ no regex engine can match).
 
 ## API
 
-| Method | Returns | Description |
-| --- | --- | --- |
-| `new RegexSet(patterns, options?)` | instance | Compile patterns |
-| `.findIter(haystack)` | `Match[]` | All non-overlapping matches |
-| `.isMatch(haystack)` | `boolean` | Any pattern matches? |
-| `.whichMatch(haystack)` | `number[]` | Which pattern indices matched |
-| `.replaceAll(haystack, replacements)` | `string` | Replace matches |
-| `.patternCount` | `number` | Number of patterns |
+| Method                                | Returns    | Description                   |
+| ------------------------------------- | ---------- | ----------------------------- |
+| `new RegexSet(patterns, options?)`    | instance   | Compile patterns              |
+| `.findIter(haystack)`                 | `Match[]`  | All non-overlapping matches   |
+| `.isMatch(haystack)`                  | `boolean`  | Any pattern matches?          |
+| `.whichMatch(haystack)`               | `number[]` | Which pattern indices matched |
+| `.replaceAll(haystack, replacements)` | `string`   | Replace matches               |
+| `.patternCount`                       | `number`   | Number of patterns            |
 
 ### Types
 
@@ -256,6 +258,7 @@ with `String.prototype.slice()`.
 ## Regex syntax
 
 Uses Rust regex syntax. Similar to PCRE but:
+
 - No backreferences (by design: enables O(n))
 - Lookahead/lookbehind supported (via inline
   char checks, no backtracking)

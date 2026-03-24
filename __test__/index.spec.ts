@@ -37,9 +37,7 @@ describe("RegexSet", () => {
   });
 
   test("regex patterns: dates", () => {
-    const rs = new RegexSet([
-      "\\d{2}\\.\\d{2}\\.\\d{4}",
-    ]);
+    const rs = new RegexSet(["\\d{2}\\.\\d{2}\\.\\d{4}"]);
     const matches = rs.findIter(
       "Born 15.03.1990 in Prague",
     );
@@ -91,11 +89,7 @@ describe("RegexSet", () => {
   });
 
   test("whichMatch returns pattern indices", () => {
-    const rs = new RegexSet([
-      "foo",
-      "bar",
-      "baz",
-    ]);
+    const rs = new RegexSet(["foo", "bar", "baz"]);
     const which = rs.whichMatch("foo and baz");
     expect(which).toContain(0);
     expect(which).toContain(2);
@@ -111,16 +105,12 @@ describe("RegexSet", () => {
       "Born 15.03.1990, phone +420123456789",
       ["[DATE]", "[PHONE]"],
     );
-    expect(result).toBe(
-      "Born [DATE], phone [PHONE]",
-    );
+    expect(result).toBe("Born [DATE], phone [PHONE]");
   });
 
   test("replaceAll throws on wrong count", () => {
     const rs = new RegexSet(["a", "b"]);
-    expect(() =>
-      rs.replaceAll("ab", ["x"]),
-    ).toThrow();
+    expect(() => rs.replaceAll("ab", ["x"])).toThrow();
   });
 
   test("empty patterns", () => {
@@ -164,26 +154,19 @@ describe("wholeWords", () => {
     // "123" inside "abc123def" is NOT a whole word
     expect(rs.findIter("abc123def").length).toBe(0);
     // "123" surrounded by spaces IS
-    expect(rs.findIter("abc 123 def").length).toBe(
-      1,
-    );
+    expect(rs.findIter("abc 123 def").length).toBe(1);
   });
 
   test("regex pattern with wholeWords", () => {
-    const rs = new RegexSet(
-      ["\\d{2}\\.\\d{2}\\.\\d{4}"],
-      { wholeWords: true },
-    );
-    const matches = rs.findIter(
-      "date 15.03.1990 ok",
-    );
+    const rs = new RegexSet(["\\d{2}\\.\\d{2}\\.\\d{4}"], {
+      wholeWords: true,
+    });
+    const matches = rs.findIter("date 15.03.1990 ok");
     expect(matches).toHaveLength(1);
     expect(matches[0]!.text).toBe("15.03.1990");
 
     // Not a whole word if glued to text
-    expect(
-      rs.findIter("date15.03.1990ok").length,
-    ).toBe(0);
+    expect(rs.findIter("date15.03.1990ok").length).toBe(0);
   });
 
   test("wholeWords with literal patterns", () => {
@@ -250,13 +233,8 @@ describe("unicode offsets", () => {
 
 describe("ascii word boundary", () => {
   test("\\b in string patterns uses ASCII boundary", () => {
-    const rs = new RegexSet([
-      "\\bJan\\b",
-      "\\bPavel\\b",
-    ]);
-    const matches = rs.findIter(
-      "Jan met Pavel in Prague",
-    );
+    const rs = new RegexSet(["\\bJan\\b", "\\bPavel\\b"]);
+    const matches = rs.findIter("Jan met Pavel in Prague");
     expect(matches).toHaveLength(2);
     expect(matches[0]!.text).toBe("Jan");
     expect(matches[1]!.text).toBe("Pavel");
@@ -326,9 +304,7 @@ describe("ascii word boundary", () => {
 
   test("\\b + lookahead combination works", () => {
     // Regression: (?-u:\b) broke fancy-regex fallback
-    const rs = new RegexSet([
-      String.raw`\b\d{3}(?!\d)\b`,
-    ]);
+    const rs = new RegexSet([String.raw`\b\d{3}(?!\d)\b`]);
     const matches = rs.findIter("abc 123 def 4567");
     expect(matches).toHaveLength(1);
     expect(matches[0]!.text).toBe("123");
@@ -393,12 +369,10 @@ describe("unicodeBoundaries", () => {
     const rs = new RegexSet(["\\bčáp\\b"], {
       unicodeBoundaries: true,
     });
-    expect(rs.findIter("malý čáp letí")).toHaveLength(
-      1,
+    expect(rs.findIter("malý čáp letí")).toHaveLength(1);
+    expect(rs.findIter("malý čáp letí")[0]!.text).toBe(
+      "čáp",
     );
-    expect(
-      rs.findIter("malý čáp letí")[0]!.text,
-    ).toBe("čáp");
     // Should not match inside another word
     expect(rs.findIter("čápek")).toHaveLength(0);
   });
@@ -416,10 +390,9 @@ describe("unicodeBoundaries", () => {
   });
 
   test("Unicode \\b + lookahead works", () => {
-    const rs = new RegexSet(
-      [String.raw`\b\d{3}(?!\d)\b`],
-      { unicodeBoundaries: true },
-    );
+    const rs = new RegexSet([String.raw`\b\d{3}(?!\d)\b`], {
+      unicodeBoundaries: true,
+    });
     const matches = rs.findIter("abc 123 def 4567");
     expect(matches).toHaveLength(1);
     expect(matches[0]!.text).toBe("123");
@@ -443,10 +416,9 @@ describe("(?i) string + \\b parity", () => {
   test("string (?i)\\b matches like RegExp /\\b/i", () => {
     // Both paths should produce Unicode \b semantics
     // when unicodeBoundaries is true.
-    const strRs = new RegexSet(
-      ["(?i)\\bjanuar\\b"],
-      { unicodeBoundaries: true },
-    );
+    const strRs = new RegexSet(["(?i)\\bjanuar\\b"], {
+      unicodeBoundaries: true,
+    });
     const reRs = new RegexSet([/\bjanuar\b/i], {
       unicodeBoundaries: true,
     });
@@ -465,10 +437,9 @@ describe("(?i) string + \\b parity", () => {
     // čáp is one word in Unicode — \b should not
     // fire between á and p. If -u leaked to \b,
     // it would fire (ASCII \b treats á as non-word).
-    const rs = new RegexSet(
-      ["(?i)\\bp\\b"],
-      { unicodeBoundaries: true },
-    );
+    const rs = new RegexSet(["(?i)\\bp\\b"], {
+      unicodeBoundaries: true,
+    });
     // Should NOT match: čáp is one Unicode word
     expect(rs.findIter("čáp")).toHaveLength(0);
   });
@@ -501,10 +472,9 @@ describe("(?i) string + \\b parity", () => {
   });
 
   test("bare (?i-s) at start gets -u scoping", () => {
-    const rs = new RegexSet(
-      ["(?i-s)\\bjanuar\\b"],
-      { unicodeBoundaries: true },
-    );
+    const rs = new RegexSet(["(?i-s)\\bjanuar\\b"], {
+      unicodeBoundaries: true,
+    });
     expect(rs.isMatch("Januar")).toBe(true);
     expect(rs.isMatch("JANUAR")).toBe(true);
   });
@@ -519,10 +489,9 @@ describe("heterogeneous boundaries", () => {
     // On "foobar": foo at 0..3, trailing is o|b
     // (both word chars) → \b fails, \B passes.
     // Pattern 1 should match.
-    const rs = new RegexSet(
-      ["\\bfoo\\b", "\\bfoo\\B"],
-      { unicodeBoundaries: true },
-    );
+    const rs = new RegexSet(["\\bfoo\\b", "\\bfoo\\B"], {
+      unicodeBoundaries: true,
+    });
     const matches = rs.findIter("foobar");
     expect(matches).toHaveLength(1);
     expect(matches[0]!.pattern).toBe(1);
@@ -530,10 +499,9 @@ describe("heterogeneous boundaries", () => {
   });
 
   test("\\bfoo\\b + \\bfoo\\B: first matches in foo bar", () => {
-    const rs = new RegexSet(
-      ["\\bfoo\\b", "\\bfoo\\B"],
-      { unicodeBoundaries: true },
-    );
+    const rs = new RegexSet(["\\bfoo\\b", "\\bfoo\\B"], {
+      unicodeBoundaries: true,
+    });
     const matches = rs.findIter("foo bar");
     expect(matches).toHaveLength(1);
     expect(matches[0]!.pattern).toBe(0);
@@ -579,12 +547,8 @@ describe("named patterns", () => {
       /[a-z]+/, // unnamed
     ]);
     const matches = rs.findIter("a1");
-    const named = matches.find(
-      (m) => m.pattern === 0,
-    )!;
-    const unnamed = matches.find(
-      (m) => m.pattern === 1,
-    )!;
+    const named = matches.find((m) => m.pattern === 0)!;
+    const unnamed = matches.find((m) => m.pattern === 1)!;
     expect(named.name).toBe("num");
     expect("name" in unnamed).toBe(false);
   });
@@ -611,8 +575,7 @@ describe("named patterns", () => {
       () => new RegexSet([{ pattern: "a", name: 42 }]),
     ).toThrow(/must be a string/);
     expect(
-      () =>
-        new RegexSet([{ pattern: "a", name: ["x"] }]),
+      () => new RegexSet([{ pattern: "a", name: ["x"] }]),
     ).toThrow(/must be a string/);
   });
 });
@@ -630,32 +593,55 @@ describe("internal \\b DFA explosion", () => {
   // state explosion with large alternation patterns.
 
   const TITLES = [
-    "Ing\\.", "Mgr\\.", "JUDr\\.", "MUDr\\.",
-    "PhDr\\.", "RNDr\\.", "Bc\\.", "BcA\\.",
-    "ICDr\\.", "PaedDr\\.", "PhMr\\.", "ThDr\\.",
-    "RSDr\\.", "ThLic\\.", "ThMgr\\.",
-    "Dr\\.\\s*med\\.", "Dr\\.\\s*phil\\.",
+    "Ing\\.",
+    "Mgr\\.",
+    "JUDr\\.",
+    "MUDr\\.",
+    "PhDr\\.",
+    "RNDr\\.",
+    "Bc\\.",
+    "BcA\\.",
+    "ICDr\\.",
+    "PaedDr\\.",
+    "PhMr\\.",
+    "ThDr\\.",
+    "RSDr\\.",
+    "ThLic\\.",
+    "ThMgr\\.",
+    "Dr\\.\\s*med\\.",
+    "Dr\\.\\s*phil\\.",
     "Dr\\.\\s*rer\\.\\s*nat\\.",
     "Dr\\.\\s*rer\\.\\s*pol\\.",
-    "Dr\\.\\s*jur\\.", "Dr\\.\\s*oec\\.",
-    "Dr\\.\\s*Ing\\.", "Dr\\.\\s*techn\\.",
+    "Dr\\.\\s*jur\\.",
+    "Dr\\.\\s*oec\\.",
+    "Dr\\.\\s*Ing\\.",
+    "Dr\\.\\s*techn\\.",
     "Dr\\.\\s*med\\.\\s*dent\\.",
     "Dr\\.\\s*med\\.\\s*vet\\.",
-    "Dr\\.\\s*theol\\.", "Dr\\.\\s*habil\\.",
-    "Dipl\\.-Ing\\.", "Dipl\\.-Kfm\\.",
+    "Dr\\.\\s*theol\\.",
+    "Dr\\.\\s*habil\\.",
+    "Dipl\\.-Ing\\.",
+    "Dipl\\.-Kfm\\.",
     "Dipl\\.-Betriebsw\\.",
     "Dipl\\.-Wirt\\.-Ing\\.",
     "Mag\\.\\s*rer\\.\\s*nat\\.",
     "Mag\\.\\s*rer\\.\\s*soc\\.\\s*oec\\.",
-    "Mag\\.\\s*phil\\.", "Mag\\.\\s*iur\\.",
+    "Mag\\.\\s*phil\\.",
+    "Mag\\.\\s*iur\\.",
     "Mag\\.\\s*theol\\.",
     "Bakk\\.\\s*rer\\.\\s*nat\\.",
     "ao\\.\\s*Univ\\.-Prof\\.",
     "o\\.\\s*Univ\\.-Prof\\.",
-    "Priv\\.-Doz\\.", "PD", "RA",
-    "Prof\\.", "doc\\.", "as\\.\\s*prof\\.",
-    "Lic\\.\\s*iur\\.", "Lic\\.\\s*oec\\.",
-    "Lic\\.\\s*phil\\.", "Lic\\.\\s*theol\\.",
+    "Priv\\.-Doz\\.",
+    "PD",
+    "RA",
+    "Prof\\.",
+    "doc\\.",
+    "as\\.\\s*prof\\.",
+    "Lic\\.\\s*iur\\.",
+    "Lic\\.\\s*oec\\.",
+    "Lic\\.\\s*phil\\.",
+    "Lic\\.\\s*theol\\.",
     ...Array.from(
       { length: 32 },
       (_, i) => `Extra\\.\\s*Title${i}`,
@@ -673,8 +659,7 @@ describe("internal \\b DFA explosion", () => {
     "\\s?[\\dA-Z]{4}\\s?[\\dA-Z]{4}" +
     "\\s?[\\dA-Z]{0,14}\\b";
   const internalBPat =
-    "(?:\\bM\\.|Mrs|Ms|Mr)" +
-    "\\.?\\s+[A-Z][a-z]+";
+    "(?:\\bM\\.|Mrs|Ms|Mr)" + "\\.?\\s+[A-Z][a-z]+";
 
   test("correctness: internal \\b pattern matches", () => {
     const rs = new RegexSet([
@@ -716,9 +701,17 @@ describe("internal \\b DFA explosion", () => {
     // Mixed-content text with varied byte classes
     // triggers cache misses in an exploded DFA.
     const words = [
-      "Společnost", "zastoupená", "jednatelem",
-      "se sídlem", "IČO", "zapsaná", "v obchodním",
-      "rejstříku", "vedeném", "Krajským", "soudem",
+      "Společnost",
+      "zastoupená",
+      "jednatelem",
+      "se sídlem",
+      "IČO",
+      "zapsaná",
+      "v obchodním",
+      "rejstříku",
+      "vedeném",
+      "Krajským",
+      "soudem",
     ];
     const text = Array.from(
       { length: 5000 },

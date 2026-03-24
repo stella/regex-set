@@ -164,7 +164,8 @@ fn needs_segmenter(haystack: &str) -> bool {
         || (0x1780..=0x17FF).contains(&cp) // Khmer
         || (0x3040..=0x30FF).contains(&cp) // Kana
         || (0x3400..=0x9FFF).contains(&cp) // CJK
-        || (0xAC00..=0xD7AF).contains(&cp) // Hangul
+        || (0xAC00..=0xD7AF).contains(&cp)
+      // Hangul
       {
         return true;
       }
@@ -261,8 +262,7 @@ fn has_internal_boundary(pattern: &str) -> bool {
   while i < bytes.len() {
     if bytes[i] == b'\\' && i + 1 < bytes.len() {
       if !in_class
-        && (bytes[i + 1] == b'b'
-          || bytes[i + 1] == b'B')
+        && (bytes[i + 1] == b'b' || bytes[i + 1] == b'B')
       {
         return true;
       }
@@ -298,8 +298,7 @@ fn ascii_internal_boundaries(pattern: &str) -> String {
   while i < bytes.len() {
     if bytes[i] == b'\\' && i + 1 < bytes.len() {
       let next = bytes[i + 1];
-      if !in_class && (next == b'b' || next == b'B')
-      {
+      if !in_class && (next == b'b' || next == b'B') {
         result.push_str(&pattern[seg_start..i]);
         result.push_str("(?-u:\\");
         result.push(next as char); // b/B are ASCII
@@ -821,9 +820,7 @@ fn check_match(
   if pi.has_internal_b {
     let input = Input::new(haystack).range(start..);
     match pi.individual.find(input) {
-      Some(m)
-        if m.start() == start && m.end() == end =>
-      {
+      Some(m) if m.start() == start && m.end() == end => {
         Ok(())
       }
       _ => Err(Rejection::Verifier),
