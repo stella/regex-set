@@ -37,9 +37,7 @@ describe("property: text field", () => {
       fc.property(safePatterns, hay, (pats, h) => {
         const rs = new RegexSet(pats);
         for (const m of rs.findIter(h)) {
-          expect(h.slice(m.start, m.end)).toBe(
-            m.text,
-          );
+          expect(h.slice(m.start, m.end)).toBe(m.text);
         }
       }),
       PARAMS,
@@ -51,9 +49,7 @@ describe("property: text field", () => {
       fc.property(safePatterns, hay, (pats, h) => {
         const rs = new RegexSet(pats);
         for (const m of rs.findIter(h)) {
-          const jsRe = new RegExp(
-            pats[m.pattern]!,
-          );
+          const jsRe = new RegExp(pats[m.pattern]!);
           expect(jsRe.test(m.text)).toBe(true);
         }
       }),
@@ -71,9 +67,7 @@ describe("property: non-overlapping", () => {
         const rs = new RegexSet(pats);
         const matches = rs.findIter(h);
         for (let i = 1; i < matches.length; i++) {
-          expect(
-            matches[i]!.start,
-          ).toBeGreaterThanOrEqual(
+          expect(matches[i]!.start).toBeGreaterThanOrEqual(
             matches[i - 1]!.end,
           );
         }
@@ -92,9 +86,7 @@ describe("property: monotonic offsets", () => {
         const rs = new RegexSet(pats);
         const matches = rs.findIter(h);
         for (let i = 1; i < matches.length; i++) {
-          expect(
-            matches[i]!.start,
-          ).toBeGreaterThan(
+          expect(matches[i]!.start).toBeGreaterThan(
             matches[i - 1]!.start,
           );
         }
@@ -218,15 +210,9 @@ describe("property: oracle vs JS RegExp", () => {
 
         // Same positions and text
         for (let i = 0; i < real.length; i++) {
-          expect(real[i]!.start).toBe(
-            oracle[i]!.start,
-          );
-          expect(real[i]!.end).toBe(
-            oracle[i]!.end,
-          );
-          expect(real[i]!.text).toBe(
-            oracle[i]!.text,
-          );
+          expect(real[i]!.start).toBe(oracle[i]!.start);
+          expect(real[i]!.end).toBe(oracle[i]!.end);
+          expect(real[i]!.text).toBe(oracle[i]!.text);
         }
       }),
       PARAMS,
@@ -250,15 +236,10 @@ describe("property: oracle vs JS RegExp", () => {
  * Convert a Rust-syntax pattern to JS RegExp.
  * Returns null if the pattern uses Rust-only syntax.
  */
-function toJsRegExp(
-  pat: string | RegExp,
-): RegExp | null {
+function toJsRegExp(pat: string | RegExp): RegExp | null {
   try {
     if (pat instanceof RegExp) {
-      return new RegExp(
-        pat.source,
-        pat.flags + "g",
-      );
+      return new RegExp(pat.source, pat.flags + "g");
     }
     return new RegExp(pat, "g");
   } catch {
@@ -286,8 +267,7 @@ describe("property: JS oracle on feature patterns", () => {
           // Filter: all patterns must compile in JS
           const jsRegexps: (RegExp | null)[] =
             pats.map(toJsRegExp);
-          if (jsRegexps.some((r) => r === null))
-            return;
+          if (jsRegexps.some((r) => r === null)) return;
 
           // RegexSet with ASCII \b (matches JS)
           let rs;
@@ -330,9 +310,7 @@ describe("property: JS oracle on feature patterns", () => {
           all.sort((a, b) =>
             a.start !== b.start
               ? a.start - b.start
-              : b.end -
-                b.start -
-                (a.end - a.start),
+              : b.end - b.start - (a.end - a.start),
           );
 
           // Greedy non-overlapping selection
@@ -358,12 +336,8 @@ describe("property: JS oracle on feature patterns", () => {
           // since those can't be verified on the
           // isolated text slice.
           const hasContext = (p: string | RegExp) => {
-            const s =
-              p instanceof RegExp ? p.source : p;
-            return (
-              /\\[bB]/.test(s) ||
-              /\(\?[=!<]/.test(s)
-            );
+            const s = p instanceof RegExp ? p.source : p;
+            return /\\[bB]/.test(s) || /\(\?[=!<]/.test(s);
           };
 
           for (const m of real) {
@@ -377,9 +351,7 @@ describe("property: JS oracle on feature patterns", () => {
           }
 
           // isMatch must agree
-          expect(real.length > 0).toBe(
-            all.length > 0,
-          );
+          expect(real.length > 0).toBe(all.length > 0);
         },
       ),
       { ...PARAMS, numRuns: 300 },
@@ -408,9 +380,7 @@ const prefixes = [
   "(?<!\\d)", // negative lookbehind (digit)
 ];
 
-const cores = [
-  "[a-z]+", "\\d+", "\\w+", "[A-Z][a-z]+",
-];
+const cores = ["[a-z]+", "\\d+", "\\w+", "[A-Z][a-z]+"];
 
 const suffixes = [
   "", // none
@@ -455,9 +425,7 @@ const backslashEdgePattern = fc
   .chain((n) => {
     const bs = "\\".repeat(n);
     const suffix = `${bs}b`;
-    return safePattern.map(
-      (core) => `${core}${suffix}`,
-    );
+    return safePattern.map((core) => `${core}${suffix}`);
   });
 
 // RegExp objects with flag combinations.
@@ -467,7 +435,14 @@ const backslashEdgePattern = fc
 // Every flag combination as a proper axis that
 // crosses with all patterns. "" = no flags (string).
 const allFlags = fc.constantFrom(
-  "", "i", "m", "s", "im", "is", "ms", "ims",
+  "",
+  "i",
+  "m",
+  "s",
+  "im",
+  "is",
+  "ms",
+  "ims",
 );
 
 // Base patterns (string form, no flags).
@@ -475,18 +450,18 @@ const basePatterns = fc.oneof(
   safePattern,
   ...prefixes.map((pre) =>
     safePattern.chain((p) =>
-      fc.constantFrom(...suffixes).map(
-        (suf) => `${pre}${p}${suf}`,
-      ),
+      fc
+        .constantFrom(...suffixes)
+        .map((suf) => `${pre}${p}${suf}`),
     ),
   ),
   ...cores.flatMap((core) => [
-    fc.constantFrom(...prefixes).map(
-      (pre) => `${pre}${core}`,
-    ),
-    fc.constantFrom(...suffixes).map(
-      (suf) => `${core}${suf}`,
-    ),
+    fc
+      .constantFrom(...prefixes)
+      .map((pre) => `${pre}${core}`),
+    fc
+      .constantFrom(...suffixes)
+      .map((suf) => `${core}${suf}`),
     fc
       .tuple(
         fc.constantFrom(...prefixes),
@@ -553,28 +528,18 @@ describe("exhaustive: options × patterns × haystacks", () => {
             const matches = rs.findIter(h);
 
             // isMatch agrees with findIter
-            expect(rs.isMatch(h)).toBe(
-              matches.length > 0,
-            );
+            expect(rs.isMatch(h)).toBe(matches.length > 0);
 
             // text field is correct slice
             for (const m of matches) {
-              expect(
-                h.slice(m.start, m.end),
-              ).toBe(m.text);
+              expect(h.slice(m.start, m.end)).toBe(m.text);
             }
 
             // Non-overlapping + monotonic
-            for (
-              let i = 1;
-              i < matches.length;
-              i++
-            ) {
+            for (let i = 1; i < matches.length; i++) {
               expect(
                 matches[i]!.start,
-              ).toBeGreaterThanOrEqual(
-                matches[i - 1]!.end,
-              );
+              ).toBeGreaterThanOrEqual(matches[i - 1]!.end);
             }
           } catch {
             // Compile errors for invalid patterns
@@ -685,12 +650,7 @@ describe("oracle: every match individually verified", () => {
             let anyMatch = false;
             for (const pat of pats) {
               try {
-                if (
-                  new RegexSet(
-                    [pat],
-                    opts,
-                  ).isMatch(h)
-                ) {
+                if (new RegexSet([pat], opts).isMatch(h)) {
                   anyMatch = true;
                   break;
                 }
@@ -724,9 +684,7 @@ describe("oracle: reverse isMatch", () => {
           let anyMatch = false;
           for (const pat of pats) {
             try {
-              if (
-                new RegexSet([pat], opts).isMatch(h)
-              ) {
+              if (new RegexSet([pat], opts).isMatch(h)) {
                 anyMatch = true;
                 break;
               }
@@ -772,9 +730,7 @@ describe("oracle: replaceAll ↔ findIter", () => {
           }
 
           const matches = rs.findIter(h);
-          const repls = pats.map(
-            (_, i) => `[${i}]`,
-          );
+          const repls = pats.map((_, i) => `[${i}]`);
 
           let replaceResult;
           try {
@@ -833,9 +789,7 @@ describe("oracle: whichMatch ↔ findIter", () => {
           }
 
           // whichMatch must agree with isMatch
-          expect(which.size > 0).toBe(
-            rs.isMatch(h),
-          );
+          expect(which.size > 0).toBe(rs.isMatch(h));
         },
       ),
       { ...PARAMS, numRuns: 300 },
@@ -861,11 +815,10 @@ describe("property: named patterns", () => {
         ),
         hay,
         (entries, h) => {
-          const patterns = entries.map(
-            ([pat, name]) =>
-              name !== undefined
-                ? { pattern: pat, name }
-                : pat,
+          const patterns = entries.map(([pat, name]) =>
+            name !== undefined
+              ? { pattern: pat, name }
+              : pat,
           );
           const rs = new RegexSet(patterns);
           for (const m of rs.findIter(h)) {
@@ -905,8 +858,7 @@ describe("property: no catastrophic slowdown", () => {
         (pats, opts) => {
           const jsRegs: (RegExp | null)[] =
             pats.map(toJsRegExp);
-          if (jsRegs.some((r) => r === null))
-            return;
+          if (jsRegs.some((r) => r === null)) return;
 
           let rs;
           try {
@@ -943,9 +895,7 @@ describe("property: no catastrophic slowdown", () => {
           // (like the (?i) bug at 15x) while allowing
           // for normal variance on the slow path.
           if (jsTime > 0.1) {
-            expect(rsTime / jsTime).toBeLessThan(
-              20,
-            );
+            expect(rsTime / jsTime).toBeLessThan(20);
           }
         },
       ),

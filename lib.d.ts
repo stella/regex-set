@@ -47,10 +47,7 @@ export type NamedPattern = {
 };
 
 /** A pattern entry: string, RegExp, or named. */
-export type PatternEntry =
-  | string
-  | RegExp
-  | NamedPattern;
+export type PatternEntry = string | RegExp | NamedPattern;
 
 /** A single match result. */
 export type Match = {
@@ -88,10 +85,7 @@ export type Match = {
  * ```
  */
 export declare class RegexSet {
-  constructor(
-    patterns: PatternEntry[],
-    options?: Options,
-  );
+  constructor(patterns: PatternEntry[], options?: Options);
 
   /** Number of patterns. */
   get patternCount(): number;

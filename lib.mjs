@@ -40,10 +40,7 @@ function asciiBoundaries(src) {
   while (i < src.length) {
     if (src[i] === "\\" && i + 1 < src.length) {
       const next = src[i + 1];
-      if (
-        !inClass &&
-        (next === "b" || next === "B")
-      ) {
+      if (!inClass && (next === "b" || next === "B")) {
         result += `(?-u:\\${next})`;
         i += 2;
       } else {
@@ -109,8 +106,8 @@ function regexpToRust(re) {
     }
   }
 
-  const uFlag = needsAsciiMode(src) && !hasNonAscii(src)
-    ? "-u" : "";
+  const uFlag =
+    needsAsciiMode(src) && !hasNonAscii(src) ? "-u" : "";
   return `${leading}(?${flags}${uFlag}:${src})${trailing}`;
 }
 
@@ -196,9 +193,10 @@ function scopeInlineFlags(src) {
     const inner = scopeInnerFlags(rest);
     // Only add -u when content uses char class
     // shortcuts (\w, \d, \s) that benefit from it.
-    const addU = needsAsciiMode(rest)
-      && !hasNonAscii(rest)
-      && !disable.includes("u");
+    const addU =
+      needsAsciiMode(rest) &&
+      !hasNonAscii(rest) &&
+      !disable.includes("u");
     const merged = addU ? disable + "u" : disable;
     const disablePart = merged ? `-${merged}` : "";
     return `${leading}(?${enable}${disablePart}:${inner})${trailing}`;
@@ -224,17 +222,10 @@ function scopeInnerFlags(src) {
     }
     if (src[i] === "[") inClass = true;
     if (src[i] === "]") inClass = false;
-    if (
-      !inClass &&
-      src[i] === "(" &&
-      src[i + 1] === "?"
-    ) {
+    if (!inClass && src[i] === "(" && src[i + 1] === "?") {
       let j = i + 2;
       let enable = "";
-      while (
-        j < src.length &&
-        "ims".includes(src[j])
-      ) {
+      while (j < src.length && "ims".includes(src[j])) {
         enable += src[j];
         j++;
       }
@@ -242,10 +233,7 @@ function scopeInnerFlags(src) {
       let disable = "";
       if (j < src.length && src[j] === "-") {
         j++; // skip -
-        while (
-          j < src.length &&
-          "imsu".includes(src[j])
-        ) {
+        while (j < src.length && "imsu".includes(src[j])) {
           disable += src[j];
           j++;
         }
@@ -347,8 +335,7 @@ class RegexSet {
       (e) => e.name !== undefined,
     );
 
-    const unicode =
-      options?.unicodeBoundaries ?? true;
+    const unicode = options?.unicodeBoundaries ?? true;
     const ci = options?.caseInsensitive ?? false;
 
     let processed = entries.map((e) => e.pattern);
@@ -361,7 +348,11 @@ class RegexSet {
       processed = processed.map((p) => {
         // Skip patterns already wrapped by
         // regexpToRust or scopeInlineFlags.
-        if (/^(?:\\[bB]|\(\?[ims]+(?:-[imsu]+)?\))*\(\?[ims]*i[ims]*(?:-[imsu]+)?[:(]/.test(p))
+        if (
+          /^(?:\\[bB]|\(\?[ims]+(?:-[imsu]+)?\))*\(\?[ims]*i[ims]*(?:-[imsu]+)?[:(]/.test(
+            p,
+          )
+        )
           return p;
         // Strip leading bare-flag prefix (e.g. (?m),
         // (?ms)) before extracting edge \b.
@@ -399,7 +390,10 @@ class RegexSet {
             }
           }
         }
-        const uFlag = needsAsciiMode(src) && !hasNonAscii(src) ? "-u" : "";
+        const uFlag =
+          needsAsciiMode(src) && !hasNonAscii(src)
+            ? "-u"
+            : "";
         return `${flagPrefix}${leading}(?i${uFlag}:${src})${trailing}`;
       });
     }
@@ -409,17 +403,12 @@ class RegexSet {
     }
 
     // Strip JS-only options before passing to native
-    const nativeOpts = options
-      ? { ...options }
-      : undefined;
+    const nativeOpts = options ? { ...options } : undefined;
     if (nativeOpts) {
       delete nativeOpts.caseInsensitive;
     }
 
-    this._inner = new NativeRegexSet(
-      processed,
-      nativeOpts,
-    );
+    this._inner = new NativeRegexSet(processed, nativeOpts);
   }
 
   get patternCount() {
@@ -427,16 +416,12 @@ class RegexSet {
   }
 
   isMatch(haystack) {
-    return this._inner._isMatchBuf(
-      Buffer.from(haystack),
-    );
+    return this._inner._isMatchBuf(Buffer.from(haystack));
   }
 
   findIter(haystack) {
     return unpack(
-      this._inner._findIterPackedBuf(
-        Buffer.from(haystack),
-      ),
+      this._inner._findIterPackedBuf(Buffer.from(haystack)),
       haystack,
       this._hasNames ? this._names : null,
     );
@@ -447,10 +432,7 @@ class RegexSet {
   }
 
   replaceAll(haystack, replacements) {
-    return this._inner.replaceAll(
-      haystack,
-      replacements,
-    );
+    return this._inner.replaceAll(haystack, replacements);
   }
 }
 

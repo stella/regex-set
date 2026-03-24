@@ -2,28 +2,49 @@
   "name": "@stll/regex-set",
   "version": "0.4.0",
   "description": "Multi-pattern regex for Node.js/Bun. 2-9x faster than JS RegExp, backtracking-immune, Unicode word boundaries. Rust DFA engine via NAPI-RS.",
+  "keywords": [
+    "multi-pattern",
+    "napi-rs",
+    "native",
+    "regex",
+    "regex-set",
+    "rust"
+  ],
+  "homepage": "https://github.com/stella/regex-set#readme",
+  "bugs": {
+    "url": "https://github.com/stella/regex-set/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/stella/regex-set"
   },
-  "homepage": "https://github.com/stella/regex-set#readme",
-  "bugs": {
-    "url": "https://github.com/stella/regex-set/issues"
-  },
-  "keywords": [
-    "regex",
-    "regex-set",
-    "multi-pattern",
-    "napi-rs",
-    "native",
-    "rust"
+  "files": [
+    "lib.js",
+    "lib.mjs",
+    "lib.d.ts",
+    "lib.wasm.js",
+    "index.js",
+    "index.d.ts",
+    "regex-set.wasi.cjs",
+    "regex-set.wasi-browser.js",
+    "regex-set.wasm32-wasi.wasm",
+    "wasi-worker.mjs",
+    "wasi-worker-browser.mjs"
   ],
   "main": "lib.js",
   "module": "lib.mjs",
+  "browser": {
+    "./lib.js": "./lib.wasm.js",
+    "./lib.mjs": "./lib.wasm.js"
+  },
   "types": "lib.d.ts",
   "exports": {
     ".": {
+      "browser": {
+        "types": "./lib.d.ts",
+        "default": "./lib.wasm.js"
+      },
       "import": {
         "types": "./lib.d.ts",
         "default": "./lib.mjs"
@@ -33,27 +54,6 @@
         "default": "./lib.js"
       }
     }
-  },
-  "browser": {
-    "./lib.js": "./lib.wasm.js",
-    "./lib.mjs": "./lib.wasm.js"
-  },
-  "files": [
-    "lib.js",
-    "lib.mjs",
-    "lib.d.ts",
-    "lib.wasm.js",
-    "index.js",
-    "index.d.ts"
-  ],
-  "napi": {
-    "binaryName": "regex-set",
-    "targets": [
-      "x86_64-apple-darwin",
-      "aarch64-apple-darwin",
-      "x86_64-unknown-linux-gnu",
-      "aarch64-unknown-linux-gnu"
-    ]
   },
   "scripts": {
     "build": "napi build --platform --release",
@@ -78,13 +78,22 @@
     "oxfmt": "^0.41.0",
     "oxlint": "^1.55.0"
   },
-  "engines": {
-    "node": ">= 18"
-  },
   "optionalDependencies": {
     "@stll/regex-set-darwin-arm64": "0.4.0",
     "@stll/regex-set-darwin-x64": "0.4.0",
     "@stll/regex-set-linux-arm64-gnu": "0.4.0",
     "@stll/regex-set-linux-x64-gnu": "0.4.0"
+  },
+  "napi": {
+    "binaryName": "regex-set",
+    "targets": [
+      "x86_64-apple-darwin",
+      "aarch64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-gnu"
+    ]
+  },
+  "engines": {
+    "node": ">= 18"
   }
 }

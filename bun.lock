@@ -13,12 +13,10 @@
         "oxlint": "^1.55.0",
       },
       "optionalDependencies": {
-        "@stll/regex-set-darwin-arm64": "0.3.2",
-        "@stll/regex-set-darwin-x64": "0.3.2",
-        "@stll/regex-set-linux-arm64-gnu": "0.3.2",
-        "@stll/regex-set-linux-x64-gnu": "0.3.2",
-        "@stll/regex-set-linux-x64-musl": "0.3.2",
-        "@stll/regex-set-win32-x64-msvc": "0.3.2",
+        "@stll/regex-set-darwin-arm64": "0.4.0",
+        "@stll/regex-set-darwin-x64": "0.4.0",
+        "@stll/regex-set-linux-arm64-gnu": "0.4.0",
+        "@stll/regex-set-linux-x64-gnu": "0.4.0",
       },
     },
   },
@@ -264,6 +262,14 @@
     "@oxlint/binding-win32-ia32-msvc": ["@oxlint/binding-win32-ia32-msvc@1.56.0", "", { "os": "win32", "cpu": "ia32" }, "sha512-PTRy6sIEPqy2x8PTP1baBNReN/BNEFmde0L+mYeHmjXE1Vlcc9+I5nsqENsB2yAm5wLkzPoTNCMY/7AnabT4/A=="],
 
     "@oxlint/binding-win32-x64-msvc": ["@oxlint/binding-win32-x64-msvc@1.56.0", "", { "os": "win32", "cpu": "x64" }, "sha512-ZHa0clocjLmIDr+1LwoWtxRcoYniAvERotvwKUYKhH41NVfl0Y4LNbyQkwMZzwDvKklKGvGZ5+DAG58/Ik47tQ=="],
+
+    "@stll/regex-set-darwin-arm64": ["@stll/regex-set-darwin-arm64@0.4.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-lOYaNYkClywMCqJw1NKzzqN2YjyEdmJ2O573LZneh+/QJzjbF3kvtTIJ6wts/RJdDVngqjiaHtLjcKkYUk1vSA=="],
+
+    "@stll/regex-set-darwin-x64": ["@stll/regex-set-darwin-x64@0.4.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-9mBkV5j9UK/Isd+DqJwuZPA8HOI2b23PDo80ae4MWUcChhYdqf5pvOEU+PcZq/FHPnRT+rEBCtloImop6j6J4g=="],
+
+    "@stll/regex-set-linux-arm64-gnu": ["@stll/regex-set-linux-arm64-gnu@0.4.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-IzL2jcSrAMZMI7a4MKYqnRcoH+3TALRFtcYniQyD6vsHjwrRRpYjI9uiEinR4fEErWQ5jPBChgQkdlC9/YgpLg=="],
+
+    "@stll/regex-set-linux-x64-gnu": ["@stll/regex-set-linux-x64-gnu@0.4.0", "", { "os": "linux", "cpu": "x64" }, "sha512-8DvAVVV2f4Rpi2Fkvf30QnYCMGehroN2yTjFP1XRulT6Dzb92JyAdCaVm48iI9jzV8wJWnXFVJ/Bx6Wrpf0DjA=="],
 
     "@tybys/wasm-util": ["@tybys/wasm-util@0.10.1", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg=="],
 

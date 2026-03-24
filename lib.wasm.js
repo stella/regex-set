@@ -1,8 +1,7 @@
 // @ts-nocheck
-/* Wrapper that unpacks Uint32Array results from
- * the native module into Match objects. */
-
-const native = require("./index.js");
+/* WASM-only wrapper. Loads the WASI module instead
+ * of the native .node binary. Same API as lib.mjs. */
+import native from "./regex-set.wasi-browser.js";
 
 const NativeRegexSet = native.RegexSet;
 
@@ -60,8 +59,6 @@ function asciiBoundaries(src) {
 
 /**
  * Convert a RegExp to Rust regex syntax string.
- * Extracts .source and maps JS flags to Rust
- * inline flags.
  */
 function regexpToRust(re) {
   let flags = "";
@@ -77,14 +74,6 @@ function regexpToRust(re) {
     return re.source;
   }
 
-  // When /i is present, use -u for ASCII case folding
-  // (avoids Unicode case folding DFA state explosion).
-  // Scope -u to the content only so edge \b stays in
-  // Unicode mode for unicodeBoundaries.
-  //
-  // /\btest\b/i → \b(?i-u:test)\b
-  //   \b outside: Unicode (default)
-  //   content: ASCII case + \w/\d/\s (matches JS)
   if (!flags.includes("i")) {
     return `(?${flags})${re.source}`;
   }
@@ -93,7 +82,6 @@ function regexpToRust(re) {
   let leading = "";
   let trailing = "";
 
-  // Strip edge \b/\B from source
   if (src.startsWith("\\b")) {
     leading = "\\b";
     src = src.slice(2);
@@ -101,9 +89,6 @@ function regexpToRust(re) {
     leading = "\\B";
     src = src.slice(2);
   }
-
-  // Count trailing backslashes before b/B.
-  // Odd = word boundary, even = escaped.
   if (src.length >= 2) {
     const last = src[src.length - 1];
     if (last === "b" || last === "B") {
@@ -120,7 +105,34 @@ function regexpToRust(re) {
     }
   }
 
-  return `${leading}(?${flags}-u:${src})${trailing}`;
+  const uFlag =
+    needsAsciiMode(src) && !hasNonAscii(src) ? "-u" : "";
+  return `${leading}(?${flags}${uFlag}:${src})${trailing}`;
+}
+
+/**
+ * Check if content uses character class shortcuts
+ * (\w, \W, \d, \D, \s, \S, \b, \B) that have
+ * Unicode-aware versions. Only these benefit from
+ * -u (ASCII-only mode). Literal strings like
+ * "dollars" produce identical DFAs with or without
+ * -u, so skipping -u for them is zero-cost.
+ */
+function needsAsciiMode(s) {
+  return /\\[wWdDsSbB]/.test(s);
+}
+
+/**
+ * Check if a string contains non-ASCII characters.
+ * When true, -u MUST NOT be added: regex-automata
+ * rejects (?-u) alongside non-ASCII content like
+ * [ÁČĎÉĚ] or literal złotych.
+ */
+function hasNonAscii(s) {
+  for (let i = 0; i < s.length; i++) {
+    if (s.charCodeAt(i) > 127) return true;
+  }
+  return false;
 }
 
 /**
@@ -175,11 +187,18 @@ function scopeInlineFlags(src) {
       }
     }
 
+    // Scope the flags and recurse for any nested
+    // inline flags in the content.
     const inner = scopeInnerFlags(rest);
-    const merged = disable.includes("u")
-      ? disable
-      : disable + "u";
-    return `${leading}(?${enable}-${merged}:${inner})${trailing}`;
+    // Only add -u when content uses char class
+    // shortcuts (\w, \d, \s) that benefit from it.
+    const addU =
+      needsAsciiMode(rest) &&
+      !hasNonAscii(rest) &&
+      !disable.includes("u");
+    const merged = addU ? disable + "u" : disable;
+    const disablePart = merged ? `-${merged}` : "";
+    return `${leading}(?${enable}${disablePart}:${inner})${trailing}`;
   }
 
   return scopeInnerFlags(src);
@@ -223,10 +242,19 @@ function scopeInnerFlags(src) {
         (src[j] === ")" || src[j] === ":")
       ) {
         if (enable.includes("i")) {
-          const merged = disable.includes("u")
-            ? disable
-            : disable + "u";
-          result += `(?${enable}-${merged}${src[j]}`;
+          // For scoped groups (?i:content), don't add
+          // -u: literal strings produce identical DFAs
+          // with or without -u, and -u breaks when
+          // the overall pattern has non-ASCII chars.
+          // For bare flags (?i), the -u would apply to
+          // the rest of the pattern which might have
+          // \w/\d — but bare flags are handled by
+          // scopeInlineFlags, not here.
+          if (disable.length > 0) {
+            result += `(?${enable}-${disable}${src[j]}`;
+          } else {
+            result += `(?${enable}${src[j]}`;
+          }
         } else if (disable.length > 0) {
           result += `(?${enable}-${disable}${src[j]}`;
         } else {
@@ -311,14 +339,22 @@ class RegexSet {
 
     let processed = entries.map((e) => e.pattern);
 
+    // Wrap with (?i-u:...) for case-insensitive
+    // matching. Edge \b/\B are extracted first so
+    // they stay outside the -u scope (preserving
+    // Unicode word boundary semantics).
     if (ci) {
       processed = processed.map((p) => {
+        // Skip patterns already wrapped by
+        // regexpToRust or scopeInlineFlags.
         if (
-          /^(?:\\[bB]|\(\?[ims]+(?:-[imsu]+)?\))*\(\?[ims]*i[ims]*-[imsu]*u/.test(
+          /^(?:\\[bB]|\(\?[ims]+(?:-[imsu]+)?\))*\(\?[ims]*i[ims]*(?:-[imsu]+)?[:(]/.test(
             p,
           )
         )
           return p;
+        // Strip leading bare-flag prefix (e.g. (?m),
+        // (?ms)) before extracting edge \b.
         let src = p;
         let flagPrefix = "";
         const bareFlagMatch = src.match(
@@ -328,6 +364,7 @@ class RegexSet {
           flagPrefix = bareFlagMatch[0];
           src = src.slice(flagPrefix.length);
         }
+        // Extract edge \b/\B
         let leading = "";
         let trailing = "";
         if (src.startsWith("\\b")) {
@@ -352,7 +389,11 @@ class RegexSet {
             }
           }
         }
-        return `${flagPrefix}${leading}(?i-u:${src})${trailing}`;
+        const uFlag =
+          needsAsciiMode(src) && !hasNonAscii(src)
+            ? "-u"
+            : "";
+        return `${flagPrefix}${leading}(?i${uFlag}:${src})${trailing}`;
       });
     }
 
@@ -360,6 +401,7 @@ class RegexSet {
       processed = processed.map(asciiBoundaries);
     }
 
+    // Strip JS-only options before passing to native
     const nativeOpts = options ? { ...options } : undefined;
     if (nativeOpts) {
       delete nativeOpts.caseInsensitive;
@@ -373,12 +415,12 @@ class RegexSet {
   }
 
   isMatch(haystack) {
-    return this._inner._isMatchBuf(Buffer.from(haystack));
+    return this._inner.isMatch(haystack);
   }
 
   findIter(haystack) {
     return unpack(
-      this._inner._findIterPackedBuf(Buffer.from(haystack)),
+      this._inner._findIterPacked(haystack),
       haystack,
       this._hasNames ? this._names : null,
     );
@@ -393,4 +435,4 @@ class RegexSet {
   }
 }
 
-module.exports.RegexSet = RegexSet;
+export { RegexSet };
