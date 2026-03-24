@@ -11,7 +11,7 @@
 import { describe, expect, test } from "bun:test";
 import fc from "fast-check";
 
-import { RegexSet } from "../lib";
+import { RegexSet } from "../src/lib";
 
 const PARAMS = { numRuns: 200 };
 
