@@ -1,6 +1,6 @@
 {
   "name": "@stll/regex-set",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Multi-pattern regex for Node.js/Bun. 2-9x faster than JS RegExp, backtracking-immune, Unicode word boundaries. Rust DFA engine via NAPI-RS.",
   "license": "MIT",
   "repository": {
@@ -71,9 +71,9 @@
     "node": ">= 18"
   },
   "optionalDependencies": {
-    "@stll/regex-set-darwin-arm64": "0.4.0",
-    "@stll/regex-set-darwin-x64": "0.4.0",
-    "@stll/regex-set-linux-arm64-gnu": "0.4.0",
-    "@stll/regex-set-linux-x64-gnu": "0.4.0"
+    "@stll/regex-set-darwin-arm64": "0.5.0",
+    "@stll/regex-set-darwin-x64": "0.5.0",
+    "@stll/regex-set-linux-arm64-gnu": "0.5.0",
+    "@stll/regex-set-linux-x64-gnu": "0.5.0"
   }
 }
