@@ -35,8 +35,8 @@
     }
   },
   "browser": {
-    "./lib.js": "./lib.wasm.js",
-    "./lib.mjs": "./lib.wasm.js"
+    "./dist/lib.js": "./lib.wasm.js",
+    "./dist/lib.mjs": "./lib.wasm.js"
   },
   "files": [
     "dist",

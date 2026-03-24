@@ -107,6 +107,8 @@ function unpack(
   const len = packed.length;
   // eslint-disable-next-line unicorn/no-new-array
   const matches: Match[] = new Array(len / 3);
+  // SAFETY: Loop increments by 3 and terminates at packed.length.
+  // Indices i, i+1, i+2 are always in bounds.
   for (let i = 0, j = 0; i < len; i += 3, j++) {
     const idx = packed[i]!;
     const s = packed[i + 1]!;
@@ -135,8 +137,8 @@ function asciiBoundaries(src: string): string {
   let inClass = false;
   let i = 0;
   while (i < src.length) {
-    if (src[i] === "\\" && i + 1 < src.length) {
-      const next = src[i + 1];
+    if (src.charAt(i) === "\\" && i + 1 < src.length) {
+      const next = src.charAt(i + 1);
       if (
         !inClass &&
         (next === "b" || next === "B")
@@ -145,13 +147,13 @@ function asciiBoundaries(src: string): string {
         i += 2;
       } else {
         // escaped char (including \\) — emit as-is
-        result += src[i] + src[i + 1];
+        result += src.charAt(i) + src.charAt(i + 1);
         i += 2;
       }
     } else {
-      if (src[i] === "[") inClass = true;
-      if (src[i] === "]") inClass = false;
-      result += src[i];
+      if (src.charAt(i) === "[") inClass = true;
+      if (src.charAt(i) === "]") inClass = false;
+      result += src.charAt(i);
       i++;
     }
   }
@@ -191,11 +193,11 @@ function regexpToRust(re: RegExp): string {
     src = src.slice(2);
   }
   if (src.length >= 2) {
-    const last = src[src.length - 1];
+    const last = src.charAt(src.length - 1);
     if (last === "b" || last === "B") {
       let bs = 0;
       let k = src.length - 2;
-      while (k >= 0 && src[k] === "\\") {
+      while (k >= 0 && src.charAt(k) === "\\") {
         bs++;
         k--;
       }
@@ -260,6 +262,7 @@ function scopeInlineFlags(src: string): string {
     /^\(\?([ims]+)(?:-([imsu]+))?\)/,
   );
   if (leadingBare && leadingBare[1]!.includes("i")) {
+    // SAFETY: The regex requires group 1 to match.
     const enable = leadingBare[1]!;
     const disable = leadingBare[2] || "";
     let rest = src.slice(leadingBare[0].length);
@@ -275,11 +278,11 @@ function scopeInlineFlags(src: string): string {
       rest = rest.slice(2);
     }
     if (rest.length >= 2) {
-      const last = rest[rest.length - 1];
+      const last = rest.charAt(rest.length - 1);
       if (last === "b" || last === "B") {
         let bs = 0;
         let k = rest.length - 2;
-        while (k >= 0 && rest[k] === "\\") {
+        while (k >= 0 && rest.charAt(k) === "\\") {
           bs++;
           k--;
         }
@@ -317,42 +320,42 @@ function scopeInnerFlags(src: string): string {
   let inClass = false;
   let i = 0;
   while (i < src.length) {
-    if (src[i] === "\\" && i + 1 < src.length) {
-      result += src[i] + src[i + 1];
+    if (src.charAt(i) === "\\" && i + 1 < src.length) {
+      result += src.charAt(i) + src.charAt(i + 1);
       i += 2;
       continue;
     }
-    if (src[i] === "[") inClass = true;
-    if (src[i] === "]") inClass = false;
+    if (src.charAt(i) === "[") inClass = true;
+    if (src.charAt(i) === "]") inClass = false;
     if (
       !inClass &&
-      src[i] === "(" &&
-      src[i + 1] === "?"
+      src.charAt(i) === "(" &&
+      src.charAt(i + 1) === "?"
     ) {
       let j = i + 2;
       let enable = "";
       while (
         j < src.length &&
-        "ims".includes(src[j]!)
+        "ims".includes(src.charAt(j))
       ) {
-        enable += src[j];
+        enable += src.charAt(j);
         j++;
       }
       // Handle disable part: (?i-s) or (?i-s:...)
       let disable = "";
-      if (j < src.length && src[j] === "-") {
+      if (j < src.length && src.charAt(j) === "-") {
         j++; // skip -
         while (
           j < src.length &&
-          "imsu".includes(src[j]!)
+          "imsu".includes(src.charAt(j))
         ) {
-          disable += src[j];
+          disable += src.charAt(j);
           j++;
         }
       }
       if (
         enable.length > 0 &&
-        (src[j] === ")" || src[j] === ":")
+        (src.charAt(j) === ")" || src.charAt(j) === ":")
       ) {
         if (enable.includes("i")) {
           // For scoped groups (?i:content), don't add
@@ -364,20 +367,20 @@ function scopeInnerFlags(src: string): string {
           // \w/\d — but bare flags are handled by
           // scopeInlineFlags, not here.
           if (disable.length > 0) {
-            result += `(?${enable}-${disable}${src[j]}`;
+            result += `(?${enable}-${disable}${src.charAt(j)}`;
           } else {
-            result += `(?${enable}${src[j]}`;
+            result += `(?${enable}${src.charAt(j)}`;
           }
         } else if (disable.length > 0) {
-          result += `(?${enable}-${disable}${src[j]}`;
+          result += `(?${enable}-${disable}${src.charAt(j)}`;
         } else {
-          result += `(?${enable}${src[j]}`;
+          result += `(?${enable}${src.charAt(j)}`;
         }
         i = j + 1;
         continue;
       }
     }
-    result += src[i];
+    result += src.charAt(i);
     i++;
   }
   return result;
@@ -522,11 +525,11 @@ class RegexSet {
           src = src.slice(2);
         }
         if (src.length >= 2) {
-          const last = src[src.length - 1];
+          const last = src.charAt(src.length - 1);
           if (last === "b" || last === "B") {
             let bs = 0;
             let k = src.length - 2;
-            while (k >= 0 && src[k] === "\\") {
+            while (k >= 0 && src.charAt(k) === "\\") {
               bs++;
               k--;
             }
