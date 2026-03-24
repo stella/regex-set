@@ -1,6 +1,6 @@
 {
   "name": "@stll/regex-set",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Multi-pattern regex for Node.js/Bun. 2-9x faster than JS RegExp, backtracking-immune, Unicode word boundaries. Rust DFA engine via NAPI-RS.",
   "keywords": [
     "multi-pattern",
