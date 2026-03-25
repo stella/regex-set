@@ -450,6 +450,13 @@ enum CharClass {
   Whitespace,
   Alpha,
   Numeric,
+  AsciiLowercase,
+  AsciiUppercase,
+  Lowercase,
+  Uppercase,
+  /// Small character set expanded at construction
+  /// time. Sorted for binary search.
+  CharSet(Vec<char>),
   Regex(regex::Regex),
 }
 
@@ -466,6 +473,17 @@ impl CharClass {
       CharClass::Whitespace => ch.is_whitespace(),
       CharClass::Alpha => ch.is_alphabetic(),
       CharClass::Numeric => ch.is_numeric(),
+      CharClass::AsciiLowercase => {
+        ch.is_ascii_lowercase()
+      }
+      CharClass::AsciiUppercase => {
+        ch.is_ascii_uppercase()
+      }
+      CharClass::Lowercase => ch.is_lowercase(),
+      CharClass::Uppercase => ch.is_uppercase(),
+      CharClass::CharSet(set) => {
+        set.binary_search(&ch).is_ok()
+      }
       CharClass::Regex(re) => {
         let mut buf = [0u8; 4];
         re.is_match(ch.encode_utf8(&mut buf))
@@ -486,13 +504,80 @@ impl CharClass {
       "\\p{N}" | "\\p{Numeric}" | "\\p{Number}" => {
         Ok(CharClass::Numeric)
       }
+      "[a-z]" => Ok(CharClass::AsciiLowercase),
+      "[A-Z]" => Ok(CharClass::AsciiUppercase),
+      "\\p{Ll}" | "\\p{Lowercase}" => {
+        Ok(CharClass::Lowercase)
+      }
+      "\\p{Lu}" | "\\p{Uppercase}" => {
+        Ok(CharClass::Uppercase)
+      }
       _ => {
+        // Try expanding a simple bracket expression
+        // into a sorted char set for O(log n) lookup
+        // instead of a full regex engine call.
+        if let Some(chars) = expand_bracket_expr(s) {
+          return Ok(CharClass::CharSet(chars));
+        }
         let re = regex::Regex::new(s)
           .map_err(|e| format!("{e}"))?;
         Ok(CharClass::Regex(re))
       }
     }
   }
+}
+
+/// Try to expand a bracket expression like `[a-zA-Z]`
+/// into a sorted `Vec<char>`. Returns `None` if the
+/// expression is too complex or too large (> 256 chars).
+/// Only handles ASCII ranges and literal chars.
+fn expand_bracket_expr(s: &str) -> Option<Vec<char>> {
+  let bytes = s.as_bytes();
+  if bytes.len() < 3
+    || bytes[0] != b'['
+    || bytes[bytes.len() - 1] != b']'
+  {
+    return None;
+  }
+  let inner = &s[1..s.len() - 1];
+  // Reject if it contains nested brackets, escapes
+  // for special classes, or non-ASCII.
+  if !inner.is_ascii()
+    || inner.contains('[')
+    || inner.contains(']')
+    || inner.contains('\\')
+  {
+    return None;
+  }
+  let mut chars: Vec<char> = Vec::new();
+  let ibytes = inner.as_bytes();
+  let mut i = 0;
+  while i < ibytes.len() {
+    if i + 2 < ibytes.len() && ibytes[i + 1] == b'-' {
+      let lo = ibytes[i];
+      let hi = ibytes[i + 2];
+      if lo > hi {
+        return None;
+      }
+      let count = (hi - lo) as usize + 1;
+      if chars.len() + count > 256 {
+        return None;
+      }
+      for c in lo..=hi {
+        chars.push(c as char);
+      }
+      i += 3;
+    } else {
+      chars.push(ibytes[i] as char);
+      i += 1;
+    }
+  }
+  if chars.is_empty() || chars.len() > 256 {
+    return None;
+  }
+  chars.sort_unstable();
+  chars.dedup();
+  Some(chars)
 }
 
 struct CharCheck {
