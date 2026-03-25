@@ -830,25 +830,28 @@ describe("negated bracket expression [^...] in lookahead", () => {
 // ─── Shadowed pattern after fancy_fallback ────
 
 describe("shadowed pattern still found after fancy_fallback", () => {
-  test("shadowed slow pattern found when primary uses fancy_fallback", () => {
-    // Pattern 0: greedy \s* + lookahead → verifier
-    // rejects, fancy_fallback backtracks to shorter.
-    // Pattern 1: different lookahead pattern, matches
-    // at a different position, should not be affected
-    // by pattern 0's fancy_fallback.
+  test("shadowed slow pattern found when primary fancy_fallback produces shorter match", () => {
+    // Pattern 0: fancy_fallback backtracks to "Vinci
+    // a.s." (10 bytes). Pattern 1 (also slow: has a
+    // lookahead) matches the longer "Vinci a.s.\n"
+    // (11 bytes) at the same start. Without the fix,
+    // find_shadowed_slow was skipped after a successful
+    // fancy_fallback, so only pattern 0 was found.
+    // With the fix, pattern 1 is discovered and, being
+    // longer, wins the non-overlapping selection.
     const rs = new RegexSet([
       String.raw`[A-Z][a-z]+\s+a\.[\s]*s\.[\s]*(?![a-z])`,
-      String.raw`[a-z]+(?![A-Z])`,
+      String.raw`[A-Z][a-z]+\s+a\.[\s]*s\.[\s]*\n(?=\S)`,
     ]);
 
-    // Pattern 0 should match "Vinci a.s." via
-    // fancy_fallback; pattern 1 matches elsewhere.
     const matches = rs.findIter("Vinci a.s.\nsídlo");
-    expect(matches.length).toBeGreaterThanOrEqual(1);
-    // Verify pattern 0 found via fallback
-    const p0 = matches.find((m) => m.pattern === 0);
-    expect(p0).toBeDefined();
-    expect(p0!.text).toBe("Vinci a.s.");
+    expect(matches.length).toBe(1);
+    // The shadowed pattern (1) must be the winner:
+    // it's longer than pattern 0's fancy_fallback
+    // result at the same start position.
+    expect(matches[0]!.pattern).toBe(1);
+    expect(matches[0]!.start).toBe(0);
+    expect(matches[0]!.text).toBe("Vinci a.s.\n");
   });
 });
 

@@ -1257,6 +1257,7 @@ impl RegexSet {
     haystack: &str,
   ) -> (Vec<RawMatch>, bool) {
     let mut all: Vec<RawMatch> = Vec::new();
+    let mut has_shadowed = false;
     let mode = self.boundary_mode(haystack);
 
     // Fast DFA: single-pass find_iter.
@@ -1322,7 +1323,12 @@ impl RegexSet {
                   // Also check shadowed patterns:
                   // other patterns may have a valid
                   // match at the same start position.
-                  if self.needs_shadowed_check(rej) {
+                  // Guard is always true here (rej is
+                  // Verifier), kept for symmetry with
+                  // the else-if branch below.
+                  let alt_end = if self
+                    .needs_shadowed_check(rej)
+                  {
                     if let Some(alt) =
                       self.find_shadowed_slow(
                         haystack,
@@ -1331,10 +1337,18 @@ impl RegexSet {
                         &mode,
                       )
                     {
+                      let end = alt.2;
                       all.push(alt);
+                      has_shadowed = true;
+                      end
+                    } else {
+                      0
                     }
-                  }
-                  pos = fe.max(pos + 1);
+                  } else {
+                    0
+                  };
+                  pos =
+                    fe.max(alt_end).max(pos + 1);
                 } else if self.needs_shadowed_check(rej)
                 {
                   if let Some(alt) =
@@ -1346,6 +1360,7 @@ impl RegexSet {
                     )
                   {
                     all.push(alt);
+                    has_shadowed = true;
                     pos = alt.2.max(pos + 1);
                   } else {
                     pos = m.start() + 1;
@@ -1394,7 +1409,8 @@ impl RegexSet {
       + u8::from(self.slow_multi.is_some())
       + u8::try_from(self.fallbacks.len().min(2))
         .unwrap_or(2);
-    let needs_sort = sources > 1 && all.len() > 1;
+    let needs_sort =
+      (sources > 1 || has_shadowed) && all.len() > 1;
     (all, needs_sort)
   }
 
