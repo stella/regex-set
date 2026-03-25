@@ -1269,15 +1269,20 @@ impl RegexSet {
                           .check_with_mode(
                             haystack, s, e, &mode,
                           ))
+                      // Verify Unicode \b at start.
+                      // pi.individual uses the original
+                      // Unicode \b but has no lookahead,
+                      // so it will greedily overshoot
+                      // past the backtracked end e.
+                      // Start-only check suffices: the
+                      // fancy_regex match already found
+                      // the correct bounds.
                       && (!pi.has_internal_b || {
                         let inp =
                           Input::new(haystack).range(s..);
                         pi.individual
                           .find(inp)
-                          .filter(|im| {
-                            im.start() == s
-                              && im.end() == e
-                          })
+                          .filter(|im| im.start() == s)
                           .is_some()
                       })
                   });
@@ -1471,6 +1476,8 @@ impl RegexSet {
                             .check_with_mode(
                               haystack, s, e, &mode,
                             );
+                      // Start-only check (see
+                      // collect_matches comment).
                       let internal_b_ok =
                         !pi.has_internal_b || {
                           let inp = Input::new(haystack)
@@ -1479,7 +1486,6 @@ impl RegexSet {
                             .find(inp)
                             .filter(|im| {
                               im.start() == s
-                                && im.end() == e
                             })
                             .is_some()
                         };
