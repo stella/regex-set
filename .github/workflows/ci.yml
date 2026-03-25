@@ -85,14 +85,50 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run lint
 
+  # ── Rust checks (PRs + push) ─────────────────
+  rust-checks:
+    name: Rust checks
+    if: >-
+      always()
+      && needs.check-changes.outputs.rust-changed == 'true'
+      && (github.event_name != 'pull_request'
+          || needs.trust-check.outputs.trusted == 'true')
+    needs: [trust-check, check-changes]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-checks
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -Dwarnings
+
+      - name: Format
+        run: cargo fmt -- --check
+
+      - name: License audit
+        run: |
+          cargo install cargo-deny --locked
+          cargo deny check
+
+      - name: Docs
+        run: cargo doc --no-deps
+        env:
+          RUSTDOCFLAGS: -Dwarnings
+
   # ── Build (push to main + tags only) ──────────
   build:
     name: Build - ${{ matrix.settings.target }}
     needs: [check-changes]
     if: >-
       github.event_name != 'pull_request'
-      && (github.event_name == 'workflow_dispatch'
-          || startsWith(github.ref, 'refs/tags/v')
+      && (startsWith(github.ref, 'refs/tags/v')
           || needs.check-changes.outputs.rust-changed == 'true')
     runs-on: ${{ matrix.settings.os }}
     strategy:
@@ -108,6 +144,8 @@ jobs:
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
             use-cross: true
+          - target: wasm32-wasip1-threads
+            os: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
@@ -128,7 +166,9 @@ jobs:
       - run: bun install --frozen-lockfile
 
       - name: Build (native)
-        if: ${{ !matrix.settings.use-cross }}
+        if: >-
+          !matrix.settings.use-cross
+          && matrix.settings.target != 'wasm32-wasip1-threads'
         run: >
           bun run build
           --target ${{ matrix.settings.target }}
@@ -140,10 +180,17 @@ jobs:
           --target ${{ matrix.settings.target }}
           --use-napi-cross
 
+      - name: Build (WASM)
+        if: matrix.settings.target == 'wasm32-wasip1-threads'
+        run: bun run build:wasm
+
       - uses: actions/upload-artifact@v7
         with:
           name: bindings-${{ matrix.settings.target }}
-          path: "*.node"
+          path: |
+            *.node
+            *.wasm
+            !*.debug.wasm
           if-no-files-found: error
 
   # ── Test (after build, push only) ─────────────
@@ -170,8 +217,10 @@ jobs:
           ls -R artifacts/
           for dir in artifacts/bindings-*; do
             cp "$dir"/*.node . 2>/dev/null || true
+            cp "$dir"/*.wasm . 2>/dev/null || true
           done
           ls -la *.node 2>/dev/null || echo "No .node files"
+          ls -la *.wasm 2>/dev/null || echo "No .wasm files"
 
       - run: bun test
 
@@ -183,7 +232,7 @@ jobs:
       && startsWith(github.ref, 'refs/tags/v')
       && !contains(needs.*.result, 'failure')
       && !contains(needs.*.result, 'cancelled')
-    needs: [test, lint]
+    needs: [test, lint, rust-checks]
     runs-on: ubuntu-latest
     permissions:
       contents: write
