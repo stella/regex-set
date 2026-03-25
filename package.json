@@ -56,6 +56,7 @@
     "format": "oxfmt . && rustfmt src/lib.rs",
     "lint": "oxlint .",
     "bench": "bun __bench__/speed.ts",
+    "bench:fallback": "bun __bench__/fancy-fallback.ts",
     "bench:install": "cd __bench__ && bun install",
     "bench:download": "bash __bench__/download-corpus.sh"
   },
