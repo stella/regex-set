@@ -827,6 +827,34 @@ describe("negated bracket expression [^...] in lookahead", () => {
   });
 });
 
+// ─── Shadowed pattern after fancy_fallback ────
+
+describe("shadowed pattern still found after fancy_fallback", () => {
+  test("shadowed slow pattern found when primary fancy_fallback produces shorter match", () => {
+    // Pattern 0: fancy_fallback backtracks to "Vinci
+    // a.s." (10 bytes). Pattern 1 (also slow: has a
+    // lookahead) matches the longer "Vinci a.s.\n"
+    // (11 bytes) at the same start. Without the fix,
+    // find_shadowed_slow was skipped after a successful
+    // fancy_fallback, so only pattern 0 was found.
+    // With the fix, pattern 1 is discovered and, being
+    // longer, wins the non-overlapping selection.
+    const rs = new RegexSet([
+      String.raw`[A-Z][a-z]+\s+a\.[\s]*s\.[\s]*(?![a-z])`,
+      String.raw`[A-Z][a-z]+\s+a\.[\s]*s\.[\s]*\n(?=\S)`,
+    ]);
+
+    const matches = rs.findIter("Vinci a.s.\nsídlo");
+    expect(matches.length).toBe(1);
+    // The shadowed pattern (1) must be the winner:
+    // it's longer than pattern 0's fancy_fallback
+    // result at the same start position.
+    expect(matches[0]!.pattern).toBe(1);
+    expect(matches[0]!.start).toBe(0);
+    expect(matches[0]!.text).toBe("Vinci a.s.\n");
+  });
+});
+
 // ─── Same Match type as aho-corasick ──────────
 
 describe("Match type compatibility", () => {
