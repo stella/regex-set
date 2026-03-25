@@ -150,6 +150,15 @@ assertions are verified as inline char checks on
 each match (~1ns per check). No backtracking engine
 involved for simple assertions.
 
+When a greedy quantifier (e.g., `\s*`) causes the DFA
+to overshoot past a valid match boundary and the
+lookahead rejects the longer match, the engine falls
+back to `fancy-regex` for that specific match to
+backtrack the quantifier and find the shorter valid
+match. This fallback is ~5-6x slower per affected
+match but ensures correctness; patterns without
+lookaround are unaffected.
+
 ## Benchmarks
 
 Measured on Apple M3, 24 GB RAM, macOS 25.3.0.

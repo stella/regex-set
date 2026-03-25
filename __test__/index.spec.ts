@@ -734,6 +734,99 @@ describe("internal \\b DFA explosion", () => {
   });
 });
 
+// ─── Greedy \s* + lookahead across newline ────
+// Regression: when \s* greedily consumes a newline
+// and the trailing lookahead then rejects, the DFA
+// discards the valid shorter match instead of
+// backtracking. Manifests with legal form patterns
+// like `a\.\s*s\.\s*(?![lower])` followed by a line
+// starting with a lowercase letter.
+
+describe("greedy quantifier + lookahead across newline", () => {
+  test("\\s* does not discard valid match when lookahead rejects on next line", () => {
+    // Pattern: match "Vinci a.s." with optional
+    // trailing whitespace, but reject if followed
+    // by a lowercase letter.
+    const rs = new RegexSet([
+      String.raw`[A-Z][a-z]+\s+a\.[\s]*s\.[\s]*(?![a-z])`,
+    ]);
+
+    // All should match "Vinci a.s."
+    expect(rs.isMatch("Vinci a.s.\n")).toBe(true);
+    expect(rs.isMatch("Vinci a.s.\nsídlo")).toBe(true);
+    expect(rs.isMatch("Vinci a.s.\ns")).toBe(true);
+    expect(rs.isMatch("Vinci a.s.\nxyz")).toBe(true);
+    expect(rs.isMatch("Vinci a.s.")).toBe(true);
+  });
+
+  test("findIter returns correct match text with greedy \\s* + lookahead", () => {
+    const rs = new RegexSet([
+      String.raw`[A-Z][a-z]+\s+a\.[\s]*s\.[\s]*(?![a-z])`,
+    ]);
+
+    const m1 = rs.findIter("Vinci a.s.\nsídlo");
+    expect(m1).toHaveLength(1);
+    expect(m1[0]!.text).toBe("Vinci a.s.");
+
+    const m2 = rs.findIter("Vinci a.s.\nse sídlem");
+    expect(m2).toHaveLength(1);
+    expect(m2[0]!.text).toBe("Vinci a.s.");
+  });
+
+  test("full legal form pattern with \\s* across newline", () => {
+    // Simulate the actual legal form detection pattern
+    const UPPER =
+      "A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽÄÖÜÀÂÆÇÈÊËÎÏÔÙÛŸÑ\\u0130";
+    const LOWER =
+      "a-záčďéěíňóřšťúůýžäöüßàâæçèêëîïôùûÿñ\\u0131";
+    const CAP = `(?:[${UPPER}]{2,}|[${UPPER}][${LOWER}${UPPER}]+)`;
+    const ANY = `(?:[${UPPER}${LOWER}][${LOWER}${UPPER}]+|[${UPPER}]{2,3})`;
+    const CONN = `(?:[\\s&,.-]{1,4}|\\s+(?:a|and|und|et|e|y|i)\\s+)`;
+    const prefix = `(?:${CAP})(?:${CONN}(?:${ANY})){0,7}`;
+    const alt = "a\\.\\s*s\\.\\s*";
+    const pat = `${prefix}\\s+(?:${alt})(?![${LOWER}])`;
+
+    const rs = new RegexSet([pat]);
+
+    expect(rs.isMatch("VINCI Construction CS a.s.\nsídlo")).toBe(true);
+    expect(rs.isMatch("VINCI Construction CS a.s.\nse sídlem")).toBe(true);
+    expect(rs.isMatch("VINCI Construction CS a.s.\n")).toBe(true);
+    expect(rs.isMatch("VINCI Construction CS a.s.")).toBe(true);
+  });
+});
+
+// ─── Negated bracket expression in lookahead ──
+
+describe("negated bracket expression [^...] in lookahead", () => {
+  test("(?![^a-z]) rejects non-lowercase", () => {
+    // (?![^a-z]) = "not followed by a char outside
+    // a-z" = "must be followed by lowercase or end".
+    const rs = new RegexSet([
+      String.raw`\d+(?![^a-z])`,
+    ]);
+
+    // "123a" → digit followed by lowercase → match
+    expect(rs.isMatch("123a")).toBe(true);
+    // "123A" → digit followed by uppercase → no match
+    expect(rs.isMatch("123A")).toBe(false);
+    // "123" at end → no following char → match
+    expect(rs.isMatch("123")).toBe(true);
+  });
+
+  test("(?<=[^A-Z]) only matches after non-uppercase", () => {
+    const rs = new RegexSet([
+      String.raw`(?<=[^A-Z])\d`,
+    ]);
+
+    // "a1" → digit preceded by lowercase → match
+    expect(rs.isMatch("a1")).toBe(true);
+    // "A1" → digit preceded by uppercase → no match
+    expect(rs.isMatch("A1")).toBe(false);
+    // "A12" → "2" preceded by "1" (not uppercase) → match
+    expect(rs.isMatch("A12")).toBe(true);
+  });
+});
+
 // ─── Same Match type as aho-corasick ──────────
 
 describe("Match type compatibility", () => {

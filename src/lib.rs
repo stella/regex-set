@@ -450,6 +450,13 @@ enum CharClass {
   Whitespace,
   Alpha,
   Numeric,
+  AsciiLowercase,
+  AsciiUppercase,
+  Lowercase,
+  Uppercase,
+  /// Small character set expanded at construction
+  /// time. Sorted for binary search.
+  CharSet(Vec<char>),
   Regex(regex::Regex),
 }
 
@@ -466,6 +473,17 @@ impl CharClass {
       CharClass::Whitespace => ch.is_whitespace(),
       CharClass::Alpha => ch.is_alphabetic(),
       CharClass::Numeric => ch.is_numeric(),
+      CharClass::AsciiLowercase => {
+        ch.is_ascii_lowercase()
+      }
+      CharClass::AsciiUppercase => {
+        ch.is_ascii_uppercase()
+      }
+      CharClass::Lowercase => ch.is_lowercase(),
+      CharClass::Uppercase => ch.is_uppercase(),
+      CharClass::CharSet(set) => {
+        set.binary_search(&ch).is_ok()
+      }
       CharClass::Regex(re) => {
         let mut buf = [0u8; 4];
         re.is_match(ch.encode_utf8(&mut buf))
@@ -486,13 +504,87 @@ impl CharClass {
       "\\p{N}" | "\\p{Numeric}" | "\\p{Number}" => {
         Ok(CharClass::Numeric)
       }
+      "[a-z]" => Ok(CharClass::AsciiLowercase),
+      "[A-Z]" => Ok(CharClass::AsciiUppercase),
+      "\\p{Ll}" | "\\p{Lowercase}" => {
+        Ok(CharClass::Lowercase)
+      }
+      "\\p{Lu}" | "\\p{Uppercase}" => {
+        Ok(CharClass::Uppercase)
+      }
       _ => {
+        // Try expanding a simple bracket expression
+        // into a sorted char set for O(log n) lookup
+        // instead of a full regex engine call.
+        if let Some(chars) = expand_bracket_expr(s) {
+          return Ok(CharClass::CharSet(chars));
+        }
         let re = regex::Regex::new(s)
           .map_err(|e| format!("{e}"))?;
         Ok(CharClass::Regex(re))
       }
     }
   }
+}
+
+/// Try to expand a bracket expression like `[a-zA-Z]`
+/// into a sorted `Vec<char>`. Returns `None` if the
+/// expression is too complex or too large (> 256 chars).
+/// Only handles ASCII ranges and literal chars.
+fn expand_bracket_expr(s: &str) -> Option<Vec<char>> {
+  let bytes = s.as_bytes();
+  if bytes.len() < 3
+    || bytes[0] != b'['
+    || bytes[bytes.len() - 1] != b']'
+  {
+    return None;
+  }
+  let inner = &s[1..s.len() - 1];
+  // Reject negated classes — [^...] must go through
+  // the full regex engine for correct semantics.
+  // Also reject nested brackets, escapes, non-ASCII.
+  if !inner.is_ascii()
+    || inner.starts_with('^')
+    || inner.contains('[')
+    || inner.contains(']')
+    || inner.contains('\\')
+  {
+    return None;
+  }
+  let mut chars: Vec<char> = Vec::new();
+  let ibytes = inner.as_bytes();
+  let mut i = 0;
+  // Note: a trailing `-` (e.g. `[a-z-]`) is handled
+  // correctly by the loop structure. When `-` is at a
+  // position where `i + 2 >= len`, the range guard
+  // fails and `-` falls through to the literal branch.
+  // This matches regex crate semantics.
+  while i < ibytes.len() {
+    if i + 2 < ibytes.len() && ibytes[i + 1] == b'-' {
+      let lo = ibytes[i];
+      let hi = ibytes[i + 2];
+      if lo > hi {
+        return None;
+      }
+      let count = (hi - lo) as usize + 1;
+      if chars.len() + count > 256 {
+        return None;
+      }
+      for c in lo..=hi {
+        chars.push(c as char);
+      }
+      i += 3;
+    } else {
+      chars.push(ibytes[i] as char);
+      i += 1;
+    }
+  }
+  if chars.is_empty() || chars.len() > 256 {
+    return None;
+  }
+  chars.sort_unstable();
+  chars.dedup();
+  Some(chars)
 }
 
 struct CharCheck {
@@ -830,6 +922,46 @@ fn check_match(
   }
 }
 
+/// Try the fancy-regex fallback after a verifier
+/// rejection. Returns `Some((start, end))` if fancy-regex
+/// found a valid backtracked match at the DFA's start
+/// position that also passes boundary and internal-\b
+/// checks.
+fn try_fancy_fallback(
+  pi: &PatternInfo,
+  haystack: &str,
+  dfa_start: usize,
+  mode: &BoundaryMode,
+) -> Option<(usize, usize)> {
+  let re = pi.fancy_fallback.as_ref()?;
+  let (s, e) = safe_fancy_find(re, haystack, dfa_start)?;
+  if s != dfa_start {
+    return None;
+  }
+  if pi.boundaries.has_any()
+    && !pi
+      .boundaries
+      .check_with_mode(haystack, s, e, mode)
+  {
+    return None;
+  }
+  // Verify Unicode \b at start. pi.individual has
+  // no lookahead so it greedily overshoots past the
+  // backtracked end. Start-only check suffices.
+  if pi.has_internal_b {
+    let inp = Input::new(haystack).range(s..);
+    if pi
+      .individual
+      .find(inp)
+      .filter(|im| im.start() == s)
+      .is_none()
+    {
+      return None;
+    }
+  }
+  Some((s, e))
+}
+
 // ─── Engine ───────────────────────────────────
 
 struct PatternInfo {
@@ -842,6 +974,13 @@ struct PatternInfo {
   /// verified against `individual` (which has the
   /// original Unicode `\b`).
   has_internal_b: bool,
+  /// Full pattern with lookaround for backtracking
+  /// fallback. When the DFA finds a greedy match
+  /// that the inline verifier rejects (e.g., `\s*`
+  /// overshoots past a valid match and the trailing
+  /// lookahead fails), fancy-regex can backtrack
+  /// the quantifier to find the shorter valid match.
+  fancy_fallback: Option<fancy_regex::Regex>,
 }
 
 struct FallbackPattern {
@@ -953,6 +1092,35 @@ impl RegexSet {
             || eb.leading_big_b
             || eb.trailing_big_b
             || internal_b;
+
+        // Build fancy-regex fallback for patterns
+        // with verifiers. When the DFA finds a greedy
+        // match that the verifier rejects, fancy-regex
+        // can backtrack quantifiers to find a shorter
+        // valid match. This fixes cases where `\s*`
+        // overshoots past a valid match and the
+        // trailing lookahead fails.
+        //
+        // For Complex verifiers, the inner regex is
+        // already compiled from the same source string,
+        // so we clone it instead of recompiling.
+        let fancy_fallback = match &verifier {
+          Verifier::Complex(re) => Some(re.clone()),
+          Verifier::Inline(_) => {
+            // First convert raw \b/\B to (?-u:\b) form,
+            // then expand to lookaround for fancy_regex.
+            // Without this, ascii_boundary_for_fancy is a
+            // no-op since stripped contains raw \b, not
+            // the (?-u:\b) form it searches for.
+            let with_ascii_b =
+              ascii_internal_boundaries(&stripped);
+            let fancy_pat =
+              ascii_boundary_for_fancy(&with_ascii_b);
+            fancy_regex::Regex::new(&fancy_pat).ok()
+          }
+          Verifier::None => None,
+        };
+
         if needs_slow {
           slow_cores.push(dfa_core);
           slow_info.push(PatternInfo {
@@ -961,6 +1129,7 @@ impl RegexSet {
             boundaries: eb,
             individual,
             has_internal_b: internal_b,
+            fancy_fallback,
           });
         } else {
           fast_cores.push(dfa_core);
@@ -970,6 +1139,10 @@ impl RegexSet {
             boundaries: eb,
             individual,
             has_internal_b: false,
+            // Fast path patterns always have Verifier::None,
+            // so fancy_fallback is always None. Skip storing
+            // the dead state.
+            fancy_fallback: None,
           });
         }
       } else {
@@ -1131,23 +1304,40 @@ impl RegexSet {
                 ));
                 pos = m.end().max(pos + 1);
               }
-              Err(ref rej)
-                if self.needs_shadowed_check(rej) =>
-              {
-                if let Some(alt) = self.find_shadowed_slow(
-                  haystack,
-                  m.start(),
-                  dfa_idx,
-                  &mode,
-                ) {
-                  all.push(alt);
-                  pos = alt.2.max(pos + 1);
+              Err(ref rej) => {
+                let fancy_match =
+                  if matches!(rej, Rejection::Verifier) {
+                    try_fancy_fallback(
+                      pi,
+                      haystack,
+                      m.start(),
+                      &mode,
+                    )
+                  } else {
+                    None
+                  };
+
+                if let Some((fs, fe)) = fancy_match {
+                  all.push((pi.original_index, fs, fe));
+                  pos = fe.max(pos + 1);
+                } else if self.needs_shadowed_check(rej)
+                {
+                  if let Some(alt) =
+                    self.find_shadowed_slow(
+                      haystack,
+                      m.start(),
+                      dfa_idx,
+                      &mode,
+                    )
+                  {
+                    all.push(alt);
+                    pos = alt.2.max(pos + 1);
+                  } else {
+                    pos = m.start() + 1;
+                  }
                 } else {
                   pos = m.start() + 1;
                 }
-              }
-              Err(_) => {
-                pos = m.start() + 1;
               }
             }
           }
@@ -1301,22 +1491,32 @@ impl RegexSet {
               &mode,
             ) {
               Ok(()) => return true,
-              Err(ref rej)
-                if self.needs_shadowed_check(rej) =>
-              {
-                if self
-                  .find_shadowed_slow(
+              Err(ref rej) => {
+                if matches!(rej, Rejection::Verifier) {
+                  if try_fancy_fallback(
+                    pi,
                     haystack,
                     m.start(),
-                    dfa_idx,
                     &mode,
                   )
                   .is_some()
+                  {
+                    return true;
+                  }
+                }
+                if self.needs_shadowed_check(rej)
+                  && self
+                    .find_shadowed_slow(
+                      haystack,
+                      m.start(),
+                      dfa_idx,
+                      &mode,
+                    )
+                    .is_some()
                 {
                   return true;
                 }
               }
-              Err(_) => {}
             }
             pos = m.start() + 1;
           }
@@ -1518,3 +1718,4 @@ pub fn uax29_boundaries(
   boundaries.dedup();
   Ok(boundaries)
 }
+
