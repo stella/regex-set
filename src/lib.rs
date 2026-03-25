@@ -1319,6 +1319,21 @@ impl RegexSet {
 
                 if let Some((fs, fe)) = fancy_match {
                   all.push((pi.original_index, fs, fe));
+                  // Also check shadowed patterns:
+                  // other patterns may have a valid
+                  // match at the same start position.
+                  if self.needs_shadowed_check(rej) {
+                    if let Some(alt) =
+                      self.find_shadowed_slow(
+                        haystack,
+                        m.start(),
+                        dfa_idx,
+                        &mode,
+                      )
+                    {
+                      all.push(alt);
+                    }
+                  }
                   pos = fe.max(pos + 1);
                 } else if self.needs_shadowed_check(rej)
                 {

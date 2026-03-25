@@ -827,6 +827,31 @@ describe("negated bracket expression [^...] in lookahead", () => {
   });
 });
 
+// ─── Shadowed pattern after fancy_fallback ────
+
+describe("shadowed pattern still found after fancy_fallback", () => {
+  test("shadowed slow pattern found when primary uses fancy_fallback", () => {
+    // Pattern 0: greedy \s* + lookahead → verifier
+    // rejects, fancy_fallback backtracks to shorter.
+    // Pattern 1: different lookahead pattern, matches
+    // at a different position, should not be affected
+    // by pattern 0's fancy_fallback.
+    const rs = new RegexSet([
+      String.raw`[A-Z][a-z]+\s+a\.[\s]*s\.[\s]*(?![a-z])`,
+      String.raw`[a-z]+(?![A-Z])`,
+    ]);
+
+    // Pattern 0 should match "Vinci a.s." via
+    // fancy_fallback; pattern 1 matches elsewhere.
+    const matches = rs.findIter("Vinci a.s.\nsídlo");
+    expect(matches.length).toBeGreaterThanOrEqual(1);
+    // Verify pattern 0 found via fallback
+    const p0 = matches.find((m) => m.pattern === 0);
+    expect(p0).toBeDefined();
+    expect(p0!.text).toBe("Vinci a.s.");
+  });
+});
+
 // ─── Same Match type as aho-corasick ──────────
 
 describe("Match type compatibility", () => {
