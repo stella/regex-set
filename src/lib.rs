@@ -1053,14 +1053,19 @@ impl RegexSet {
         // valid match. This fixes cases where `\s*`
         // overshoots past a valid match and the
         // trailing lookahead fails.
-        let fancy_fallback =
-          if !matches!(&verifier, Verifier::None) {
+        //
+        // For Complex verifiers, the inner regex is
+        // already compiled from the same source string,
+        // so we clone it instead of recompiling.
+        let fancy_fallback = match &verifier {
+          Verifier::Complex(re) => Some(re.clone()),
+          Verifier::Inline(_) => {
             let fancy_pat =
               ascii_boundary_for_fancy(&stripped);
             fancy_regex::Regex::new(&fancy_pat).ok()
-          } else {
-            None
-          };
+          }
+          Verifier::None => None,
+        };
 
         if needs_slow {
           slow_cores.push(dfa_core);
@@ -1262,6 +1267,17 @@ impl RegexSet {
                           .check_with_mode(
                             haystack, s, e, &mode,
                           ))
+                      && (!pi.has_internal_b || {
+                        let inp =
+                          Input::new(haystack).range(s..);
+                        pi.individual
+                          .find(inp)
+                          .filter(|im| {
+                            im.start() == s
+                              && im.end() == e
+                          })
+                          .is_some()
+                      })
                   });
 
                 if let Some((fs, fe)) = fancy_match {
@@ -1453,7 +1469,19 @@ impl RegexSet {
                             .check_with_mode(
                               haystack, s, e, &mode,
                             );
-                      if boundary_ok {
+                      let internal_b_ok =
+                        !pi.has_internal_b || {
+                          let inp = Input::new(haystack)
+                            .range(s..);
+                          pi.individual
+                            .find(inp)
+                            .filter(|im| {
+                              im.start() == s
+                                && im.end() == e
+                            })
+                            .is_some()
+                        };
+                      if boundary_ok && internal_b_ok {
                         return true;
                       }
                     }
