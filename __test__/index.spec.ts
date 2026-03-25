@@ -795,6 +795,38 @@ describe("greedy quantifier + lookahead across newline", () => {
   });
 });
 
+// ─── Negated bracket expression in lookahead ──
+
+describe("negated bracket expression [^...] in lookahead", () => {
+  test("(?![^a-z]) rejects non-lowercase", () => {
+    // (?![^a-z]) = "not followed by a char outside
+    // a-z" = "must be followed by lowercase or end".
+    const rs = new RegexSet([
+      String.raw`\d+(?![^a-z])`,
+    ]);
+
+    // "123a" → digit followed by lowercase → match
+    expect(rs.isMatch("123a")).toBe(true);
+    // "123A" → digit followed by uppercase → no match
+    expect(rs.isMatch("123A")).toBe(false);
+    // "123" at end → no following char → match
+    expect(rs.isMatch("123")).toBe(true);
+  });
+
+  test("(?<=[^A-Z]) only matches after non-uppercase", () => {
+    const rs = new RegexSet([
+      String.raw`(?<=[^A-Z])\d`,
+    ]);
+
+    // "a1" → digit preceded by lowercase → match
+    expect(rs.isMatch("a1")).toBe(true);
+    // "A1" → digit preceded by uppercase → no match
+    expect(rs.isMatch("A1")).toBe(false);
+    // "A12" → "2" preceded by "1" (not uppercase) → match
+    expect(rs.isMatch("A12")).toBe(true);
+  });
+});
+
 // ─── Same Match type as aho-corasick ──────────
 
 describe("Match type compatibility", () => {

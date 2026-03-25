@@ -540,9 +540,11 @@ fn expand_bracket_expr(s: &str) -> Option<Vec<char>> {
     return None;
   }
   let inner = &s[1..s.len() - 1];
-  // Reject if it contains nested brackets, escapes
-  // for special classes, or non-ASCII.
+  // Reject negated classes — [^...] must go through
+  // the full regex engine for correct semantics.
+  // Also reject nested brackets, escapes, non-ASCII.
   if !inner.is_ascii()
+    || inner.starts_with('^')
     || inner.contains('[')
     || inner.contains(']')
     || inner.contains('\\')
