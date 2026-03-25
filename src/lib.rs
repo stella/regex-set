@@ -554,6 +554,11 @@ fn expand_bracket_expr(s: &str) -> Option<Vec<char>> {
   let mut chars: Vec<char> = Vec::new();
   let ibytes = inner.as_bytes();
   let mut i = 0;
+  // Note: a trailing `-` (e.g. `[a-z-]`) is handled
+  // correctly by the loop structure. When `-` is at a
+  // position where `i + 2 >= len`, the range guard
+  // fails and `-` falls through to the literal branch.
+  // This matches regex crate semantics.
   while i < ibytes.len() {
     if i + 2 < ibytes.len() && ibytes[i + 1] == b'-' {
       let lo = ibytes[i];
@@ -1062,8 +1067,15 @@ impl RegexSet {
         let fancy_fallback = match &verifier {
           Verifier::Complex(re) => Some(re.clone()),
           Verifier::Inline(_) => {
+            // First convert raw \b/\B to (?-u:\b) form,
+            // then expand to lookaround for fancy_regex.
+            // Without this, ascii_boundary_for_fancy is a
+            // no-op since stripped contains raw \b, not
+            // the (?-u:\b) form it searches for.
+            let with_ascii_b =
+              ascii_internal_boundaries(&stripped);
             let fancy_pat =
-              ascii_boundary_for_fancy(&stripped);
+              ascii_boundary_for_fancy(&with_ascii_b);
             fancy_regex::Regex::new(&fancy_pat).ok()
           }
           Verifier::None => None,
