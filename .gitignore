@@ -26,6 +26,13 @@ __bench__/corpus/*.tar.gz
 __bench__/node_modules
 __bench__/bun.lock
 
+# WASM build artifacts
+regex-set.wasi.cjs
+regex-set.wasi-browser.js
+wasi-worker.mjs
+wasi-worker-browser.mjs
+browser.js
+
 # Misc
 .DS_Store
 *.pem
@@ -36,3 +43,7 @@ __bench__/bun.lock
 
 # Lock files (text-based bun.lock is committed)
 bun.lockb
+package-lock.json
+
+# Build output (tsdown)
+dist/

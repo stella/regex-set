@@ -27,8 +27,7 @@ Prebuilt binaries are available for:
 | ------------- | ------------ |
 | macOS         | x64, arm64   |
 | Linux (glibc) | x64, arm64   |
-| Linux (musl)  | x64          |
-| Windows       | x64          |
+| WASM          | browser      |
 
 ## Usage
 

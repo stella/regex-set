@@ -1,19 +1,28 @@
-/* Shared core: types, helpers, and RegexSet class
- * using a late-bound native backend (NAPI-RS or
- * WASM). Call initBinding() before constructing. */
+/* Shared core: types, helpers, and the RegexSet
+ * class that uses a late-bound native backend
+ * (NAPI-RS or WASM).
+ * Call initBinding() before constructing classes. */
 
-// ── Native binding types ─────────────────────────
+// -- Native binding types --------------------------------
 
 export type NativeBinding = {
   RegexSet: new (
     patterns: string[],
-    options?: Record<string, unknown>,
-  ) => NativeRegexSet;
+    options?: NativeOptions | undefined | null,
+  ) => NativeRegexSetInstance;
+  _uax29Boundaries: (haystack: Buffer) => number[];
 };
 
-type NativeRegexSet = {
+type NativeOptions = {
+  wholeWords?: boolean | undefined;
+  unicodeBoundaries?: boolean | undefined;
+};
+
+type NativeRegexSetInstance = {
   patternCount: number;
+  isMatch(haystack: string): boolean;
   _isMatchBuf(haystack: Buffer): boolean;
+  _findIterPacked(haystack: string): Uint32Array;
   _findIterPackedBuf(haystack: Buffer): Uint32Array;
   whichMatch(haystack: string): number[];
   replaceAll(
@@ -22,7 +31,7 @@ type NativeRegexSet = {
   ): string;
 };
 
-// ── Late-bound native binding ────────────────────
+// -- Late-bound native binding ---------------------------
 
 let binding: NativeBinding;
 
@@ -32,7 +41,7 @@ export const initBinding = (b: NativeBinding) => {
   binding = b;
 };
 
-// ── Public types ─────────────────────────────────
+// -- Public types ----------------------------------------
 
 /** Options for constructing a RegexSet. */
 export type Options = {
@@ -99,12 +108,7 @@ export type Match = {
   name?: string;
 };
 
-// ── Internal helpers ─────────────────────────────
-
-type NormalizedEntry = {
-  pattern: string;
-  name: string | undefined;
-};
+// -- Unpack helper ---------------------------------------
 
 function unpack(
   packed: Uint32Array,
@@ -113,9 +117,10 @@ function unpack(
 ): Match[] {
   const len = packed.length;
   // eslint-disable-next-line unicorn/no-new-array
-  const matches: Match[] = new Array(len / 3);
-  // SAFETY: Loop increments by 3 and terminates at packed.length.
-  // Indices i, i+1, i+2 are always in bounds.
+  const matches = new Array<Match>(len / 3);
+  // SAFETY: Loop increments by 3 and terminates at
+  // packed.length. Indices i, i+1, i+2 are always
+  // in bounds.
   for (let i = 0, j = 0; i < len; i += 3, j++) {
     const idx = packed[i]!;
     const s = packed[i + 1]!;
@@ -126,12 +131,13 @@ function unpack(
       end: e,
       text: haystack.slice(s, e),
     };
-    if (names && names[idx] !== undefined)
-      m.name = names[idx];
+    if (names && names[idx] !== undefined) m.name = names[idx];
     matches[j] = m;
   }
   return matches;
 }
+
+// -- Regex flag helpers ----------------------------------
 
 /**
  * Replace unescaped `\b` and `\B` with their
@@ -153,8 +159,8 @@ function asciiBoundaries(src: string): string {
         result += `(?-u:\\${next})`;
         i += 2;
       } else {
-        // escaped char (including \\) — emit as-is
-        result += src.charAt(i) + src.charAt(i + 1);
+        // escaped char (including \\) -- emit as-is
+        result += src[i]! + src[i + 1]!;
         i += 2;
       }
     } else {
@@ -177,7 +183,7 @@ function regexpToRust(re: RegExp): string {
   if (re.flags.includes("s")) flags += "s";
 
   // JS RegExp objects can't contain inline (?i) in
-  // .source — it's a SyntaxError. No need to run
+  // .source -- it's a SyntaxError. No need to run
   // scopeInlineFlags here; it only matters for
   // string patterns (handled in normalizeEntry).
   if (!flags) {
@@ -238,7 +244,7 @@ function needsAsciiMode(s: string): boolean {
  * Check if a string contains non-ASCII characters.
  * When true, -u MUST NOT be added: regex-automata
  * rejects (?-u) alongside non-ASCII content like
- * [ÁČĎÉĚ] or literal złotych.
+ * [ACDE] or literal zlotych.
  */
 function hasNonAscii(s: string): boolean {
   for (let i = 0; i < s.length; i++) {
@@ -269,9 +275,8 @@ function scopeInlineFlags(src: string): string {
     /^\(\?([ims]+)(?:-([imsu]+))?\)/,
   );
   if (leadingBare && leadingBare[1]!.includes("i")) {
-    // SAFETY: The regex requires group 1 to match.
     const enable = leadingBare[1]!;
-    const disable = leadingBare[2] || "";
+    const disable = leadingBare[2] ?? "";
     let rest = src.slice(leadingBare[0].length);
 
     // Strip edge \b/\B
@@ -327,8 +332,8 @@ function scopeInnerFlags(src: string): string {
   let inClass = false;
   let i = 0;
   while (i < src.length) {
-    if (src.charAt(i) === "\\" && i + 1 < src.length) {
-      result += src.charAt(i) + src.charAt(i + 1);
+    if (src[i] === "\\" && i + 1 < src.length) {
+      result += src[i]! + src[i + 1]!;
       i += 2;
       continue;
     }
@@ -343,7 +348,7 @@ function scopeInnerFlags(src: string): string {
       let enable = "";
       while (
         j < src.length &&
-        "ims".includes(src.charAt(j))
+        "ims".includes(src[j]!)
       ) {
         enable += src.charAt(j);
         j++;
@@ -354,7 +359,7 @@ function scopeInnerFlags(src: string): string {
         j++; // skip -
         while (
           j < src.length &&
-          "imsu".includes(src.charAt(j))
+          "imsu".includes(src[j]!)
         ) {
           disable += src.charAt(j);
           j++;
@@ -371,7 +376,7 @@ function scopeInnerFlags(src: string): string {
           // the overall pattern has non-ASCII chars.
           // For bare flags (?i), the -u would apply to
           // the rest of the pattern which might have
-          // \w/\d — but bare flags are handled by
+          // \w/\d -- but bare flags are handled by
           // scopeInlineFlags, not here.
           if (disable.length > 0) {
             result += `(?${enable}-${disable}${src.charAt(j)}`;
@@ -392,6 +397,13 @@ function scopeInnerFlags(src: string): string {
   }
   return result;
 }
+
+// -- Pattern normalization -------------------------------
+
+type NormalizedEntry = {
+  pattern: string;
+  name: string | undefined;
+};
 
 /**
  * Normalize a pattern entry to { pattern, name }.
@@ -452,13 +464,13 @@ function normalizeEntry(
   );
 }
 
-// ── RegexSet class ───────────────────────────────
+// -- RegexSet class --------------------------------------
 
 /**
  * Multi-pattern regex matcher.
  *
  * Compiles multiple regex patterns into a single
- * automaton. Guaranteed O(m * n) — no catastrophic
+ * automaton. Guaranteed O(m * n); no catastrophic
  * backtracking. Uses Rust regex syntax for string
  * patterns (no lookaheads/backreferences).
  *
@@ -476,7 +488,7 @@ function normalizeEntry(
  * ```
  */
 export class RegexSet {
-  private _inner: NativeRegexSet;
+  private _inner: NativeRegexSetInstance;
   private _names: (string | undefined)[];
   private _hasNames: boolean;
 
@@ -559,11 +571,14 @@ export class RegexSet {
     }
 
     // Strip JS-only options before passing to native
-    const nativeOpts: Record<string, unknown> | undefined =
-      options ? { ...options } : undefined;
-    if (nativeOpts) {
-      delete nativeOpts.caseInsensitive;
-    }
+    const nativeOpts: NativeOptions | undefined =
+      options
+        ? {
+            wholeWords: options.wholeWords,
+            unicodeBoundaries:
+              options.unicodeBoundaries,
+          }
+        : undefined;
 
     this._inner = new binding.RegexSet(
       processed,

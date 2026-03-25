@@ -1,12 +1,16 @@
 {
-  "name": "@stll/regex-set-linux-x64-gnu",
+  "name": "@stll/regex-set-wasm32-wasi",
   "version": "0.0.1",
   "cpu": [
-    "x64"
+    "wasm32"
   ],
-  "main": "regex-set.linux-x64-gnu.node",
+  "main": "regex-set.wasi.cjs",
   "files": [
-    "regex-set.linux-x64-gnu.node"
+    "regex-set.wasm32-wasi.wasm",
+    "regex-set.wasi.cjs",
+    "regex-set.wasi-browser.js",
+    "wasi-worker.mjs",
+    "wasi-worker-browser.mjs"
   ],
   "description": "Multi-pattern regex for Node.js/Bun. 2-9x faster than JS RegExp, backtracking-immune, Unicode word boundaries. Rust DFA engine via NAPI-RS.",
   "keywords": [
@@ -32,10 +36,8 @@
   "publishConfig": {
     "access": "restricted"
   },
-  "os": [
-    "linux"
-  ],
-  "libc": [
-    "glibc"
-  ]
+  "browser": "regex-set.wasi-browser.js",
+  "dependencies": {
+    "@napi-rs/wasm-runtime": "^1.1.1"
+  }
 }

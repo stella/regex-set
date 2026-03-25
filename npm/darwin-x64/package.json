@@ -1,9 +1,6 @@
 {
   "name": "@stll/regex-set-darwin-x64",
-  "version": "0.5.0",
-  "os": [
-    "darwin"
-  ],
+  "version": "0.0.1",
   "cpu": [
     "x64"
   ],
@@ -11,9 +8,31 @@
   "files": [
     "regex-set.darwin-x64.node"
   ],
+  "description": "Multi-pattern regex for Node.js/Bun. 2-9x faster than JS RegExp, backtracking-immune, Unicode word boundaries. Rust DFA engine via NAPI-RS.",
+  "keywords": [
+    "regex",
+    "regex-set",
+    "multi-pattern",
+    "napi-rs",
+    "native",
+    "rust"
+  ],
+  "homepage": "https://github.com/stella/regex-set#readme",
   "license": "MIT",
+  "engines": {
+    "node": ">= 18"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/stella/regex-set"
-  }
+  },
+  "bugs": {
+    "url": "https://github.com/stella/regex-set/issues"
+  },
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "os": [
+    "darwin"
+  ]
 }
