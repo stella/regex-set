@@ -1250,42 +1250,49 @@ impl RegexSet {
                 pos = m.end().max(pos + 1);
               }
               Err(ref rej) => {
-                // When the DFA finds a greedy match
-                // that the verifier rejects, try the
-                // fancy-regex fallback which can
-                // backtrack quantifiers to find a
-                // shorter valid match.
-                let fancy_match = pi
-                  .fancy_fallback
-                  .as_ref()
-                  .and_then(|re| {
-                    safe_fancy_find(re, haystack, m.start())
-                  })
-                  .filter(|&(s, e)| {
-                    s == m.start()
-                      && (!pi.boundaries.has_any()
-                        || pi
-                          .boundaries
-                          .check_with_mode(
-                            haystack, s, e, &mode,
-                          ))
-                      // Verify Unicode \b at start.
-                      // pi.individual uses the original
-                      // Unicode \b but has no lookahead,
-                      // so it will greedily overshoot
-                      // past the backtracked end e.
-                      // Start-only check suffices: the
-                      // fancy_regex match already found
-                      // the correct bounds.
-                      && (!pi.has_internal_b || {
-                        let inp =
-                          Input::new(haystack).range(s..);
-                        pi.individual
-                          .find(inp)
-                          .filter(|im| im.start() == s)
-                          .is_some()
+                // Only try fancy-regex fallback for
+                // verifier rejections (greedy quantifier
+                // overshoot). Boundary rejections cannot
+                // benefit from backtracking.
+                let fancy_match =
+                  if matches!(rej, Rejection::Verifier) {
+                    pi.fancy_fallback
+                      .as_ref()
+                      .and_then(|re| {
+                        safe_fancy_find(
+                          re, haystack, m.start(),
+                        )
                       })
-                  });
+                      .filter(|&(s, e)| {
+                        s == m.start()
+                          && (!pi.boundaries.has_any()
+                            || pi
+                              .boundaries
+                              .check_with_mode(
+                                haystack, s, e, &mode,
+                              ))
+                          // Verify Unicode \b at start.
+                          // pi.individual has no
+                          // lookahead so it greedily
+                          // overshoots past the
+                          // backtracked end. Start-only
+                          // check suffices.
+                          && (!pi.has_internal_b || {
+                            let inp = Input::new(
+                              haystack,
+                            )
+                            .range(s..);
+                            pi.individual
+                              .find(inp)
+                              .filter(|im| {
+                                im.start() == s
+                              })
+                              .is_some()
+                          })
+                      })
+                  } else {
+                    None
+                  };
 
                 if let Some((fs, fe)) = fancy_match {
                   all.push((pi.original_index, fs, fe));
@@ -1462,35 +1469,39 @@ impl RegexSet {
             ) {
               Ok(()) => return true,
               Err(ref rej) => {
-                // Try fancy-regex fallback for
-                // backtracking (see collect_matches).
-                if let Some(re) = &pi.fancy_fallback {
-                  if let Some((s, e)) =
-                    safe_fancy_find(re, haystack, m.start())
-                  {
-                    if s == m.start() {
-                      let boundary_ok =
-                        !pi.boundaries.has_any()
-                          || pi
-                            .boundaries
-                            .check_with_mode(
-                              haystack, s, e, &mode,
-                            );
-                      // Start-only check (see
-                      // collect_matches comment).
-                      let internal_b_ok =
-                        !pi.has_internal_b || {
-                          let inp = Input::new(haystack)
-                            .range(s..);
-                          pi.individual
-                            .find(inp)
-                            .filter(|im| {
-                              im.start() == s
-                            })
-                            .is_some()
-                        };
-                      if boundary_ok && internal_b_ok {
-                        return true;
+                // Only try fancy-regex fallback for
+                // verifier rejections (see
+                // collect_matches comment).
+                if matches!(rej, Rejection::Verifier) {
+                  if let Some(re) = &pi.fancy_fallback {
+                    if let Some((s, e)) =
+                      safe_fancy_find(
+                        re, haystack, m.start(),
+                      )
+                    {
+                      if s == m.start() {
+                        let boundary_ok =
+                          !pi.boundaries.has_any()
+                            || pi
+                              .boundaries
+                              .check_with_mode(
+                                haystack, s, e, &mode,
+                              );
+                        let internal_b_ok =
+                          !pi.has_internal_b || {
+                            let inp =
+                              Input::new(haystack)
+                                .range(s..);
+                            pi.individual
+                              .find(inp)
+                              .filter(|im| {
+                                im.start() == s
+                              })
+                              .is_some()
+                          };
+                        if boundary_ok && internal_b_ok {
+                          return true;
+                        }
                       }
                     }
                   }
