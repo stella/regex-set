@@ -842,6 +842,13 @@ struct PatternInfo {
   /// verified against `individual` (which has the
   /// original Unicode `\b`).
   has_internal_b: bool,
+  /// Full pattern with lookaround for backtracking
+  /// fallback. When the DFA finds a greedy match
+  /// that the inline verifier rejects (e.g., `\s*`
+  /// overshoots past a valid match and the trailing
+  /// lookahead fails), fancy-regex can backtrack
+  /// the quantifier to find the shorter valid match.
+  fancy_fallback: Option<fancy_regex::Regex>,
 }
 
 struct FallbackPattern {
@@ -953,6 +960,23 @@ impl RegexSet {
             || eb.leading_big_b
             || eb.trailing_big_b
             || internal_b;
+
+        // Build fancy-regex fallback for patterns
+        // with verifiers. When the DFA finds a greedy
+        // match that the verifier rejects, fancy-regex
+        // can backtrack quantifiers to find a shorter
+        // valid match. This fixes cases where `\s*`
+        // overshoots past a valid match and the
+        // trailing lookahead fails.
+        let fancy_fallback =
+          if !matches!(&verifier, Verifier::None) {
+            let fancy_pat =
+              ascii_boundary_for_fancy(&stripped);
+            fancy_regex::Regex::new(&fancy_pat).ok()
+          } else {
+            None
+          };
+
         if needs_slow {
           slow_cores.push(dfa_core);
           slow_info.push(PatternInfo {
@@ -961,6 +985,7 @@ impl RegexSet {
             boundaries: eb,
             individual,
             has_internal_b: internal_b,
+            fancy_fallback,
           });
         } else {
           fast_cores.push(dfa_core);
@@ -970,6 +995,7 @@ impl RegexSet {
             boundaries: eb,
             individual,
             has_internal_b: false,
+            fancy_fallback,
           });
         }
       } else {
@@ -1131,23 +1157,49 @@ impl RegexSet {
                 ));
                 pos = m.end().max(pos + 1);
               }
-              Err(ref rej)
-                if self.needs_shadowed_check(rej) =>
-              {
-                if let Some(alt) = self.find_shadowed_slow(
-                  haystack,
-                  m.start(),
-                  dfa_idx,
-                  &mode,
-                ) {
-                  all.push(alt);
-                  pos = alt.2.max(pos + 1);
+              Err(ref rej) => {
+                // When the DFA finds a greedy match
+                // that the verifier rejects, try the
+                // fancy-regex fallback which can
+                // backtrack quantifiers to find a
+                // shorter valid match.
+                let fancy_match = pi
+                  .fancy_fallback
+                  .as_ref()
+                  .and_then(|re| {
+                    safe_fancy_find(re, haystack, m.start())
+                  })
+                  .filter(|&(s, e)| {
+                    s == m.start()
+                      && (!pi.boundaries.has_any()
+                        || pi
+                          .boundaries
+                          .check_with_mode(
+                            haystack, s, e, &mode,
+                          ))
+                  });
+
+                if let Some((fs, fe)) = fancy_match {
+                  all.push((pi.original_index, fs, fe));
+                  pos = fe.max(pos + 1);
+                } else if self.needs_shadowed_check(rej)
+                {
+                  if let Some(alt) =
+                    self.find_shadowed_slow(
+                      haystack,
+                      m.start(),
+                      dfa_idx,
+                      &mode,
+                    )
+                  {
+                    all.push(alt);
+                    pos = alt.2.max(pos + 1);
+                  } else {
+                    pos = m.start() + 1;
+                  }
                 } else {
                   pos = m.start() + 1;
                 }
-              }
-              Err(_) => {
-                pos = m.start() + 1;
               }
             }
           }
@@ -1301,22 +1353,40 @@ impl RegexSet {
               &mode,
             ) {
               Ok(()) => return true,
-              Err(ref rej)
-                if self.needs_shadowed_check(rej) =>
-              {
-                if self
-                  .find_shadowed_slow(
-                    haystack,
-                    m.start(),
-                    dfa_idx,
-                    &mode,
-                  )
-                  .is_some()
+              Err(ref rej) => {
+                // Try fancy-regex fallback for
+                // backtracking (see collect_matches).
+                if let Some(re) = &pi.fancy_fallback {
+                  if let Some((s, e)) =
+                    safe_fancy_find(re, haystack, m.start())
+                  {
+                    if s == m.start() {
+                      let boundary_ok =
+                        !pi.boundaries.has_any()
+                          || pi
+                            .boundaries
+                            .check_with_mode(
+                              haystack, s, e, &mode,
+                            );
+                      if boundary_ok {
+                        return true;
+                      }
+                    }
+                  }
+                }
+                if self.needs_shadowed_check(rej)
+                  && self
+                    .find_shadowed_slow(
+                      haystack,
+                      m.start(),
+                      dfa_idx,
+                      &mode,
+                    )
+                    .is_some()
                 {
                   return true;
                 }
               }
-              Err(_) => {}
             }
             pos = m.start() + 1;
           }
@@ -1518,3 +1588,4 @@ pub fn uax29_boundaries(
   boundaries.dedup();
   Ok(boundaries)
 }
+
