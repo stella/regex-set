@@ -1,6 +1,6 @@
 {
   "name": "@stll/regex-set",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "publishConfig": {
     "access": "restricted"
   },
@@ -28,10 +28,6 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "browser": {
-        "types": "./dist/wasm.d.ts",
-        "import": "./dist/wasm.js"
-      },
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     }
@@ -85,10 +81,10 @@
     "node": ">= 18"
   },
   "optionalDependencies": {
-    "@stll/regex-set-darwin-x64": "0.0.1",
-    "@stll/regex-set-darwin-arm64": "0.0.1",
-    "@stll/regex-set-linux-x64-gnu": "0.0.1",
-    "@stll/regex-set-linux-arm64-gnu": "0.0.1",
-    "@stll/regex-set-wasm32-wasi": "0.0.1"
+    "@stll/regex-set-darwin-x64": "0.0.3",
+    "@stll/regex-set-darwin-arm64": "0.0.3",
+    "@stll/regex-set-linux-x64-gnu": "0.0.3",
+    "@stll/regex-set-linux-arm64-gnu": "0.0.3",
+    "@stll/regex-set-wasm32-wasi": "0.0.3"
   }
 }

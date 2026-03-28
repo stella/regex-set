@@ -47,3 +47,4 @@ package-lock.json
 
 # Build output (tsdown)
 dist/
+wasm/dist/
