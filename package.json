@@ -1,9 +1,6 @@
 {
   "name": "@stll/regex-set",
   "version": "0.0.3",
-  "publishConfig": {
-    "access": "restricted"
-  },
   "description": "Multi-pattern regex for Node.js/Bun. 2-9x faster than JS RegExp, backtracking-immune, Unicode word boundaries. Rust DFA engine via NAPI-RS.",
   "keywords": [
     "multi-pattern",
@@ -22,6 +19,10 @@
     "type": "git",
     "url": "https://github.com/stella/regex-set"
   },
+  "files": [
+    "dist",
+    "index.js"
+  ],
   "type": "module",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -32,19 +33,8 @@
       "default": "./dist/index.js"
     }
   },
-  "files": [
-    "dist",
-    "index.js"
-  ],
-  "napi": {
-    "binaryName": "regex-set",
-    "targets": [
-      "x86_64-apple-darwin",
-      "aarch64-apple-darwin",
-      "x86_64-unknown-linux-gnu",
-      "aarch64-unknown-linux-gnu",
-      "wasm32-wasip1-threads"
-    ]
+  "publishConfig": {
+    "access": "restricted"
   },
   "scripts": {
     "build": "napi build --platform --release",
@@ -74,17 +64,27 @@
     "fast-check": "^4.6.0",
     "oxfmt": "^0.41.0",
     "oxlint": "^1.55.0",
-    "tsdown": "^0.12.9",
+    "tsdown": "^0.21.6",
     "typescript": "^6.0.2"
+  },
+  "optionalDependencies": {
+    "@stll/regex-set-darwin-arm64": "0.0.3",
+    "@stll/regex-set-darwin-x64": "0.0.3",
+    "@stll/regex-set-linux-arm64-gnu": "0.0.3",
+    "@stll/regex-set-linux-x64-gnu": "0.0.3",
+    "@stll/regex-set-wasm32-wasi": "0.0.3"
+  },
+  "napi": {
+    "binaryName": "regex-set",
+    "targets": [
+      "x86_64-apple-darwin",
+      "aarch64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-gnu",
+      "wasm32-wasip1-threads"
+    ]
   },
   "engines": {
     "node": ">= 18"
-  },
-  "optionalDependencies": {
-    "@stll/regex-set-darwin-x64": "0.0.3",
-    "@stll/regex-set-darwin-arm64": "0.0.3",
-    "@stll/regex-set-linux-x64-gnu": "0.0.3",
-    "@stll/regex-set-linux-arm64-gnu": "0.0.3",
-    "@stll/regex-set-wasm32-wasi": "0.0.3"
   }
 }
