@@ -473,12 +473,8 @@ impl CharClass {
       CharClass::Whitespace => ch.is_whitespace(),
       CharClass::Alpha => ch.is_alphabetic(),
       CharClass::Numeric => ch.is_numeric(),
-      CharClass::AsciiLowercase => {
-        ch.is_ascii_lowercase()
-      }
-      CharClass::AsciiUppercase => {
-        ch.is_ascii_uppercase()
-      }
+      CharClass::AsciiLowercase => ch.is_ascii_lowercase(),
+      CharClass::AsciiUppercase => ch.is_ascii_uppercase(),
       CharClass::Lowercase => ch.is_lowercase(),
       CharClass::Uppercase => ch.is_uppercase(),
       CharClass::CharSet(set) => {
@@ -939,9 +935,7 @@ fn try_fancy_fallback(
     return None;
   }
   if pi.boundaries.has_any()
-    && !pi
-      .boundaries
-      .check_with_mode(haystack, s, e, mode)
+    && !pi.boundaries.check_with_mode(haystack, s, e, mode)
   {
     return None;
   }
@@ -1326,33 +1320,30 @@ impl RegexSet {
                   // Guard is always true here (rej is
                   // Verifier), kept for symmetry with
                   // the else-if branch below.
-                  let alt_end = if self
-                    .needs_shadowed_check(rej)
-                  {
-                    if let Some(alt) =
-                      self.find_shadowed_slow(
-                        haystack,
-                        m.start(),
-                        dfa_idx,
-                        &mode,
-                      )
-                    {
-                      let end = alt.2;
-                      all.push(alt);
-                      has_shadowed = true;
-                      end
+                  let alt_end =
+                    if self.needs_shadowed_check(rej) {
+                      if let Some(alt) = self
+                        .find_shadowed_slow(
+                          haystack,
+                          m.start(),
+                          dfa_idx,
+                          &mode,
+                        )
+                      {
+                        let end = alt.2;
+                        all.push(alt);
+                        has_shadowed = true;
+                        end
+                      } else {
+                        0
+                      }
                     } else {
                       0
-                    }
-                  } else {
-                    0
-                  };
-                  pos =
-                    fe.max(alt_end).max(pos + 1);
-                } else if self.needs_shadowed_check(rej)
-                {
-                  if let Some(alt) =
-                    self.find_shadowed_slow(
+                    };
+                  pos = fe.max(alt_end).max(pos + 1);
+                } else if self.needs_shadowed_check(rej) {
+                  if let Some(alt) = self
+                    .find_shadowed_slow(
                       haystack,
                       m.start(),
                       dfa_idx,
@@ -1749,4 +1740,3 @@ pub fn uax29_boundaries(
   boundaries.dedup();
   Ok(boundaries)
 }
-

@@ -67,15 +67,13 @@ const patLookahead = String.raw`[A-Z][a-z]+\s+a\.[\s]*s\.[\s]*(?![a-z])`;
 // Text where match succeeds without fallback:
 // "Vinci a.s." followed by space + uppercase (lookahead
 // passes on first DFA match)
-const textNoFallback =
-  "Vinci a.s. Praha ".repeat(REPS);
+const textNoFallback = "Vinci a.s. Praha ".repeat(REPS);
 
 // Text where fallback triggers: "Vinci a.s.\nsídlo"
 // DFA greedily consumes \s* across the newline,
 // lookahead sees 's' (lowercase) and rejects;
 // fancy-regex backtracks \s* to find "Vinci a.s."
-const textFallback =
-  "Vinci a.s.\nsídlo ".repeat(REPS);
+const textFallback = "Vinci a.s.\nsídlo ".repeat(REPS);
 
 // ─── Build RegexSets ──────────────────────────
 
@@ -92,20 +90,17 @@ console.log(
 console.log("=".repeat(70));
 console.log();
 
-const r1 = bench(
-  "1. Baseline (no lookahead, pure DFA)",
-  () => rsBaseline.findIter(textNoFallback).length,
-);
+const r1 =
+  bench("1. Baseline (no lookahead, pure DFA)", () =>
+    rsBaseline.findIter(textNoFallback).length);
 
-const r2 = bench(
-  "2. With verifier, no fallback triggered",
-  () => rsLookahead.findIter(textNoFallback).length,
-);
+const r2 =
+  bench("2. With verifier, no fallback triggered", () =>
+    rsLookahead.findIter(textNoFallback).length);
 
-const r3 = bench(
-  "3. With verifier, fallback triggers (new path)",
-  () => rsLookahead.findIter(textFallback).length,
-);
+const r3 =
+  bench("3. With verifier, fallback triggers (new path)", () =>
+    rsLookahead.findIter(textFallback).length);
 
 console.log();
 

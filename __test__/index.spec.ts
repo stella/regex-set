@@ -788,10 +788,18 @@ describe("greedy quantifier + lookahead across newline", () => {
 
     const rs = new RegexSet([pat]);
 
-    expect(rs.isMatch("VINCI Construction CS a.s.\nsídlo")).toBe(true);
-    expect(rs.isMatch("VINCI Construction CS a.s.\nse sídlem")).toBe(true);
-    expect(rs.isMatch("VINCI Construction CS a.s.\n")).toBe(true);
-    expect(rs.isMatch("VINCI Construction CS a.s.")).toBe(true);
+    expect(
+      rs.isMatch("VINCI Construction CS a.s.\nsídlo"),
+    ).toBe(true);
+    expect(
+      rs.isMatch("VINCI Construction CS a.s.\nse sídlem"),
+    ).toBe(true);
+    expect(rs.isMatch("VINCI Construction CS a.s.\n")).toBe(
+      true,
+    );
+    expect(rs.isMatch("VINCI Construction CS a.s.")).toBe(
+      true,
+    );
   });
 });
 
@@ -801,9 +809,7 @@ describe("negated bracket expression [^...] in lookahead", () => {
   test("(?![^a-z]) rejects non-lowercase", () => {
     // (?![^a-z]) = "not followed by a char outside
     // a-z" = "must be followed by lowercase or end".
-    const rs = new RegexSet([
-      String.raw`\d+(?![^a-z])`,
-    ]);
+    const rs = new RegexSet([String.raw`\d+(?![^a-z])`]);
 
     // "123a" → digit followed by lowercase → match
     expect(rs.isMatch("123a")).toBe(true);
@@ -814,9 +820,7 @@ describe("negated bracket expression [^...] in lookahead", () => {
   });
 
   test("(?<=[^A-Z]) only matches after non-uppercase", () => {
-    const rs = new RegexSet([
-      String.raw`(?<=[^A-Z])\d`,
-    ]);
+    const rs = new RegexSet([String.raw`(?<=[^A-Z])\d`]);
 
     // "a1" → digit preceded by lowercase → match
     expect(rs.isMatch("a1")).toBe(true);

@@ -3,6 +3,7 @@
  * through the shared core. */
 
 import native from "@stll/regex-set-wasm32-wasi";
+
 import { initBinding, type NativeBinding } from "./core";
 
 initBinding(native as unknown as NativeBinding);
