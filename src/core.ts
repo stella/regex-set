@@ -118,20 +118,27 @@ function unpack(
   const len = packed.length;
   // eslint-disable-next-line unicorn/no-new-array
   const matches = new Array<Match>(len / 3);
-  // SAFETY: Loop increments by 3 and terminates at
-  // packed.length. Indices i, i+1, i+2 are always
-  // in bounds.
   for (let i = 0, j = 0; i < len; i += 3, j++) {
-    const idx = packed[i]!;
-    const s = packed[i + 1]!;
-    const e = packed[i + 2]!;
+    const idx = packed[i];
+    const s = packed[i + 1];
+    const e = packed[i + 2];
+    if (
+      idx === undefined ||
+      s === undefined ||
+      e === undefined
+    ) {
+      throw new Error(
+        `Corrupt packed match data at offset ${i}`,
+      );
+    }
     const m: Match = {
       pattern: idx,
       start: s,
       end: e,
       text: haystack.slice(s, e),
     };
-    if (names && names[idx] !== undefined) m.name = names[idx];
+    if (names && names[idx] !== undefined)
+      m.name = names[idx];
     matches[j] = m;
   }
   return matches;
@@ -152,15 +159,12 @@ function asciiBoundaries(src: string): string {
   while (i < src.length) {
     if (src.charAt(i) === "\\" && i + 1 < src.length) {
       const next = src.charAt(i + 1);
-      if (
-        !inClass &&
-        (next === "b" || next === "B")
-      ) {
+      if (!inClass && (next === "b" || next === "B")) {
         result += `(?-u:\\${next})`;
         i += 2;
       } else {
         // escaped char (including \\) -- emit as-is
-        result += src[i]! + src[i + 1]!;
+        result += src.charAt(i) + src.charAt(i + 1);
         i += 2;
       }
     } else {
@@ -222,9 +226,7 @@ function regexpToRust(re: RegExp): string {
   }
 
   const uFlag =
-    needsAsciiMode(src) && !hasNonAscii(src)
-      ? "-u"
-      : "";
+    needsAsciiMode(src) && !hasNonAscii(src) ? "-u" : "";
   return `${leading}(?${flags}${uFlag}:${src})${trailing}`;
 }
 
@@ -274,8 +276,9 @@ function scopeInlineFlags(src: string): string {
   const leadingBare = src.match(
     /^\(\?([ims]+)(?:-([imsu]+))?\)/,
   );
-  if (leadingBare && leadingBare[1]!.includes("i")) {
-    const enable = leadingBare[1]!;
+  const enableGroup = leadingBare?.[1];
+  if (leadingBare && enableGroup?.includes("i")) {
+    const enable = enableGroup;
     const disable = leadingBare[2] ?? "";
     let rest = src.slice(leadingBare[0].length);
 
@@ -333,7 +336,7 @@ function scopeInnerFlags(src: string): string {
   let i = 0;
   while (i < src.length) {
     if (src[i] === "\\" && i + 1 < src.length) {
-      result += src[i]! + src[i + 1]!;
+      result += src.charAt(i) + src.charAt(i + 1);
       i += 2;
       continue;
     }
@@ -348,7 +351,7 @@ function scopeInnerFlags(src: string): string {
       let enable = "";
       while (
         j < src.length &&
-        "ims".includes(src[j]!)
+        "ims".includes(src.charAt(j))
       ) {
         enable += src.charAt(j);
         j++;
@@ -359,7 +362,7 @@ function scopeInnerFlags(src: string): string {
         j++; // skip -
         while (
           j < src.length &&
-          "imsu".includes(src[j]!)
+          "imsu".includes(src.charAt(j))
         ) {
           disable += src.charAt(j);
           j++;
@@ -492,18 +495,14 @@ export class RegexSet {
   private _names: (string | undefined)[];
   private _hasNames: boolean;
 
-  constructor(
-    patterns: PatternEntry[],
-    options?: Options,
-  ) {
+  constructor(patterns: PatternEntry[], options?: Options) {
     const entries = patterns.map(normalizeEntry);
     this._names = entries.map((e) => e.name);
     this._hasNames = entries.some(
       (e) => e.name !== undefined,
     );
 
-    const unicode =
-      options?.unicodeBoundaries ?? true;
+    const unicode = options?.unicodeBoundaries ?? true;
     const ci = options?.caseInsensitive ?? false;
 
     let processed = entries.map((e) => e.pattern);
@@ -571,14 +570,12 @@ export class RegexSet {
     }
 
     // Strip JS-only options before passing to native
-    const nativeOpts: NativeOptions | undefined =
-      options
-        ? {
-            wholeWords: options.wholeWords,
-            unicodeBoundaries:
-              options.unicodeBoundaries,
-          }
-        : undefined;
+    const nativeOpts: NativeOptions | undefined = options
+      ? {
+          wholeWords: options.wholeWords,
+          unicodeBoundaries: options.unicodeBoundaries,
+        }
+      : undefined;
 
     this._inner = new binding.RegexSet(
       processed,
@@ -593,17 +590,13 @@ export class RegexSet {
 
   /** Returns `true` if any pattern matches. */
   isMatch(haystack: string): boolean {
-    return this._inner._isMatchBuf(
-      Buffer.from(haystack),
-    );
+    return this._inner._isMatchBuf(Buffer.from(haystack));
   }
 
   /** Find all non-overlapping matches. */
   findIter(haystack: string): Match[] {
     return unpack(
-      this._inner._findIterPackedBuf(
-        Buffer.from(haystack),
-      ),
+      this._inner._findIterPackedBuf(Buffer.from(haystack)),
       haystack,
       this._hasNames ? this._names : null,
     );
@@ -622,9 +615,6 @@ export class RegexSet {
     haystack: string,
     replacements: string[],
   ): string {
-    return this._inner.replaceAll(
-      haystack,
-      replacements,
-    );
+    return this._inner.replaceAll(haystack, replacements);
   }
 }
