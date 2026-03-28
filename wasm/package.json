@@ -23,7 +23,7 @@
     "dist"
   ],
   "type": "module",
-  "main": "dist/wasm.js",
+  "module": "dist/wasm.js",
   "types": "dist/wasm.d.ts",
   "exports": {
     ".": {
