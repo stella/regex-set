@@ -1,6 +1,6 @@
 {
   "name": "@stll/regex-set-wasm",
-  "version": "0.0.1",
+  "version": "0.1.1",
   "description": "Multi-pattern regex for browsers via WebAssembly. Same API as @stll/regex-set.",
   "keywords": [
     "multi-pattern",
@@ -23,12 +23,12 @@
     "dist"
   ],
   "type": "module",
-  "module": "dist/wasm.js",
-  "types": "dist/wasm.d.ts",
+  "module": "dist/wasm.mjs",
+  "types": "dist/wasm.d.mts",
   "exports": {
     ".": {
-      "types": "./dist/wasm.d.ts",
-      "import": "./dist/wasm.js"
+      "types": "./dist/wasm.d.mts",
+      "import": "./dist/wasm.mjs"
     }
   },
   "publishConfig": {
