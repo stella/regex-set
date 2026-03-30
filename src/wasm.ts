@@ -1,8 +1,8 @@
 /* Browser/WASM entry point -- loads the WASM binding
- * from the sub-package and re-exports the public API
- * through the shared core. */
+ * from the generated browser glue and re-exports the
+ * public API through the shared core. */
 
-import native from "@stll/regex-set-wasm32-wasi";
+import native from "../regex-set.wasi-browser.js";
 
 import { initBinding, type NativeBinding } from "./core";
 
