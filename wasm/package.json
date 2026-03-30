@@ -35,6 +35,6 @@
     "access": "restricted"
   },
   "dependencies": {
-    "@stll/regex-set-wasm32-wasi": "0.0.3"
+    "@napi-rs/wasm-runtime": "^1.1.1"
   }
 }

@@ -19,6 +19,22 @@ export default defineConfig([
     clean: true,
     sourcemap: true,
     hash: false,
-    deps: { neverBundle: [/regex-set\.wasi/] },
+    deps: { neverBundle: [/^@napi-rs\/wasm-runtime$/] },
+    copy: [
+      {
+        from: "regex-set.wasm32-wasi.wasm",
+        to: "wasm/dist",
+      },
+    ],
+  },
+  {
+    entry: ["wasi-worker-browser.mjs"],
+    outDir: "wasm/dist",
+    format: ["esm"],
+    dts: false,
+    clean: false,
+    sourcemap: true,
+    hash: false,
+    deps: { neverBundle: [/^@napi-rs\/wasm-runtime$/] },
   },
 ]);

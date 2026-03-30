@@ -57,6 +57,7 @@
     "@emnapi/core": "^1.9.1",
     "@emnapi/runtime": "^1.9.1",
     "@napi-rs/cli": "^3.5.1",
+    "@napi-rs/wasm-runtime": "^1.1.1",
     "@tybys/wasm-util": "^0.10.1",
     "@types/node": "^25.5.0",
     "bun-types": "^1.3.11",
@@ -68,11 +69,11 @@
     "typescript": "^6.0.2"
   },
   "optionalDependencies": {
-    "@stll/regex-set-darwin-arm64": "0.0.3",
-    "@stll/regex-set-darwin-x64": "0.0.3",
-    "@stll/regex-set-linux-arm64-gnu": "0.0.3",
-    "@stll/regex-set-linux-x64-gnu": "0.0.3",
-    "@stll/regex-set-wasm32-wasi": "0.0.3"
+    "@stll/regex-set-darwin-x64": "0.1.1",
+    "@stll/regex-set-darwin-arm64": "0.1.1",
+    "@stll/regex-set-linux-x64-gnu": "0.1.1",
+    "@stll/regex-set-linux-arm64-gnu": "0.1.1",
+    "@stll/regex-set-wasm32-wasi": "0.1.1"
   },
   "napi": {
     "binaryName": "regex-set",
