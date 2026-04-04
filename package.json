@@ -67,13 +67,14 @@
     "oxfmt": "^0.42.0",
     "oxlint": "^1.57.0",
     "tsdown": "^0.21.7",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "vite": "^7.0.0"
   },
   "optionalDependencies": {
-    "@stll/regex-set-darwin-x64": "0.1.1",
     "@stll/regex-set-darwin-arm64": "0.1.1",
-    "@stll/regex-set-linux-x64-gnu": "0.1.1",
+    "@stll/regex-set-darwin-x64": "0.1.1",
     "@stll/regex-set-linux-arm64-gnu": "0.1.1",
+    "@stll/regex-set-linux-x64-gnu": "0.1.1",
     "@stll/regex-set-wasm32-wasi": "0.1.1"
   },
   "napi": {

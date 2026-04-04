@@ -29,6 +29,10 @@
     ".": {
       "types": "./dist/wasm.d.mts",
       "import": "./dist/wasm.mjs"
+    },
+    "./vite": {
+      "types": "./dist/vite.d.mts",
+      "import": "./dist/vite.mjs"
     }
   },
   "publishConfig": {
@@ -36,5 +40,13 @@
   },
   "dependencies": {
     "@napi-rs/wasm-runtime": "^1.1.1"
+  },
+  "peerDependencies": {
+    "vite": ">=5 <10"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
   }
 }
