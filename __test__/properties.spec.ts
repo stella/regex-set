@@ -247,6 +247,13 @@ function toJsRegExp(pat: string | RegExp): RegExp | null {
   }
 }
 
+function isAscii(s: string): boolean {
+  for (let i = 0; i < s.length; i++) {
+    if (s.charCodeAt(i) > 0x7f) return false;
+  }
+  return true;
+}
+
 describe("property: JS oracle on feature patterns", () => {
   test("findIter matches JS RegExp on ASCII text", () => {
     fc.assert(
@@ -262,7 +269,7 @@ describe("property: JS oracle on feature patterns", () => {
         }),
         (pats, h) => {
           // Filter: ASCII-only haystack
-          if (!/^[\x00-\x7F]*$/.test(h)) return;
+          if (!isAscii(h)) return;
 
           // Filter: all patterns must compile in JS
           const jsRegexps: (RegExp | null)[] =
@@ -578,7 +585,7 @@ describe("property: ASCII/Unicode agreement on ASCII text", () => {
   test("both modes produce identical results on ASCII", () => {
     fc.assert(
       fc.property(safePatterns, hay, (pats, h) => {
-        if (!/^[\x00-\x7F]*$/.test(h)) return;
+        if (!isAscii(h)) return;
 
         const rsA = new RegexSet(
           pats.map((p) => `\\b${p}\\b`),

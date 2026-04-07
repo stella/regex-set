@@ -28,7 +28,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/stella/regex-set"
+    "url": "git+https://github.com/stella/regex-set.git"
   },
   "bugs": {
     "url": "https://github.com/stella/regex-set/issues"

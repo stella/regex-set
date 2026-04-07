@@ -15,13 +15,30 @@ Built on the same regex engine that powers
 
 ## Install
 
+The repository is public, but the npm package is
+still in private beta. Public npm publishing is
+planned for `v1.0.0`.
+
+Until then, build from source:
+
+```bash
+bun install
+bun run build
+bun run build:js
+```
+
+If you already have beta access, you can install:
+
 ```bash
 npm install @stll/regex-set
 # or
 bun add @stll/regex-set
 ```
 
-Prebuilt binaries are available for:
+For browsers, use the companion
+`@stll/regex-set-wasm` package.
+
+Private-beta builds currently ship prebuilts for:
 
 | Platform      | Architecture |
 | ------------- | ------------ |
@@ -303,20 +320,25 @@ bun install
 
 # Build native module (requires Rust toolchain)
 bun run build
+bun run build:js
 
-# Run tests (49 unit + 18 property)
+# Run tests
 bun test
 bun run test:props
 
 # Download benchmark corpora
 bun run bench:download
 
-# Run benchmarks
-bun run bench
+# Run benchmark suites
+bun run bench:all
 
 # Lint & format
 bun run lint
 bun run format
+
+# Rust quality gates
+cargo clippy --all-targets -- -Dwarnings
+cargo fmt -- --check
 ```
 
 ## License

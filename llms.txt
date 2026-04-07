@@ -4,6 +4,10 @@
 > multi-pattern regex matching in Node.js and Bun.
 > Single pass, O(m*n) guaranteed, no backtracking.
 
+Status: the repository is public, but the npm
+package is still in private beta. Public npm
+publishing is planned for `v1.0.0`.
+
 ## Quick start
 
 ```typescript
@@ -24,10 +28,17 @@ rs.replaceAll(text, ["[DATE]", "[PHONE]", "[ID]"]);
 
 ## API
 
-Constructor: `new RegexSet(patterns: string[], options?: Options)`
+Constructor:
+`new RegexSet(patterns: PatternEntry[], options?: Options)`
+
+PatternEntry:
+- `string`
+- `RegExp`
+- `{ pattern: string | RegExp; name?: string }`
 
 Options:
 - `wholeWords`: `boolean` (default `false`, wraps patterns with `\b...\b`)
+- `unicodeBoundaries`: `boolean` (default `true`)
 
 Methods:
 - `findIter(haystack: string): Match[]`
@@ -67,4 +78,4 @@ small window.
 - `replaceAll` throws if `replacements.length !== patternCount`.
 - For pure literal patterns, use @stll/aho-corasick instead (faster for literals).
 - Composable with @stll/aho-corasick (same Match type, same UTF-16 offsets).
-- Native binary for Node.js/Bun. Bundlers auto-select via the `browser` field.
+- For browsers, use the separate `@stll/regex-set-wasm` package.
