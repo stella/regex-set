@@ -39,7 +39,6 @@ jobs:
           bunx @cyclonedx/cdxgen
           -t javascript
           -t rust
-          --no-recurse
           --no-install-deps
           --required-only
           --json-pretty
