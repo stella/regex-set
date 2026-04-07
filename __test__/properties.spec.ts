@@ -29,6 +29,116 @@ const hay = fc.string({
   maxLength: 500,
 });
 
+// ─── Feature-combination generators ──────────
+//
+// These generators are shared by multiple property
+// suites below, so keep them above first use.
+
+const prefixes = [
+  "", // none
+  "\\b", // word boundary
+  "\\B", // non-word boundary
+  "(?<![a-z])", // negative lookbehind
+  "(?<=\\s)", // positive lookbehind
+  "(?<!\\d)", // negative lookbehind (digit)
+];
+
+const cores = ["[a-z]+", "\\d+", "\\w+", "[A-Z][a-z]+"];
+
+const suffixes = [
+  "", // none
+  "\\b", // word boundary
+  "\\B", // non-word boundary
+  "(?![a-z])", // negative lookahead
+  "(?=\\s)", // positive lookahead
+  "(?!\\d)", // negative lookahead (digit)
+];
+
+const optionCombos = fc.constantFrom(
+  {},
+  { wholeWords: true },
+  { unicodeBoundaries: true },
+  { wholeWords: true, unicodeBoundaries: true },
+);
+
+const backslashEdgePattern = fc
+  .integer({ min: 0, max: 6 })
+  .chain((n) => {
+    const bs = "\\".repeat(n);
+    const suffix = `${bs}b`;
+    return safePattern.map((core) => `${core}${suffix}`);
+  });
+
+const allFlags = fc.constantFrom(
+  "",
+  "i",
+  "m",
+  "s",
+  "im",
+  "is",
+  "ms",
+  "ims",
+);
+
+const basePatterns = fc.oneof(
+  safePattern,
+  ...prefixes.map((pre) =>
+    safePattern.chain((p) =>
+      fc
+        .constantFrom(...suffixes)
+        .map((suf) => `${pre}${p}${suf}`),
+    ),
+  ),
+  ...cores.flatMap((core) => [
+    fc
+      .constantFrom(...prefixes)
+      .map((pre) => `${pre}${core}`),
+    fc
+      .constantFrom(...suffixes)
+      .map((suf) => `${core}${suf}`),
+    fc
+      .tuple(
+        fc.constantFrom(...prefixes),
+        fc.constantFrom(...suffixes),
+      )
+      .map(([pre, suf]) => `${pre}${core}${suf}`),
+  ]),
+  backslashEdgePattern,
+);
+
+const allPatterns: fc.Arbitrary<string | RegExp> =
+  basePatterns.chain((pat) =>
+    allFlags.map((flags) => {
+      if (!flags) return pat;
+      try {
+        return new RegExp(pat, flags);
+      } catch {
+        return pat; // invalid regex with flags → use as string
+      }
+    }),
+  );
+
+const allHaystacks = fc.oneof(
+  hay,
+  fc.constantFrom(
+    "",
+    "čáp letí",
+    "Příbram 123 Pavel",
+    "café résumé naïve",
+    "日本語 test 中文",
+    "Ωmega αlpha βeta",
+    "Łódź Gdańsk Wrocław",
+    "test",
+    "123",
+    " ",
+    // Multiline text (for /m + ^/$ tests)
+    "foo\nbar\nbaz",
+    "line1\nTEST\nline3",
+    "abc\n123\ndef",
+  ),
+  fc.string({ minLength: 0, maxLength: 200 }),
+);
+
 // ─── Property 1: text field correctness ───────
 
 describe("property: text field", () => {
@@ -247,6 +357,13 @@ function toJsRegExp(pat: string | RegExp): RegExp | null {
   }
 }
 
+function isAscii(s: string): boolean {
+  for (let i = 0; i < s.length; i++) {
+    if (s.charCodeAt(i) > 0x7f) return false;
+  }
+  return true;
+}
+
 describe("property: JS oracle on feature patterns", () => {
   test("findIter matches JS RegExp on ASCII text", () => {
     fc.assert(
@@ -262,7 +379,7 @@ describe("property: JS oracle on feature patterns", () => {
         }),
         (pats, h) => {
           // Filter: ASCII-only haystack
-          if (!/^[\x00-\x7F]*$/.test(h)) return;
+          if (!isAscii(h)) return;
 
           // Filter: all patterns must compile in JS
           const jsRegexps: (RegExp | null)[] =
@@ -367,30 +484,6 @@ describe("property: JS oracle on feature patterns", () => {
 // combine these features to catch interaction bugs
 // (e.g., \b + lookahead broke fancy-regex fallback).
 
-// Combinatorial feature generator: every combo of
-// prefix boundary × core pattern × suffix assertion
-// to catch interaction bugs between features.
-
-const prefixes = [
-  "", // none
-  "\\b", // word boundary
-  "\\B", // non-word boundary
-  "(?<![a-z])", // negative lookbehind
-  "(?<=\\s)", // positive lookbehind
-  "(?<!\\d)", // negative lookbehind (digit)
-];
-
-const cores = ["[a-z]+", "\\d+", "\\w+", "[A-Z][a-z]+"];
-
-const suffixes = [
-  "", // none
-  "\\b", // word boundary
-  "\\B", // non-word boundary
-  "(?![a-z])", // negative lookahead
-  "(?=\\s)", // positive lookahead
-  "(?!\\d)", // negative lookahead (digit)
-];
-
 // ─── Exhaustive cartesian product test ───────
 //
 // Define every axis of variation ONCE. The test
@@ -406,109 +499,6 @@ const suffixes = [
 // If any combination crashes, returns wrong text,
 // or disagrees between isMatch and findIter, the
 // test fails with the exact combination logged.
-
-// ── Axis 1: Options ──────────────────────────
-// Every boolean combination of every option.
-const optionCombos = fc.constantFrom(
-  {},
-  { wholeWords: true },
-  { unicodeBoundaries: true },
-  { wholeWords: true, unicodeBoundaries: true },
-);
-
-// ── Axis 2: Patterns ─────────────────────────
-// Every feature that could interact: boundaries,
-// assertions, escaping, character classes.
-
-const backslashEdgePattern = fc
-  .integer({ min: 0, max: 6 })
-  .chain((n) => {
-    const bs = "\\".repeat(n);
-    const suffix = `${bs}b`;
-    return safePattern.map((core) => `${core}${suffix}`);
-  });
-
-// RegExp objects with flag combinations.
-// Tests (?i-u), (?m), (?s) conversion and
-// their interaction with all features.
-// ── Axis 5: Flags ────────────────────────────
-// Every flag combination as a proper axis that
-// crosses with all patterns. "" = no flags (string).
-const allFlags = fc.constantFrom(
-  "",
-  "i",
-  "m",
-  "s",
-  "im",
-  "is",
-  "ms",
-  "ims",
-);
-
-// Base patterns (string form, no flags).
-const basePatterns = fc.oneof(
-  safePattern,
-  ...prefixes.map((pre) =>
-    safePattern.chain((p) =>
-      fc
-        .constantFrom(...suffixes)
-        .map((suf) => `${pre}${p}${suf}`),
-    ),
-  ),
-  ...cores.flatMap((core) => [
-    fc
-      .constantFrom(...prefixes)
-      .map((pre) => `${pre}${core}`),
-    fc
-      .constantFrom(...suffixes)
-      .map((suf) => `${core}${suf}`),
-    fc
-      .tuple(
-        fc.constantFrom(...prefixes),
-        fc.constantFrom(...suffixes),
-      )
-      .map(([pre, suf]) => `${pre}${core}${suf}`),
-  ]),
-  backslashEdgePattern,
-);
-
-// All patterns: base patterns × flags.
-// "" flags = string pattern, non-empty = RegExp.
-// This is the TRUE cartesian product over all axes.
-const allPatterns: fc.Arbitrary<string | RegExp> =
-  basePatterns.chain((pat) =>
-    allFlags.map((flags) => {
-      if (!flags) return pat;
-      try {
-        return new RegExp(pat, flags);
-      } catch {
-        return pat; // invalid regex with flags → use as string
-      }
-    }),
-  );
-
-// ── Axis 3: Haystacks ────────────────────────
-// ASCII, multilingual, edge cases.
-const allHaystacks = fc.oneof(
-  hay,
-  fc.constantFrom(
-    "",
-    "čáp letí",
-    "Příbram 123 Pavel",
-    "café résumé naïve",
-    "日本語 test 中文",
-    "Ωmega αlpha βeta",
-    "Łódź Gdańsk Wrocław",
-    "test",
-    "123",
-    " ",
-    // Multiline text (for /m + ^/$ tests)
-    "foo\nbar\nbaz",
-    "line1\nTEST\nline3",
-    "abc\n123\ndef",
-  ),
-  fc.string({ minLength: 0, maxLength: 200 }),
-);
 
 // ── The test ─────────────────────────────────
 
@@ -578,7 +568,7 @@ describe("property: ASCII/Unicode agreement on ASCII text", () => {
   test("both modes produce identical results on ASCII", () => {
     fc.assert(
       fc.property(safePatterns, hay, (pats, h) => {
-        if (!/^[\x00-\x7F]*$/.test(h)) return;
+        if (!isAscii(h)) return;
 
         const rsA = new RegexSet(
           pats.map((p) => `\\b${p}\\b`),

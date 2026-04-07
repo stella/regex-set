@@ -17,7 +17,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/stella/regex-set"
+    "url": "git+https://github.com/stella/regex-set.git"
   },
   "files": [
     "dist",
@@ -49,6 +49,7 @@
     "format": "oxfmt . && rustfmt src/lib.rs",
     "lint": "oxlint .",
     "bench": "bun __bench__/speed.ts",
+    "bench:all": "bun run bench && bun run bench:fallback",
     "bench:fallback": "bun __bench__/fancy-fallback.ts",
     "bench:install": "cd __bench__ && bun install",
     "bench:download": "bash __bench__/download-corpus.sh"

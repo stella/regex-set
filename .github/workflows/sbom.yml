@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: sbom-generation
@@ -35,33 +35,19 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Generate CycloneDX SBOM
-        run: bunx @cyclonedx/cdxgen -o sbom.cdx.json
-
-      - name: Generate third-party license notices
         run: >
-          bunx generate-license-file
-          --input package.json
-          --output THIRD-PARTY-NOTICES.txt
-          --overwrite
+          bunx @cyclonedx/cdxgen
+          -t javascript
+          -t rust
+          --no-install-deps
+          --required-only
+          --json-pretty
+          -o sbom.cdx.json
+          .
 
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v7
         with:
           name: sbom-${{ github.sha }}
-          path: |
-            sbom.cdx.json
-            THIRD-PARTY-NOTICES.txt
+          path: sbom.cdx.json
           retention-days: 365
-
-      - name: Commit SBOM and NOTICE to repo
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add sbom.cdx.json THIRD-PARTY-NOTICES.txt
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "chore: update SBOM and third-party notices [skip ci]"
-            git pull --rebase
-            git push
-          fi

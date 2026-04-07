@@ -944,14 +944,7 @@ fn try_fancy_fallback(
   // backtracked end. Start-only check suffices.
   if pi.has_internal_b {
     let inp = Input::new(haystack).range(s..);
-    if pi
-      .individual
-      .find(inp)
-      .filter(|im| im.start() == s)
-      .is_none()
-    {
-      return None;
-    }
+    pi.individual.find(inp).filter(|im| im.start() == s)?;
   }
   Some((s, e))
 }
@@ -1514,17 +1507,16 @@ impl RegexSet {
             ) {
               Ok(()) => return true,
               Err(ref rej) => {
-                if matches!(rej, Rejection::Verifier) {
-                  if try_fancy_fallback(
+                if matches!(rej, Rejection::Verifier)
+                  && try_fancy_fallback(
                     pi,
                     haystack,
                     m.start(),
                     &mode,
                   )
                   .is_some()
-                  {
-                    return true;
-                  }
+                {
+                  return true;
                 }
                 if self.needs_shadowed_check(rej)
                   && self

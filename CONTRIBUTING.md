@@ -16,17 +16,25 @@ a pull request.
 # Prerequisites: Rust toolchain, Bun
 bun install
 bun run build       # native module
+bun run build:js    # JS/TS entrypoints
 bun test            # run tests
+bun run test:props  # property tests
 bun run lint        # oxlint
 bun run format      # oxfmt + rustfmt
+cargo clippy --all-targets -- -Dwarnings
+cargo fmt -- --check
 ```
 
 ## Pull requests
 
 - One logical change per PR.
 - Include tests for bug fixes and new features.
-- Run `bun test && bun run lint && bun run format`
-  before submitting.
+- Run `bun test && bun run test:props` before
+  submitting.
+- Run `bun run lint && bun run format` before
+  submitting.
+- Run `cargo clippy --all-targets -- -Dwarnings`
+  and `cargo fmt -- --check` before submitting.
 - Use [Conventional Commits](https://www.conventionalcommits.org/):
   `feat:`, `fix:`, `chore:`, `docs:`.
 - Squash merge is enforced; keep the PR title clean.
