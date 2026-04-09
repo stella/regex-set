@@ -108,7 +108,7 @@ jobs:
           shared-key: rust-checks
 
       - name: Clippy
-        run: cargo clippy --all-targets -- -Dwarnings
+        run: cargo clippy --all-targets --all-features -- -Dwarnings
 
       - name: Format
         run: cargo fmt -- --check
