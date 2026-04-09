@@ -1,0 +1,8 @@
+version: 1
+output_dir: provenance
+projects:
+  - id: root
+    path: .
+    ecosystems:
+      - javascript
+      - rust
