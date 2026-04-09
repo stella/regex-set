@@ -1,29 +1,4 @@
 {
-  "annotations": [
-    {
-      "annotator": {
-        "component": {
-          "authors": [
-            {
-              "name": "OWASP Foundation"
-            }
-          ],
-          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@12.1.5",
-          "group": "@cyclonedx",
-          "name": "cdxgen",
-          "publisher": "OWASP Foundation",
-          "purl": "pkg:npm/%40cyclonedx/cdxgen@12.1.5",
-          "type": "application",
-          "version": "12.1.5"
-        }
-      },
-      "bom-ref": "metadata-annotations",
-      "subjects": [
-        "pkg:npm/@stll/regex-set@0.1.1"
-      ],
-      "text": "This Software Bill-of-Materials (SBOM) document was created on Thursday, April 9, 2026 with cdxgen. The data was captured during the pre-build lifecycle phase without building the application. The document describes an application named 'regex-set' with version '0.1.1'. The application also has 1 child modules/components. 2 package type(s) and 2 purl namespaces are described in the document under components."
-    }
-  ],
   "bomFormat": "CycloneDX",
   "components": [
     {

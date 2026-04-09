@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "output_dir": ".",
+  "output_dir": "provenance",
   "projects": [
     {
       "id": "root",
