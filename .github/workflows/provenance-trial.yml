@@ -1,6 +1,16 @@
 name: Provenance Trial
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".provenance.yml"
+      - "bun.lock"
+      - "Cargo.lock"
+      - "package.json"
+      - "Cargo.toml"
+      - ".github/workflows/provenance-trial.yml"
   workflow_dispatch:
     inputs:
       provenance_ref:
@@ -25,7 +35,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: stella/provenance
-          ref: ${{ inputs.provenance_ref }}
+          ref: ${{ inputs.provenance_ref || 'main' }}
           path: .provenance-tool
           token: ${{ github.token }}
 
