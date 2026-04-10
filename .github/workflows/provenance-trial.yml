@@ -37,7 +37,7 @@ jobs:
           repository: stella/provenance
           ref: ${{ inputs.provenance_ref || 'main' }}
           path: .provenance-tool
-          token: ${{ github.token }}
+          token: ${{ secrets.STELLA_REPO_READ_TOKEN || github.token }}
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
