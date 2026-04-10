@@ -218,42 +218,6 @@
       "version": "0.11.0"
     },
     {
-      "bom-ref": "pkg:cargo/ctor-proc-macro@0.0.7",
-      "evidence": {
-        "identity": [
-          {
-            "concludedValue": "Cargo.lock",
-            "confidence": 0.6,
-            "field": "purl",
-            "methods": [
-              {
-                "confidence": 0.6,
-                "technique": "manifest-analysis",
-                "value": "Cargo.lock"
-              }
-            ]
-          }
-        ]
-      },
-      "group": "",
-      "hashes": [
-        {
-          "alg": "SHA-384",
-          "content": "52560adf09603e58c9a7ee1fe1dcb95a16927b17c127f0ac02d6e768a0e25bc1"
-        }
-      ],
-      "name": "ctor-proc-macro",
-      "properties": [
-        {
-          "name": "SrcFile",
-          "value": "Cargo.lock"
-        }
-      ],
-      "purl": "pkg:cargo/ctor-proc-macro@0.0.7",
-      "type": "library",
-      "version": "0.0.7"
-    },
-    {
       "bom-ref": "pkg:cargo/ctor@0.6.3",
       "evidence": {
         "identity": [
@@ -290,7 +254,7 @@
       "version": "0.6.3"
     },
     {
-      "bom-ref": "pkg:cargo/dtor-proc-macro@0.0.6",
+      "bom-ref": "pkg:cargo/ctor-proc-macro@0.0.7",
       "evidence": {
         "identity": [
           {
@@ -311,19 +275,19 @@
       "hashes": [
         {
           "alg": "SHA-384",
-          "content": "f678cf4a922c215c63e0de95eb1ff08a958a81d47e485cf9da1e27bf6305cfa5"
+          "content": "52560adf09603e58c9a7ee1fe1dcb95a16927b17c127f0ac02d6e768a0e25bc1"
         }
       ],
-      "name": "dtor-proc-macro",
+      "name": "ctor-proc-macro",
       "properties": [
         {
           "name": "SrcFile",
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/dtor-proc-macro@0.0.6",
+      "purl": "pkg:cargo/ctor-proc-macro@0.0.7",
       "type": "library",
-      "version": "0.0.6"
+      "version": "0.0.7"
     },
     {
       "bom-ref": "pkg:cargo/dtor@0.1.1",
@@ -362,6 +326,42 @@
       "version": "0.1.1"
     },
     {
+      "bom-ref": "pkg:cargo/dtor-proc-macro@0.0.6",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "Cargo.lock",
+            "confidence": 0.6,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.6,
+                "technique": "manifest-analysis",
+                "value": "Cargo.lock"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-384",
+          "content": "f678cf4a922c215c63e0de95eb1ff08a958a81d47e485cf9da1e27bf6305cfa5"
+        }
+      ],
+      "name": "dtor-proc-macro",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "Cargo.lock"
+        }
+      ],
+      "purl": "pkg:cargo/dtor-proc-macro@0.0.6",
+      "type": "library",
+      "version": "0.0.6"
+    },
+    {
       "bom-ref": "pkg:cargo/fancy-regex@0.17.0",
       "evidence": {
         "identity": [
@@ -396,6 +396,42 @@
       "purl": "pkg:cargo/fancy-regex@0.17.0",
       "type": "library",
       "version": "0.17.0"
+    },
+    {
+      "bom-ref": "pkg:cargo/futures@0.3.32",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "Cargo.lock",
+            "confidence": 0.6,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.6,
+                "technique": "manifest-analysis",
+                "value": "Cargo.lock"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-384",
+          "content": "8b147ee9d1f6d097cef9ce628cd2ee62288d963e16fb287bd9286455b241382d"
+        }
+      ],
+      "name": "futures",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "Cargo.lock"
+        }
+      ],
+      "purl": "pkg:cargo/futures@0.3.32",
+      "type": "library",
+      "version": "0.3.32"
     },
     {
       "bom-ref": "pkg:cargo/futures-channel@0.3.32",
@@ -686,42 +722,6 @@
       "version": "0.3.32"
     },
     {
-      "bom-ref": "pkg:cargo/futures@0.3.32",
-      "evidence": {
-        "identity": [
-          {
-            "concludedValue": "Cargo.lock",
-            "confidence": 0.6,
-            "field": "purl",
-            "methods": [
-              {
-                "confidence": 0.6,
-                "technique": "manifest-analysis",
-                "value": "Cargo.lock"
-              }
-            ]
-          }
-        ]
-      },
-      "group": "",
-      "hashes": [
-        {
-          "alg": "SHA-384",
-          "content": "8b147ee9d1f6d097cef9ce628cd2ee62288d963e16fb287bd9286455b241382d"
-        }
-      ],
-      "name": "futures",
-      "properties": [
-        {
-          "name": "SrcFile",
-          "value": "Cargo.lock"
-        }
-      ],
-      "purl": "pkg:cargo/futures@0.3.32",
-      "type": "library",
-      "version": "0.3.32"
-    },
-    {
       "bom-ref": "pkg:cargo/itoa@1.0.17",
       "evidence": {
         "identity": [
@@ -830,6 +830,42 @@
       "version": "2.8.0"
     },
     {
+      "bom-ref": "pkg:cargo/napi@3.8.3",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "Cargo.lock",
+            "confidence": 0.6,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.6,
+                "technique": "manifest-analysis",
+                "value": "Cargo.lock"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-384",
+          "content": "e6944d0bf100571cd6e1a98a316cdca262deb6fccf8d93f5ae1502ca3fc88bd3"
+        }
+      ],
+      "name": "napi",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "Cargo.lock"
+        }
+      ],
+      "purl": "pkg:cargo/napi@3.8.3",
+      "type": "library",
+      "version": "3.8.3"
+    },
+    {
       "bom-ref": "pkg:cargo/napi-build@2.3.1",
       "evidence": {
         "identity": [
@@ -864,42 +900,6 @@
       "purl": "pkg:cargo/napi-build@2.3.1",
       "type": "library",
       "version": "2.3.1"
-    },
-    {
-      "bom-ref": "pkg:cargo/napi-derive-backend@5.0.2",
-      "evidence": {
-        "identity": [
-          {
-            "concludedValue": "Cargo.lock",
-            "confidence": 0.6,
-            "field": "purl",
-            "methods": [
-              {
-                "confidence": 0.6,
-                "technique": "manifest-analysis",
-                "value": "Cargo.lock"
-              }
-            ]
-          }
-        ]
-      },
-      "group": "",
-      "hashes": [
-        {
-          "alg": "SHA-384",
-          "content": "f0864cf6a82e2cfb69067374b64c9253d7e910e5b34db833ed7495dda56ccb18"
-        }
-      ],
-      "name": "napi-derive-backend",
-      "properties": [
-        {
-          "name": "SrcFile",
-          "value": "Cargo.lock"
-        }
-      ],
-      "purl": "pkg:cargo/napi-derive-backend@5.0.2",
-      "type": "library",
-      "version": "5.0.2"
     },
     {
       "bom-ref": "pkg:cargo/napi-derive@3.5.2",
@@ -938,6 +938,42 @@
       "version": "3.5.2"
     },
     {
+      "bom-ref": "pkg:cargo/napi-derive-backend@5.0.2",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "Cargo.lock",
+            "confidence": 0.6,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.6,
+                "technique": "manifest-analysis",
+                "value": "Cargo.lock"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-384",
+          "content": "f0864cf6a82e2cfb69067374b64c9253d7e910e5b34db833ed7495dda56ccb18"
+        }
+      ],
+      "name": "napi-derive-backend",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "Cargo.lock"
+        }
+      ],
+      "purl": "pkg:cargo/napi-derive-backend@5.0.2",
+      "type": "library",
+      "version": "5.0.2"
+    },
+    {
       "bom-ref": "pkg:cargo/napi-sys@3.2.1",
       "evidence": {
         "identity": [
@@ -972,42 +1008,6 @@
       "purl": "pkg:cargo/napi-sys@3.2.1",
       "type": "library",
       "version": "3.2.1"
-    },
-    {
-      "bom-ref": "pkg:cargo/napi@3.8.3",
-      "evidence": {
-        "identity": [
-          {
-            "concludedValue": "Cargo.lock",
-            "confidence": 0.6,
-            "field": "purl",
-            "methods": [
-              {
-                "confidence": 0.6,
-                "technique": "manifest-analysis",
-                "value": "Cargo.lock"
-              }
-            ]
-          }
-        ]
-      },
-      "group": "",
-      "hashes": [
-        {
-          "alg": "SHA-384",
-          "content": "e6944d0bf100571cd6e1a98a316cdca262deb6fccf8d93f5ae1502ca3fc88bd3"
-        }
-      ],
-      "name": "napi",
-      "properties": [
-        {
-          "name": "SrcFile",
-          "value": "Cargo.lock"
-        }
-      ],
-      "purl": "pkg:cargo/napi@3.8.3",
-      "type": "library",
-      "version": "3.8.3"
     },
     {
       "bom-ref": "pkg:cargo/nohash-hasher@0.2.0",
@@ -1154,6 +1154,42 @@
       "version": "1.0.45"
     },
     {
+      "bom-ref": "pkg:cargo/regex@1.12.3",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "Cargo.lock",
+            "confidence": 0.6,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.6,
+                "technique": "manifest-analysis",
+                "value": "Cargo.lock"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "hashes": [
+        {
+          "alg": "SHA-384",
+          "content": "e10754a14b9137dd7b1e3e5b0493cc9171fdd105e0ab477f51b72e7f3ac0e276"
+        }
+      ],
+      "name": "regex",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "Cargo.lock"
+        }
+      ],
+      "purl": "pkg:cargo/regex@1.12.3",
+      "type": "library",
+      "version": "1.12.3"
+    },
+    {
       "bom-ref": "pkg:cargo/regex-automata@0.4.14",
       "evidence": {
         "identity": [
@@ -1224,42 +1260,6 @@
       "purl": "pkg:cargo/regex-syntax@0.8.10",
       "type": "library",
       "version": "0.8.10"
-    },
-    {
-      "bom-ref": "pkg:cargo/regex@1.12.3",
-      "evidence": {
-        "identity": [
-          {
-            "concludedValue": "Cargo.lock",
-            "confidence": 0.6,
-            "field": "purl",
-            "methods": [
-              {
-                "confidence": 0.6,
-                "technique": "manifest-analysis",
-                "value": "Cargo.lock"
-              }
-            ]
-          }
-        ]
-      },
-      "group": "",
-      "hashes": [
-        {
-          "alg": "SHA-384",
-          "content": "e10754a14b9137dd7b1e3e5b0493cc9171fdd105e0ab477f51b72e7f3ac0e276"
-        }
-      ],
-      "name": "regex",
-      "properties": [
-        {
-          "name": "SrcFile",
-          "value": "Cargo.lock"
-        }
-      ],
-      "purl": "pkg:cargo/regex@1.12.3",
-      "type": "library",
-      "version": "1.12.3"
     },
     {
       "bom-ref": "pkg:cargo/rustc-hash@2.1.1",
@@ -1722,162 +1722,6 @@
       "purl": "pkg:cargo/zmij@1.0.21",
       "type": "library",
       "version": "1.0.21"
-    },
-    {
-      "authors": [
-        {
-          "name": "LongYinan (https://github.com/Brooooooklyn)"
-        }
-      ],
-      "bom-ref": "pkg:npm/@napi-rs/wasm-runtime@1.1.1",
-      "description": "Runtime and polyfill for wasm targets",
-      "evidence": {
-        "identity": [
-          {
-            "concludedValue": "node_modules/@napi-rs/wasm-runtime/package.json",
-            "confidence": 0.7,
-            "field": "purl",
-            "methods": [
-              {
-                "confidence": 0.7,
-                "technique": "manifest-analysis",
-                "value": "node_modules/@napi-rs/wasm-runtime/package.json"
-              }
-            ]
-          }
-        ],
-        "occurrences": [
-          {
-            "location": "npm/wasm32-wasi/regex-set.wasi-browser.js#6"
-          },
-          {
-            "location": "regex-set.wasi-browser.js#6"
-          },
-          {
-            "location": "npm/wasm32-wasi/regex-set.wasi.cjs#15"
-          },
-          {
-            "location": "regex-set.wasi.cjs#15"
-          },
-          {
-            "location": "npm/wasm32-wasi/wasi-worker-browser.mjs#1"
-          },
-          {
-            "location": "npm/wasm32-wasi/wasi-worker.mjs#9"
-          },
-          {
-            "location": "wasi-worker-browser.mjs#1"
-          },
-          {
-            "location": "wasi-worker.mjs#9"
-          },
-          {
-            "location": "wasm/dist/wasi-worker-browser.mjs#1"
-          },
-          {
-            "location": "wasm/dist/wasm.mjs#1"
-          }
-        ]
-      },
-      "externalReferences": [
-        {
-          "type": "website",
-          "url": "https://napi.rs/"
-        },
-        {
-          "type": "vcs",
-          "url": "git+https://github.com/napi-rs/napi-rs.git"
-        }
-      ],
-      "group": "@napi-rs",
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
-          }
-        }
-      ],
-      "name": "wasm-runtime",
-      "properties": [
-        {
-          "name": "SrcFile",
-          "value": "node_modules/@napi-rs/wasm-runtime/package.json"
-        },
-        {
-          "name": "ImportedModules",
-          "value": "@napi-rs/wasm-runtime,createOnMessage,@napi-rs/wasm-runtime/createOnMessage,getDefaultContext,@napi-rs/wasm-runtime/getDefaultContext,instantiateNapiModuleSync,@napi-rs/wasm-runtime/instantiateNapiModuleSync,WASI,@napi-rs/wasm-runtime/WASI,MessageHandler,@napi-rs/wasm-runtime/MessageHandler"
-        }
-      ],
-      "purl": "pkg:npm/%40napi-rs/wasm-runtime@1.1.1",
-      "scope": "required",
-      "type": "library",
-      "version": "1.1.1"
-    },
-    {
-      "bom-ref": "pkg:npm/@stll/regex-set-darwin-arm64@0.1.1",
-      "description": "Multi-pattern regex for Node.js/Bun. 2-9x faster than JS RegExp, backtracking-immune, Unicode word boundaries. Rust DFA engine via NAPI-RS.",
-      "evidence": {
-        "identity": [
-          {
-            "concludedValue": "node_modules/@stll/regex-set-darwin-arm64/package.json",
-            "confidence": 0.7,
-            "field": "purl",
-            "methods": [
-              {
-                "confidence": 0.7,
-                "technique": "manifest-analysis",
-                "value": "node_modules/@stll/regex-set-darwin-arm64/package.json"
-              }
-            ]
-          }
-        ],
-        "occurrences": [
-          {
-            "location": "index.js#55"
-          }
-        ]
-      },
-      "externalReferences": [
-        {
-          "type": "vcs",
-          "url": "https://github.com/stella/regex-set#readme"
-        },
-        {
-          "type": "vcs",
-          "url": "https://github.com/stella/regex-set"
-        }
-      ],
-      "group": "@stll",
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
-          }
-        }
-      ],
-      "name": "regex-set-darwin-arm64",
-      "properties": [
-        {
-          "name": "SrcFile",
-          "value": "node_modules/@stll/regex-set-darwin-arm64/package.json"
-        },
-        {
-          "name": "ImportedModules",
-          "value": "@stll/regex-set-darwin-arm64"
-        }
-      ],
-      "purl": "pkg:npm/%40stll/regex-set-darwin-arm64@0.1.1",
-      "scope": "required",
-      "type": "library",
-      "version": "0.1.1"
-    }
-  ],
-  "compositions": [
-    {
-      "aggregate": "incomplete",
-      "bom-ref": "pkg:npm/@stll/regex-set@0.1.1"
     }
   ],
   "dependencies": [
@@ -2184,10 +2028,6 @@
     {
       "dependsOn": [],
       "ref": "pkg:cargo/zmij@1.0.21"
-    },
-    {
-      "dependsOn": [],
-      "ref": "pkg:npm/@stll/regex-set@0.1.1"
     }
   ],
   "metadata": {
@@ -2197,37 +2037,8 @@
       }
     ],
     "component": {
-      "bom-ref": "pkg:npm/@stll/regex-set@0.1.1",
-      "components": [
-        {
-          "bom-ref": "pkg:cargo/stella-regex-set@0.1.1",
-          "group": "",
-          "licenses": [
-            {
-              "license": {
-                "id": "MIT",
-                "url": "https://opensource.org/licenses/MIT"
-              }
-            }
-          ],
-          "name": "stella-regex-set",
-          "purl": "pkg:cargo/stella-regex-set@0.1.1",
-          "type": "application",
-          "version": "0.1.1"
-        }
-      ],
-      "description": "Multi-pattern regex for Node.js/Bun. 2-9x faster than JS RegExp, backtracking-immune, Unicode word boundaries. Rust DFA engine via NAPI-RS.",
-      "externalReferences": [
-        {
-          "type": "vcs",
-          "url": "https://github.com/stella/regex-set#readme"
-        },
-        {
-          "type": "vcs",
-          "url": "git+https://github.com/stella/regex-set.git"
-        }
-      ],
-      "group": "@stll",
+      "bom-ref": "pkg:cargo/stella-regex-set@0.1.1",
+      "group": "",
       "licenses": [
         {
           "license": {
@@ -2236,8 +2047,8 @@
           }
         }
       ],
-      "name": "regex-set",
-      "purl": "pkg:npm/%40stll/regex-set@0.1.1",
+      "name": "stella-regex-set",
+      "purl": "pkg:cargo/stella-regex-set@0.1.1",
       "type": "application",
       "version": "0.1.1"
     },
@@ -2249,15 +2060,11 @@
     "properties": [
       {
         "name": "cdx:bom:componentTypes",
-        "value": "cargo\\nnpm"
-      },
-      {
-        "name": "cdx:bom:componentNamespaces",
-        "value": "@napi-rs\\n@stll"
+        "value": "cargo"
       },
       {
         "name": "cdx:bom:componentSrcFiles",
-        "value": "Cargo.lock\\nnode_modules/@napi-rs/wasm-runtime/package.json\\nnode_modules/@stll/regex-set-darwin-arm64/package.json"
+        "value": "Cargo.lock"
       }
     ],
     "tools": {
