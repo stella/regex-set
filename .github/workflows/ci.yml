@@ -152,9 +152,9 @@ jobs:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
-      - uses: stella/.github/actions/provenance-check@94e70352f5ab42a465f7b03d9ab1bae07b53e4b9
+      - uses: stella/.github/actions/provenance-check@0107276320ff349dda9bcd9e111680cca1951fce
         with:
-          provenance-ref: 6f09a7a32729220a104fc13a5fd03cb7e6538997
+          provenance-version: v0.1.0
 
   # ── Build (push to main + tags only) ──────────
   build:
@@ -250,11 +250,11 @@ jobs:
         run: |
           ls -R artifacts/
           for dir in artifacts/bindings-*; do
-            cp "$dir"/*.node . 2>/dev/null || true
-            cp "$dir"/*.wasm . 2>/dev/null || true
+            cp -- "$dir"/*.node . 2>/dev/null || true
+            cp -- "$dir"/*.wasm . 2>/dev/null || true
           done
-          ls -la *.node 2>/dev/null || echo "No .node files"
-          ls -la *.wasm 2>/dev/null || echo "No .wasm files"
+          ls -la -- *.node 2>/dev/null || echo "No .node files"
+          ls -la -- *.wasm 2>/dev/null || echo "No .wasm files"
 
       - run: bun test
 
