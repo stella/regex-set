@@ -7,18 +7,106 @@ This file is a generated inventory of detected third-party components and declar
 Some licenses may require additional attribution text or redistribution steps.
 
 Project: root
+- @babel/generator 8.0.0-rc.3 — MIT
+- @babel/helper-string-parser 8.0.0-rc.3 — MIT
+- @babel/helper-validator-identifier 8.0.0-rc.3 — MIT
+- @babel/parser 8.0.0-rc.3 — MIT
+- @babel/types 8.0.0-rc.3 — MIT
+- @emnapi/core 1.9.1 — MIT
+- @emnapi/runtime 1.9.1 — MIT
+- @emnapi/wasi-threads 1.2.0 — MIT
+- @inquirer/ansi 2.0.4 — MIT
+- @inquirer/checkbox 5.1.2 — MIT
+- @inquirer/confirm 6.0.10 — MIT
+- @inquirer/core 11.1.7 — MIT
+- @inquirer/editor 5.0.10 — MIT
+- @inquirer/expand 5.0.10 — MIT
+- @inquirer/external-editor 2.0.4 — MIT
+- @inquirer/figures 2.0.4 — MIT
+- @inquirer/input 5.0.10 — MIT
+- @inquirer/number 4.0.10 — MIT
+- @inquirer/password 5.0.10 — MIT
+- @inquirer/prompts 8.3.2 — MIT
+- @inquirer/rawlist 5.2.6 — MIT
+- @inquirer/search 4.1.6 — MIT
+- @inquirer/select 5.1.2 — MIT
+- @inquirer/type 4.0.4 — MIT
+- @jridgewell/gen-mapping 0.3.13 — MIT
+- @jridgewell/resolve-uri 3.1.2 — MIT
+- @jridgewell/sourcemap-codec 1.5.5 — MIT
+- @jridgewell/trace-mapping 0.3.31 — MIT
+- @napi-rs/cli 3.5.1 — MIT
+- @napi-rs/cross-toolchain 1.0.3 — MIT
+- @napi-rs/lzma 1.4.5 — MIT
+- @napi-rs/lzma-linux-x64-gnu 1.4.5 — MIT
+- @napi-rs/lzma-linux-x64-musl 1.4.5 — MIT
+- @napi-rs/tar 1.1.0 — MIT
+- @napi-rs/tar-linux-x64-gnu 1.1.0 — MIT
+- @napi-rs/tar-linux-x64-musl 1.1.0 — MIT
 - @napi-rs/wasm-runtime 1.1.1 — MIT
+- @napi-rs/wasm-tools 1.0.1 — MIT
+- @napi-rs/wasm-tools-linux-x64-gnu 1.0.1 — MIT
+- @napi-rs/wasm-tools-linux-x64-musl 1.0.1 — MIT
+- @octokit/auth-token 6.0.0 — MIT
+- @octokit/core 7.0.6 — MIT
+- @octokit/endpoint 11.0.3 — MIT
+- @octokit/graphql 9.0.3 — MIT
+- @octokit/openapi-types 27.0.0 — MIT
+- @octokit/plugin-paginate-rest 14.0.0 — MIT
+- @octokit/plugin-request-log 6.0.0 — MIT
+- @octokit/plugin-rest-endpoint-methods 17.0.0 — MIT
+- @octokit/request 10.0.8 — MIT
+- @octokit/request-error 7.1.0 — MIT
+- @octokit/rest 22.0.1 — MIT
+- @octokit/types 16.0.0 — MIT
+- @oxc-project/types 0.122.0 — MIT
+- @oxfmt/binding-linux-x64-gnu 0.42.0 — MIT
+- @oxfmt/binding-linux-x64-musl 0.42.0 — MIT
+- @oxlint/binding-linux-x64-gnu 1.57.0 — MIT
+- @oxlint/binding-linux-x64-musl 1.57.0 — MIT
+- @quansync/fs 1.0.0 — MIT
+- @rolldown/binding-linux-x64-gnu 1.0.0-rc.12 — MIT
+- @rolldown/binding-linux-x64-musl 1.0.0-rc.12 — MIT
+- @rolldown/pluginutils 1.0.0-rc.12 — MIT
+- @tybys/wasm-util 0.10.1 — MIT
+- @types/estree 1.0.8 — MIT
+- @types/jsesc 2.5.1 — MIT
+- @types/node 25.5.0 — MIT
 - aho-corasick 1.1.4 — MIT OR Unlicense
+- ansis 4.2.0 — ISC
+- argparse 2.0.1 — Python-2.0
+- ast-kit 3.0.0-beta.1 — MIT
+- before-after-hook 4.0.0 — Apache-2.0
+- birpc 4.0.0 — MIT
 - bit-set 0.8.0 — Apache-2.0 OR MIT
 - bit-vec 0.8.0 — Apache-2.0 OR MIT
 - bitflags 2.11.0 — Apache-2.0 OR MIT
+- bun-types 1.3.11 — MIT
+- cac 7.0.0 — MIT
 - cfg-if 1.0.4 — Apache-2.0 OR MIT
+- chardet 2.1.1 — MIT
+- cli-width 4.1.0 — ISC
+- clipanion 4.0.0-rc.4 — MIT
+- colorette 2.0.20 — MIT
 - convert_case 0.11.0 — MIT
 - ctor 0.6.3 — Apache-2.0 OR MIT
 - ctor-proc-macro 0.0.7 — Apache-2.0 OR MIT
+- debug 4.4.3 — MIT
+- defu 6.1.4 — MIT
 - dtor 0.1.1 — Apache-2.0 OR MIT
 - dtor-proc-macro 0.0.6 — Apache-2.0 OR MIT
+- dts-resolver 2.1.3 — MIT
+- emnapi 1.9.1 — MIT
+- empathic 2.0.0 — MIT
+- es-toolkit 1.45.1 — MIT
+- estree-walker 3.0.3 — MIT
 - fancy-regex 0.17.0 — MIT
+- fast-check 4.6.0 — MIT
+- fast-content-type-parse 3.0.0 — MIT
+- fast-string-truncated-width 3.0.3 — MIT
+- fast-string-width 3.0.2 — MIT
+- fast-wrap-ansi 0.2.0 — MIT
+- fdir 6.5.0 — MIT
 - futures 0.3.32 — Apache-2.0 OR MIT
 - futures-channel 0.3.32 — Apache-2.0 OR MIT
 - futures-core 0.3.32 — Apache-2.0 OR MIT
@@ -28,30 +116,64 @@ Project: root
 - futures-sink 0.3.32 — Apache-2.0 OR MIT
 - futures-task 0.3.32 — Apache-2.0 OR MIT
 - futures-util 0.3.32 — Apache-2.0 OR MIT
+- get-tsconfig 4.13.7 — MIT
+- hookable 6.1.0 — MIT
+- iconv-lite 0.7.2 — MIT
+- import-without-cache 0.2.5 — MIT
 - itoa 1.0.17 — Apache-2.0 OR MIT
+- js-yaml 4.1.1 — MIT
+- jsesc 3.1.0 — MIT
+- json-with-bigint 3.5.8 — MIT
 - libloading 0.9.0 — ISC
 - memchr 2.8.0 — MIT OR Unlicense
+- ms 2.1.3 — MIT
+- mute-stream 3.0.0 — ISC
 - napi 3.8.3 — MIT
 - napi-build 2.3.1 — MIT
 - napi-derive 3.5.2 — MIT
 - napi-derive-backend 5.0.2 — MIT
 - napi-sys 3.2.1 — MIT
 - nohash-hasher 0.2.0 — Apache-2.0 OR MIT
+- obug 2.1.1 — MIT
+- oxfmt 0.42.0 — MIT
+- oxlint 1.57.0 — MIT
+- pathe 2.0.3 — MIT
+- picomatch 4.0.4 — MIT
 - pin-project-lite 0.2.17 — Apache-2.0 OR MIT
 - proc-macro2 1.0.106 — Apache-2.0 OR MIT
+- pure-rand 8.3.0 — MIT
+- quansync 1.0.0 — MIT
 - quote 1.0.45 — Apache-2.0 OR MIT
 - regex 1.12.3 — Apache-2.0 OR MIT
 - regex-automata 0.4.14 — Apache-2.0 OR MIT
 - regex-syntax 0.8.10 — Apache-2.0 OR MIT
+- resolve-pkg-maps 1.0.0 — MIT
+- rolldown 1.0.0-rc.12 — MIT
+- rolldown-plugin-dts 0.23.1 — MIT
 - rustc-hash 2.1.1 — Apache-2.0 OR MIT
+- safer-buffer 2.1.2 — MIT
 - semver 1.0.27 — Apache-2.0 OR MIT
+- semver 7.7.4 — ISC
 - serde 1.0.228 — Apache-2.0 OR MIT
 - serde_core 1.0.228 — Apache-2.0 OR MIT
 - serde_derive 1.0.228 — Apache-2.0 OR MIT
 - serde_json 1.0.149 — Apache-2.0 OR MIT
+- signal-exit 4.1.0 — ISC
 - slab 0.4.12 — MIT
 - syn 2.0.117 — Apache-2.0 OR MIT
+- tinyexec 1.0.4 — MIT
+- tinyglobby 0.2.15 — MIT
+- tinypool 2.1.0 — MIT
+- tree-kill 1.2.2 — MIT
+- tsdown 0.21.6 — MIT
+- tslib 2.8.1 — 0BSD
+- typanion 3.14.0 — MIT
+- typescript 6.0.2 — Apache-2.0
+- unconfig-core 7.5.0 — MIT
+- undici-types 7.18.2 — MIT
 - unicode-ident 1.0.24 — (MIT OR Apache-2.0) AND Unicode-3.0
 - unicode-segmentation 1.12.0 — Apache-2.0 OR MIT
+- universal-user-agent 7.0.3 — ISC
+- unrun 0.2.34 — MIT
 - windows-link 0.2.1 — Apache-2.0 OR MIT
 - zmij 1.0.21 — MIT
