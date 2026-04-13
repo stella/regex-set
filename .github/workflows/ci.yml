@@ -144,7 +144,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: stella/.github/actions/provenance-check@7fe890082be778c2f601d2fcada0353ae4a288a3
+      - uses: stella/.github/actions/provenance-check@94e70352f5ab42a465f7b03d9ab1bae07b53e4b9
         with:
           provenance-ref: eba1d86
 
