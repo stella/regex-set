@@ -154,7 +154,7 @@ jobs:
       - run: bun install --frozen-lockfile
       - uses: stella/.github/actions/provenance-check@94e70352f5ab42a465f7b03d9ab1bae07b53e4b9
         with:
-          provenance-ref: 8483cc82fcae7385d1d450cabc54cabe9ed5acf2
+          provenance-ref: 6f09a7a32729220a104fc13a5fd03cb7e6538997
 
   # ── Build (push to main + tags only) ──────────
   build:
