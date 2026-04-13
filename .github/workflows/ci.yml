@@ -138,7 +138,9 @@ jobs:
     if: >-
       always()
       && needs.check-changes.outputs.provenance-changed == 'true'
-    needs: [check-changes]
+      && (github.event_name != 'pull_request'
+          || needs.trust-check.outputs.trusted == 'true')
+    needs: [check-changes, trust-check]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
