@@ -33,6 +33,7 @@ jobs:
       pull-requests: read
     outputs:
       rust-changed: ${{ steps.filter.outputs.rust }}
+      provenance-changed: ${{ steps.filter.outputs.provenance }}
     steps:
       - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v4
@@ -44,6 +45,19 @@ jobs:
               - 'build.rs'
               - 'Cargo.toml'
               - 'Cargo.lock'
+              - '.github/workflows/ci.yml'
+            provenance:
+              - 'bun.lock'
+              - 'Cargo.lock'
+              - '**/package.json'
+              - 'Cargo.toml'
+              - 'src/**'
+              - 'wasm/**'
+              - '*.js'
+              - '*.cjs'
+              - '*.mjs'
+              - '.provenance.yml'
+              - 'provenance/**'
               - '.github/workflows/ci.yml'
 
   # ── Trust gate (PRs only) ─────────────────────
@@ -122,6 +136,25 @@ jobs:
         run: cargo doc --no-deps
         env:
           RUSTDOCFLAGS: -Dwarnings
+
+  # ── Provenance (PRs + push) ───────────────────
+  provenance:
+    name: Provenance
+    if: >-
+      always()
+      && (startsWith(github.ref, 'refs/tags/v')
+          || needs.check-changes.outputs.provenance-changed == 'true')
+      && (github.event_name != 'pull_request'
+          || needs.trust-check.outputs.trusted == 'true')
+    needs: [check-changes, trust-check]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - uses: stella/.github/actions/provenance-check@94e70352f5ab42a465f7b03d9ab1bae07b53e4b9
+        with:
+          provenance-ref: 77fe6be71a1da6fe179226076e96f89f80210f52
 
   # ── Build (push to main + tags only) ──────────
   build:
@@ -233,7 +266,7 @@ jobs:
       && startsWith(github.ref, 'refs/tags/v')
       && !contains(needs.*.result, 'failure')
       && !contains(needs.*.result, 'cancelled')
-    needs: [test, lint, rust-checks]
+    needs: [test, lint, rust-checks, provenance]
     runs-on: ubuntu-latest
     permissions:
       contents: write
