@@ -152,9 +152,9 @@ jobs:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
-      - uses: stella/.github/actions/provenance-check@94e70352f5ab42a465f7b03d9ab1bae07b53e4b9
+      - uses: stella/.github/actions/provenance-check@0107276320ff349dda9bcd9e111680cca1951fce
         with:
-          provenance-ref: 77fe6be71a1da6fe179226076e96f89f80210f52
+          provenance-version: v0.1.0
 
   # ── Build (push to main + tags only) ──────────
   build:
@@ -250,11 +250,11 @@ jobs:
         run: |
           ls -R artifacts/
           for dir in artifacts/bindings-*; do
-            cp "$dir"/*.node . 2>/dev/null || true
-            cp "$dir"/*.wasm . 2>/dev/null || true
+            cp -- "$dir"/*.node . 2>/dev/null || true
+            cp -- "$dir"/*.wasm . 2>/dev/null || true
           done
-          ls -la *.node 2>/dev/null || echo "No .node files"
-          ls -la *.wasm 2>/dev/null || echo "No .wasm files"
+          ls -la -- *.node 2>/dev/null || echo "No .node files"
+          ls -la -- *.wasm 2>/dev/null || echo "No .wasm files"
 
       - run: bun test
 
@@ -270,6 +270,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      attestations: write
       id-token: write
     steps:
       - uses: actions/checkout@v6
@@ -292,15 +293,59 @@ jobs:
       - name: Build JS/TS entrypoints
         run: bun run build:js
 
+      - name: Pack release tarballs
+        id: pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-artifacts
+
+          root_json="$(npm pack --json --ignore-scripts --pack-destination release-artifacts)"
+          root_file="$(echo "$root_json" | jq -r '.[0].filename')"
+          root_tarball="release-artifacts/$root_file"
+
+          while IFS= read -r pkg; do
+            (
+              cd "$pkg"
+              npm pack --json --ignore-scripts --pack-destination "$GITHUB_WORKSPACE/release-artifacts" >/dev/null
+            )
+          done < <(find npm -mindepth 1 -maxdepth 1 -type d | sort)
+
+          (
+            cd wasm
+            npm pack --json --ignore-scripts --pack-destination "$GITHUB_WORKSPACE/release-artifacts" >/dev/null
+          )
+
+          mapfile -t aux_tarballs < <(find release-artifacts -maxdepth 1 -name '*.tgz' ! -name "$root_file" | sort)
+
+          echo "root_tarball=$root_tarball" >> "$GITHUB_OUTPUT"
+          {
+            echo 'aux_tarballs<<EOF'
+            printf '%s\n' "${aux_tarballs[@]}"
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
+          ls -la release-artifacts
+
+      - name: Attest root package tarball with SBOM
+        uses: actions/attest@281a49d4cbb0a72c9575a50d18f6deb515a11deb
+        with:
+          subject-path: ${{ steps.pack.outputs.root_tarball }}
+          sbom-path: provenance/sbom.cdx.json
+
+      - name: Attest auxiliary package tarballs
+        if: steps.pack.outputs.aux_tarballs != ''
+        uses: actions/attest@281a49d4cbb0a72c9575a50d18f6deb515a11deb
+        with:
+          subject-path: ${{ steps.pack.outputs.aux_tarballs }}
+
       - name: Publish to npm
         run: |
-          npm publish --access restricted
-          for pkg in npm/*/; do
-            cd "$pkg"
-            npm publish --access restricted
-            cd ../..
-          done
-          cd wasm
-          npm publish --access restricted
+          while IFS= read -r tarball; do
+            [[ -n "$tarball" ]] || continue
+            npm publish "$tarball" --access restricted
+          done <<< "${{ steps.pack.outputs.aux_tarballs }}"
+
+          npm publish "${{ steps.pack.outputs.root_tarball }}" --access restricted
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
