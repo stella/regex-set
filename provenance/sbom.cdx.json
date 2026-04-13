@@ -1748,34 +1748,16 @@
         ],
         "occurrences": [
           {
-            "location": "npm/wasm32-wasi/regex-set.wasi-browser.js#6"
-          },
-          {
             "location": "regex-set.wasi-browser.js#6"
           },
           {
-            "location": "npm/wasm32-wasi/regex-set.wasi.cjs#15"
-          },
-          {
             "location": "regex-set.wasi.cjs#15"
-          },
-          {
-            "location": "npm/wasm32-wasi/wasi-worker-browser.mjs#1"
-          },
-          {
-            "location": "npm/wasm32-wasi/wasi-worker.mjs#9"
           },
           {
             "location": "wasi-worker-browser.mjs#1"
           },
           {
             "location": "wasi-worker.mjs#9"
-          },
-          {
-            "location": "wasm/dist/wasi-worker-browser.mjs#1"
-          },
-          {
-            "location": "wasm/dist/wasm.mjs#1"
           }
         ]
       },
@@ -1813,65 +1795,6 @@
       "scope": "required",
       "type": "library",
       "version": "1.1.1"
-    },
-    {
-      "bom-ref": "pkg:npm/@stll/regex-set-darwin-arm64@0.1.1",
-      "description": "Multi-pattern regex for Node.js/Bun. 2-9x faster than JS RegExp, backtracking-immune, Unicode word boundaries. Rust DFA engine via NAPI-RS.",
-      "evidence": {
-        "identity": [
-          {
-            "concludedValue": "node_modules/@stll/regex-set-darwin-arm64/package.json",
-            "confidence": 0.7,
-            "field": "purl",
-            "methods": [
-              {
-                "confidence": 0.7,
-                "technique": "manifest-analysis",
-                "value": "node_modules/@stll/regex-set-darwin-arm64/package.json"
-              }
-            ]
-          }
-        ],
-        "occurrences": [
-          {
-            "location": "index.js#55"
-          }
-        ]
-      },
-      "externalReferences": [
-        {
-          "type": "vcs",
-          "url": "https://github.com/stella/regex-set#readme"
-        },
-        {
-          "type": "vcs",
-          "url": "https://github.com/stella/regex-set"
-        }
-      ],
-      "group": "@stll",
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
-          }
-        }
-      ],
-      "name": "regex-set-darwin-arm64",
-      "properties": [
-        {
-          "name": "SrcFile",
-          "value": "node_modules/@stll/regex-set-darwin-arm64/package.json"
-        },
-        {
-          "name": "ImportedModules",
-          "value": "@stll/regex-set-darwin-arm64"
-        }
-      ],
-      "purl": "pkg:npm/%40stll/regex-set-darwin-arm64@0.1.1",
-      "scope": "required",
-      "type": "library",
-      "version": "0.1.1"
     }
   ],
   "compositions": [
@@ -2253,11 +2176,11 @@
       },
       {
         "name": "cdx:bom:componentNamespaces",
-        "value": "@napi-rs\\n@stll"
+        "value": "@napi-rs"
       },
       {
         "name": "cdx:bom:componentSrcFiles",
-        "value": "Cargo.lock\\nnode_modules/@napi-rs/wasm-runtime/package.json\\nnode_modules/@stll/regex-set-darwin-arm64/package.json"
+        "value": "Cargo.lock\\nnode_modules/@napi-rs/wasm-runtime/package.json"
       }
     ],
     "tools": {
