@@ -300,20 +300,20 @@ jobs:
           set -euo pipefail
           mkdir -p release-artifacts
 
-          root_json="$(npm pack --json --pack-destination release-artifacts)"
+          root_json="$(npm pack --json --ignore-scripts --pack-destination release-artifacts)"
           root_file="$(echo "$root_json" | jq -r '.[0].filename')"
           root_tarball="release-artifacts/$root_file"
 
           while IFS= read -r pkg; do
             (
               cd "$pkg"
-              npm pack --json --pack-destination "$GITHUB_WORKSPACE/release-artifacts" >/dev/null
+              npm pack --json --ignore-scripts --pack-destination "$GITHUB_WORKSPACE/release-artifacts" >/dev/null
             )
           done < <(find npm -mindepth 1 -maxdepth 1 -type d | sort)
 
           (
             cd wasm
-            npm pack --json --pack-destination "$GITHUB_WORKSPACE/release-artifacts" >/dev/null
+            npm pack --json --ignore-scripts --pack-destination "$GITHUB_WORKSPACE/release-artifacts" >/dev/null
           )
 
           mapfile -t aux_tarballs < <(find release-artifacts -maxdepth 1 -name '*.tgz' ! -name "$root_file" | sort)
