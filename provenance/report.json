@@ -9,9 +9,9 @@
         "javascript",
         "rust"
       ],
-      "sbom": "projects/root/sbom.cdx.json",
-      "notice": "projects/root/THIRD-PARTY-NOTICES.txt",
-      "dependencies_with_licenses": 47
+      "sbom": "sbom.cdx.json",
+      "notice": "THIRD-PARTY-NOTICES.txt",
+      "dependencies_with_licenses": 48
     }
   ],
   "containers": []

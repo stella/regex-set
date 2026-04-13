@@ -1,5 +1,8 @@
 version: 1
 output_dir: provenance
+notice:
+  internal_scopes:
+    - "@stll"
 projects:
   - id: root
     path: .

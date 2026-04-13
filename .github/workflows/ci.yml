@@ -33,6 +33,7 @@ jobs:
       pull-requests: read
     outputs:
       rust-changed: ${{ steps.filter.outputs.rust }}
+      provenance-changed: ${{ steps.filter.outputs.provenance }}
     steps:
       - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v4
@@ -44,6 +45,14 @@ jobs:
               - 'build.rs'
               - 'Cargo.toml'
               - 'Cargo.lock'
+              - '.github/workflows/ci.yml'
+            provenance:
+              - 'bun.lock'
+              - 'Cargo.lock'
+              - '**/package.json'
+              - 'Cargo.toml'
+              - '.provenance.yml'
+              - 'provenance/**'
               - '.github/workflows/ci.yml'
 
   # ── Trust gate (PRs only) ─────────────────────
@@ -122,6 +131,20 @@ jobs:
         run: cargo doc --no-deps
         env:
           RUSTDOCFLAGS: -Dwarnings
+
+  # ── Provenance (PRs + push) ───────────────────
+  provenance:
+    name: Provenance
+    if: >-
+      always()
+      && needs.check-changes.outputs.provenance-changed == 'true'
+    needs: [check-changes]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: stella/.github/actions/provenance-check@codex/provenance-action
+        with:
+          provenance-ref: eba1d86
 
   # ── Build (push to main + tags only) ──────────
   build:
