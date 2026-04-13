@@ -142,7 +142,8 @@ jobs:
     name: Provenance
     if: >-
       always()
-      && needs.check-changes.outputs.provenance-changed == 'true'
+      && (startsWith(github.ref, 'refs/tags/v')
+          || needs.check-changes.outputs.provenance-changed == 'true')
       && (github.event_name != 'pull_request'
           || needs.trust-check.outputs.trusted == 'true')
     needs: [check-changes, trust-check]
