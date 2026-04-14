@@ -221,18 +221,11 @@ The benchmark harness covers:
 - the verifier + `fancy-regex` fallback path
 
 Benchmark notes:
-- the JS multi-pattern baseline applies the same
+- multi-pattern JS baselines apply the same
   non-overlapping selection policy as
   `RegexSet.findIter()`
-- the `mariomka` benchmark uses explicit ASCII
-  classes so JS and Rust are compared on the same
-  pattern semantics
-- single-literal and some simple single-pattern
-  regex searches are not the target use case;
-  V8 can be faster there, and
-  [@stll/aho-corasick](https://github.com/stella/aho-corasick)
-  is the better fit for literal-only workloads in
-  the Stella stack
+- the `mariomka` patterns use explicit ASCII
+  classes for JS/Rust parity
 - we intentionally do not publish internal corpora
   or non-reproducible benchmark claims in this repo
 
