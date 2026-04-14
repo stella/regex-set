@@ -34,7 +34,7 @@
     "url": "https://github.com/stella/regex-set/issues"
   },
   "publishConfig": {
-    "access": "restricted"
+    "access": "public"
   },
   "browser": "regex-set.wasi-browser.js",
   "dependencies": {

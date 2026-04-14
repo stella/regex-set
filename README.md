@@ -15,20 +15,6 @@ Built on the same regex engine that powers
 
 ## Install
 
-The repository is public, but the npm package is
-still in private beta. Public npm publishing is
-planned for `v1.0.0`.
-
-Until then, build from source:
-
-```bash
-bun install
-bun run build
-bun run build:js
-```
-
-If you already have beta access, you can install:
-
 ```bash
 npm install @stll/regex-set
 # or
@@ -38,7 +24,10 @@ bun add @stll/regex-set
 For browsers, use the companion
 `@stll/regex-set-wasm` package.
 
-Private-beta builds currently ship prebuilts for:
+GitHub releases also publish npm tarballs, an SBOM,
+and third-party notices.
+
+Published builds ship prebuilts for:
 
 | Platform      | Architecture |
 | ------------- | ------------ |

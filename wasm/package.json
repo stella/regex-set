@@ -36,7 +36,7 @@
     }
   },
   "publishConfig": {
-    "access": "restricted"
+    "access": "public"
   },
   "dependencies": {
     "@napi-rs/wasm-runtime": "^1.1.1"

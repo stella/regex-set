@@ -154,7 +154,7 @@ jobs:
       - run: bun install --frozen-lockfile
       - uses: stella/.github/actions/provenance-check@0107276320ff349dda9bcd9e111680cca1951fce
         with:
-          provenance-version: v0.1.0
+          provenance-version: v0.1.1
 
   # ── Build (push to main + tags only) ──────────
   build:
@@ -327,6 +327,12 @@ jobs:
 
           ls -la release-artifacts
 
+      - name: Generate release checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum release-artifacts/*.tgz > release-artifacts/SHA256SUMS
+
       - name: Attest root package tarball with SBOM
         uses: actions/attest@281a49d4cbb0a72c9575a50d18f6deb515a11deb
         with:
@@ -343,9 +349,32 @@ jobs:
         run: |
           while IFS= read -r tarball; do
             [[ -n "$tarball" ]] || continue
-            npm publish "$tarball" --access restricted
+            npm publish "$tarball" --access public
           done <<< "${{ steps.pack.outputs.aux_tarballs }}"
 
-          npm publish "${{ steps.pack.outputs.root_tarball }}" --access restricted
+          npm publish "${{ steps.pack.outputs.root_tarball }}" --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          assets=(
+            release-artifacts/*.tgz
+            release-artifacts/SHA256SUMS
+            provenance/sbom.cdx.json
+            provenance/THIRD-PARTY-NOTICES.txt
+            provenance/report.json
+          )
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "${assets[@]}" --clobber
+          else
+            gh release create "$tag" "${assets[@]}" \
+              --verify-tag \
+              --generate-notes \
+              --title "$tag"
+          fi
