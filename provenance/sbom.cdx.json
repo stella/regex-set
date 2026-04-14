@@ -333,54 +333,6 @@
       "version": "0.0.7"
     },
     {
-      "bom-ref": "pkg:cargo/ctor@0.6.3",
-      "evidence": {
-        "identity": [
-          {
-            "concludedValue": "Cargo.lock",
-            "confidence": 0.6,
-            "field": "purl",
-            "methods": [
-              {
-                "confidence": 0.6,
-                "technique": "manifest-analysis",
-                "value": "Cargo.lock"
-              }
-            ]
-          }
-        ]
-      },
-      "group": "",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "424e0138278faeb2b401f174ad17e715c829512d74f3d1e81eb43365c2e0590e"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "Apache-2.0"
-          }
-        },
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "name": "ctor",
-      "properties": [
-        {
-          "name": "SrcFile",
-          "value": "Cargo.lock"
-        }
-      ],
-      "purl": "pkg:cargo/ctor@0.6.3",
-      "type": "library",
-      "version": "0.6.3"
-    },
-    {
       "bom-ref": "pkg:cargo/ctor@0.8.0",
       "evidence": {
         "identity": [
@@ -475,54 +427,6 @@
       "purl": "pkg:cargo/dtor-proc-macro@0.0.6",
       "type": "library",
       "version": "0.0.6"
-    },
-    {
-      "bom-ref": "pkg:cargo/dtor@0.1.1",
-      "evidence": {
-        "identity": [
-          {
-            "concludedValue": "Cargo.lock",
-            "confidence": 0.6,
-            "field": "purl",
-            "methods": [
-              {
-                "confidence": 0.6,
-                "technique": "manifest-analysis",
-                "value": "Cargo.lock"
-              }
-            ]
-          }
-        ]
-      },
-      "group": "",
-      "hashes": [
-        {
-          "alg": "SHA-256",
-          "content": "404d02eeb088a82cfd873006cb713fe411306c7d182c344905e101fb1167d301"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "Apache-2.0"
-          }
-        },
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "name": "dtor",
-      "properties": [
-        {
-          "name": "SrcFile",
-          "value": "Cargo.lock"
-        }
-      ],
-      "purl": "pkg:cargo/dtor@0.1.1",
-      "type": "library",
-      "version": "0.1.1"
     },
     {
       "bom-ref": "pkg:cargo/dtor@0.3.0",
@@ -1273,7 +1177,7 @@
       "version": "5.0.2"
     },
     {
-      "bom-ref": "pkg:cargo/napi-derive@3.5.2",
+      "bom-ref": "pkg:cargo/napi-derive@3.5.3",
       "evidence": {
         "identity": [
           {
@@ -1294,7 +1198,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "2c914b5e420182bfb73504e0607592cdb8e2e21437d450883077669fb72a114d"
+          "content": "60867ff9a6f76e82350e0c3420cb0736f5866091b61d7d8a024baa54b0ec17dd"
         }
       ],
       "licenses": [
@@ -1311,9 +1215,9 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/napi-derive@3.5.2",
+      "purl": "pkg:cargo/napi-derive@3.5.3",
       "type": "library",
-      "version": "3.5.2"
+      "version": "3.5.3"
     },
     {
       "bom-ref": "pkg:cargo/napi-sys@3.2.1",
@@ -2567,13 +2471,13 @@
     {
       "dependsOn": [
         "pkg:cargo/convert_case@0.11.0",
-        "pkg:cargo/ctor@0.6.3",
+        "pkg:cargo/ctor@0.8.0",
         "pkg:cargo/napi-derive-backend@5.0.2",
         "pkg:cargo/proc-macro2@1.0.106",
         "pkg:cargo/quote@1.0.45",
         "pkg:cargo/syn@2.0.117"
       ],
-      "ref": "pkg:cargo/napi-derive@3.5.2"
+      "ref": "pkg:cargo/napi-derive@3.5.3"
     },
     {
       "dependsOn": [
@@ -2678,7 +2582,7 @@
       "dependsOn": [
         "pkg:cargo/fancy-regex@0.17.0",
         "pkg:cargo/napi-build@2.3.1",
-        "pkg:cargo/napi-derive@3.5.2",
+        "pkg:cargo/napi-derive@3.5.3",
         "pkg:cargo/napi@3.8.4",
         "pkg:cargo/regex-automata@0.4.14",
         "pkg:cargo/regex-syntax@0.8.10",
