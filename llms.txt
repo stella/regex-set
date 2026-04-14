@@ -4,9 +4,12 @@
 > multi-pattern regex matching in Node.js and Bun.
 > Single pass, O(m*n) guaranteed, no backtracking.
 
-Install from npm:
+Status: public release preparation in progress.
+Until the first npm release lands, build from source:
 
-  npm install @stll/regex-set
+  bun install
+  bun run build
+  bun run build:js
 
 ## Quick start
 

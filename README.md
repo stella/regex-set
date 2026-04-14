@@ -15,19 +15,25 @@ Built on the same regex engine that powers
 
 ## Install
 
+The first public npm release is prepared, but not
+published yet.
+
+Until then, build from source:
+
 ```bash
-npm install @stll/regex-set
-# or
-bun add @stll/regex-set
+bun install
+bun run build
+bun run build:js
 ```
 
-For browsers, use the companion
-`@stll/regex-set-wasm` package.
+The public release will also include the companion
+`@stll/regex-set-wasm` package for browser builds.
 
-GitHub releases also publish npm tarballs, an SBOM,
-and third-party notices.
+Once public releases start, GitHub releases will
+also publish npm tarballs, an SBOM, and third-party
+notices.
 
-Published builds ship prebuilts for:
+The public release will ship prebuilts for:
 
 | Platform      | Architecture |
 | ------------- | ------------ |
@@ -134,9 +140,8 @@ new RegexSet(["\\bčáp\\b"], {
 
 Implementation: edge `\b` is stripped from patterns
 and verified inline per match (two char lookups).
-The DFA never sees `\b`, so there is zero overhead
-regardless of mode. Unicode mode is actually
-slightly faster because the DFA is simpler.
+The DFA never sees `\b`, so boundary verification
+stays O(1) per match in either mode.
 
 ### Lookaround
 
@@ -152,71 +157,69 @@ const rs = new RegexSet([
 Internally, lookaround is stripped from patterns,
 the cores are compiled into a single fast DFA, and
 assertions are verified as inline char checks on
-each match (~1ns per check). No backtracking engine
-involved for simple assertions.
+each match. No backtracking engine is involved for
+simple assertions.
 
 When a greedy quantifier (e.g., `\s*`) causes the DFA
 to overshoot past a valid match boundary and the
 lookahead rejects the longer match, the engine falls
 back to `fancy-regex` for that specific match to
 backtrack the quantifier and find the shorter valid
-match. This fallback is ~5-6x slower per affected
-match but ensures correctness; patterns without
+match. This fallback is slower on affected matches
+but preserves correctness; patterns without
 lookaround are unaffected.
 
 ## Benchmarks
 
-Measured on Apple M3, 24 GB RAM, macOS 25.3.0.
-Automaton pre-built; times are search-only averaged
-over multiple runs.
+Benchmarks below were produced from the checked-in
+scripts in `__bench__/`
+after:
+
+`bun install && bun run build && bun run bench:download && bun run bench`
+
+Current local run:
+- hardware: Apple M3, 24 GB RAM
+- OS: macOS 25.3.0
+- runtime: Bun 1.3.10
+
+Treat these as example results, not promises. Rerun
+the scripts on your own hardware before relying on
+specific absolute timings.
+
+Only scenarios with identical match counts between
+`@stll/regex-set` and JS `RegExp` are included.
 
 Corpora:
 [mariomka/regex-benchmark](https://github.com/mariomka/regex-benchmark),
 [rust-leipzig/regex-performance](https://github.com/rust-leipzig/regex-performance),
 [Canterbury Large Corpus](https://corpus.canterbury.ac.nz/).
 
-Run locally:
-`bun run bench:download && bun run bench`
-
-### Large documents (academic corpora)
+### Independently reproducible scenarios
 
 | Scenario                     | @stll/regex-set | JS RegExp | Speedup |
 | ---------------------------- | --------------- | --------- | ------- |
-| mariomka 6.2 MB (3 patterns) | **20 ms**       | 112 ms    | 5.5x    |
-| Bible 4 MB (5 multi-pattern) | **17 ms**       | 122 ms    | 7.0x    |
-| Bible 4 MB (3 + lookaround)  | **47 ms**       | 82 ms     | 1.8x    |
-| Twain 16 MB (word boundary)  | **17 ms**       | 72 ms     | 4.1x    |
-| Twain 16 MB (alternation)    | **12 ms**       | 44 ms     | 3.7x    |
-| Twain 16 MB (suffix match)   | **24 ms**       | 142 ms    | 5.8x    |
+| Twain 16 MB char class       | **20.64 ms**    | 30.31 ms  | 1.5x    |
+| Twain 16 MB word boundary    | **58.30 ms**    | 115.01 ms | 2.0x    |
+| Twain 16 MB alternation      | **14.30 ms**    | 42.27 ms  | 3.0x    |
+| Twain 16 MB suffix match     | **27.59 ms**    | 134.16 ms | 4.9x    |
+| Bible 4 MB, 5 patterns       | **16.88 ms**    | 80.14 ms  | 4.7x    |
+| Bible 4 MB, 3 + lookaround   | **35.39 ms**    | 105.94 ms | 3.0x    |
 
-### Production PII patterns (13 patterns + lookaround)
-
-| Size   | @stll/regex-set | JS RegExp | Speedup |
-| ------ | --------------- | --------- | ------- |
-| 8 KB   | **0.09 ms**     | 0.12 ms   | 1.3x    |
-| 16 KB  | **0.15 ms**     | 0.23 ms   | 1.5x    |
-| 32 KB  | **0.28 ms**     | 0.44 ms   | 1.6x    |
-| 64 KB  | **0.63 ms**     | 0.98 ms   | 1.6x    |
-| 128 KB | **1.17 ms**     | 1.79 ms   | 1.5x    |
-| 256 KB | **2.30 ms**     | 3.47 ms   | 1.5x    |
-
-### Real Czech contracts (20 anonymization patterns)
-
-| Size   | @stll/regex-set | JS RegExp | Speedup |
-| ------ | --------------- | --------- | ------- |
-| 0.6 KB | **5 μs**        | 9 μs      | 1.8x    |
-| 16 KB  | **80 μs**       | 265 μs    | 3.3x    |
-| 27 KB  | **152 μs**      | 448 μs    | 2.9x    |
-| 63 KB  | **467 μs**      | 1016 μs   | 2.2x    |
+Not included:
+- the `mariomka` email/URI/IPv4 row, because the
+  current benchmark script reports a match-count
+  mismatch (`5395` vs `5398`)
+- unpublished internal corpora
+- single-literal search, where V8 is faster and
+  `@stll/aho-corasick` is the better fit
 
 ### Backtracking resistance
 
 | Pattern   | Input                       | @stll/regex-set | JS RegExp |
 | --------- | --------------------------- | --------------- | --------- |
-| `(a+)+b`  | `"a" × 30 + "X"`            | **0.12 ms**     | hangs     |
-| `.*.*=.*` | `"x" × 30 + "=" + "y" × 30` | **0.25 ms**     | hangs     |
+| `(a+)+b`  | `"a" × 30 + "X"`            | **0.07 ms**     | may hang  |
+| `.*.*=.*` | `"x" × 30 + "=" + "y" × 30` | **0.02 ms**     | may hang  |
 
-All match counts verified against JS RegExp.
 For pure literal patterns, use
 [@stll/aho-corasick](https://github.com/stella/aho-corasick)
 instead (V8 has a SIMD fast path for literals that
@@ -336,15 +339,16 @@ bun run test:props
 bun run bench:download
 
 # Run benchmark suites
-bun run bench:all
+bun run bench
+bun run bench:fallback
 
 # Lint & format
 bun run lint
 bun run format
 
 # Rust quality gates
-cargo clippy --all-targets -- -Dwarnings
-cargo fmt -- --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo fmt --all -- --check
 ```
 
 ## License

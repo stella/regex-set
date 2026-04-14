@@ -331,7 +331,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sha256sum release-artifacts/*.tgz > release-artifacts/SHA256SUMS
+          (
+            cd release-artifacts
+            sha256sum *.tgz > SHA256SUMS
+          )
 
       - name: Attest root package tarball with SBOM
         uses: actions/attest@281a49d4cbb0a72c9575a50d18f6deb515a11deb
@@ -350,11 +353,13 @@ jobs:
           while IFS= read -r tarball; do
             [[ -n "$tarball" ]] || continue
             npm publish "$tarball" --access public
-          done <<< "${{ steps.pack.outputs.aux_tarballs }}"
+          done <<< "$AUX_TARBALLS"
 
-          npm publish "${{ steps.pack.outputs.root_tarball }}" --access public
+          npm publish "$ROOT_TARBALL" --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          AUX_TARBALLS: ${{ steps.pack.outputs.aux_tarballs }}
+          ROOT_TARBALL: ${{ steps.pack.outputs.root_tarball }}
 
       - name: Create or update GitHub release
         env:

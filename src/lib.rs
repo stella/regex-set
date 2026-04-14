@@ -1,5 +1,6 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
+use regex_automata::Anchored;
 use regex_automata::meta::Regex as MetaRegex;
 use regex_automata::Input;
 use std::panic;
@@ -1429,7 +1430,8 @@ impl RegexSet {
       if idx == skip {
         continue;
       }
-      let input = Input::new(haystack).range(at..);
+      let input =
+        Input::new(haystack).range(at..).anchored(Anchored::Yes);
       if let Some(m) = pi.individual.find(input) {
         if m.start() == at
           && check_match(
