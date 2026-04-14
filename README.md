@@ -24,6 +24,10 @@ bun add @stll/regex-set
 The companion `@stll/regex-set-wasm` package is
 available for browser builds.
 
+You do not need Vite to use `@stll/regex-set` in
+Node.js or Bun. Vite is only relevant for the
+browser/WASM companion package.
+
 GitHub releases include npm tarballs, an SBOM, and
 third-party notices.
 
@@ -213,15 +217,6 @@ The benchmark harness covers:
 - lookaround-heavy scans
 - catastrophic backtracking resistance
 - the verifier + `fancy-regex` fallback path
-
-Benchmark notes:
-- multi-pattern JS baselines apply the same
-  non-overlapping selection policy as
-  `RegexSet.findIter()`
-- the `mariomka` patterns use explicit ASCII
-  classes for JS/Rust parity
-- we intentionally do not publish internal corpora
-  or non-reproducible benchmark claims in this repo
 
 <details>
 <summary>Alternatives tested</summary>
