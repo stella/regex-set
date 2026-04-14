@@ -235,9 +235,6 @@ Benchmark notes:
   the Stella stack
 - we intentionally do not publish internal corpora
   or non-reproducible benchmark claims in this repo
-- the table above includes both wins and losses
-  because the benchmark suite is intended to remain
-  independently reproducible
 
 <details>
 <summary>Alternatives tested</summary>
