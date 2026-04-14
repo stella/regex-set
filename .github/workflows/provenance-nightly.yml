@@ -5,9 +5,17 @@ on:
     - cron: "0 2 * * *"
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
 jobs:
   provenance-update:
+    permissions:
+      contents: write
+      pull-requests: write
     uses: stella/.github/.github/workflows/provenance-update.yml@b18b9a2d7133b1d1efa956222988d7513bbfc3b5
+    secrets: inherit
     with:
       install-command: bun install --frozen-lockfile
       provenance-version: v0.1.0
