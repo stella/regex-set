@@ -303,6 +303,23 @@ Full syntax:
   [@stll/aho-corasick](https://github.com/stella/aho-corasick)
   for literal string matching.
 
+### Using with Vite
+
+Vite's dependency pre-bundler rewrites
+`import.meta.url`, which breaks the relative
+`.wasm` path emitted by the napi-rs loader. Import
+the bundled plugin so the package is excluded from
+pre-bundling:
+
+```ts
+// vite.config.ts
+import stllWasm from "@stll/regex-set-wasm/vite";
+
+export default {
+  plugins: [stllWasm()],
+};
+```
+
 ## Acknowledgements
 
 - [**regex**](https://github.com/rust-lang/regex)
