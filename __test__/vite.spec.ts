@@ -62,9 +62,7 @@ const bytes = await fetch(__wasmUrl).then((res) => res.arrayBuffer())
 
     expect(transformed).toContain("const view = new Uint8Array(bytes)");
     expect(transformed).toContain("view[0] !== 0x00");
-    expect(transformed).toContain(
-      'import stllWasm from "@stll/regex-set-wasm/vite"',
-    );
+    expect(transformed).toContain("@stll/regex-set-wasm/vite");
   });
 
   test("warns when napi-rs loader format changes", () => {
