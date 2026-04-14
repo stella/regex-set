@@ -6,14 +6,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -42,7 +42,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/aho-corasick@1.1.4",
@@ -54,14 +54,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -90,7 +90,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/bit-set@0.8.0",
@@ -102,14 +102,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -138,7 +138,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/bit-vec@0.8.0",
@@ -150,14 +150,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -186,7 +186,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/bitflags@2.11.0",
@@ -198,14 +198,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -234,7 +234,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/cfg-if@1.0.4",
@@ -246,14 +246,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -277,7 +277,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/convert_case@0.11.0",
@@ -289,14 +289,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -325,7 +325,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/ctor-proc-macro@0.0.7",
@@ -337,14 +337,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -373,7 +373,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/ctor@0.8.0",
@@ -385,14 +385,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -421,7 +421,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/dtor-proc-macro@0.0.6",
@@ -433,14 +433,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -469,7 +469,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/dtor@0.3.0",
@@ -481,14 +481,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -512,7 +512,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/fancy-regex@0.17.0",
@@ -524,14 +524,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -560,7 +560,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/futures-channel@0.3.32",
@@ -572,14 +572,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -608,7 +608,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/futures-core@0.3.32",
@@ -620,14 +620,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -656,7 +656,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/futures-executor@0.3.32",
@@ -668,14 +668,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -704,7 +704,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/futures-io@0.3.32",
@@ -716,14 +716,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -752,7 +752,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/futures-macro@0.3.32",
@@ -764,14 +764,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -800,7 +800,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/futures-sink@0.3.32",
@@ -812,14 +812,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -848,7 +848,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/futures-task@0.3.32",
@@ -860,14 +860,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -896,7 +896,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/futures-util@0.3.32",
@@ -908,14 +908,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -944,7 +944,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/futures@0.3.32",
@@ -956,14 +956,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -992,7 +992,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/itoa@1.0.17",
@@ -1004,14 +1004,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -1035,7 +1035,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/libloading@0.9.0",
@@ -1047,14 +1047,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -1083,7 +1083,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/memchr@2.8.0",
@@ -1095,14 +1095,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -1126,7 +1126,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/napi-build@2.3.1",
@@ -1138,14 +1138,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -1169,7 +1169,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/napi-derive-backend@5.0.2",
@@ -1181,14 +1181,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -1212,7 +1212,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/napi-derive@3.5.3",
@@ -1224,14 +1224,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -1255,7 +1255,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/napi-sys@3.2.1",
@@ -1267,14 +1267,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -1298,7 +1298,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/napi@3.8.4",
@@ -1310,14 +1310,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -1346,7 +1346,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/nohash-hasher@0.2.0",
@@ -1358,14 +1358,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -1394,7 +1394,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/pin-project-lite@0.2.17",
@@ -1406,14 +1406,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -1442,7 +1442,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/proc-macro2@1.0.106",
@@ -1454,14 +1454,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -1490,7 +1490,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/quote@1.0.45",
@@ -1502,14 +1502,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -1538,7 +1538,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/regex-automata@0.4.14",
@@ -1550,14 +1550,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -1586,7 +1586,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/regex-syntax@0.8.10",
@@ -1598,14 +1598,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -1634,7 +1634,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/regex@1.12.3",
@@ -1646,14 +1646,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -1682,7 +1682,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/rustc-hash@2.1.1",
@@ -1694,14 +1694,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -1730,7 +1730,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/semver@1.0.27",
@@ -1742,14 +1742,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -1778,7 +1778,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/serde@1.0.228",
@@ -1790,14 +1790,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -1826,7 +1826,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/serde_core@1.0.228",
@@ -1838,14 +1838,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -1874,7 +1874,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/serde_derive@1.0.228",
@@ -1886,14 +1886,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -1922,7 +1922,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/serde_json@1.0.149",
@@ -1934,14 +1934,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -1965,7 +1965,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/slab@0.4.12",
@@ -1977,14 +1977,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -1995,7 +1995,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/stella-regex-set@0.1.1",
@@ -2007,14 +2007,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -2043,7 +2043,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/syn@2.0.117",
@@ -2055,14 +2055,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -2084,7 +2084,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/unicode-ident@1.0.24",
@@ -2096,14 +2096,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -2132,7 +2132,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/unicode-segmentation@1.13.2",
@@ -2144,14 +2144,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -2180,7 +2180,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/windows-link@0.2.1",
@@ -2192,14 +2192,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "Cargo.lock",
+            "concludedValue": "regex-set/Cargo.lock",
             "confidence": 0.6,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.6,
                 "technique": "manifest-analysis",
-                "value": "Cargo.lock"
+                "value": "regex-set/Cargo.lock"
               }
             ]
           }
@@ -2223,7 +2223,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "Cargo.lock"
+          "value": "regex-set/Cargo.lock"
         }
       ],
       "purl": "pkg:cargo/zmij@1.0.21",
@@ -2241,14 +2241,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "node_modules/@napi-rs/wasm-runtime/package.json",
+            "concludedValue": "regex-set/node_modules/@napi-rs/wasm-runtime/package.json",
             "confidence": 0.7,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.7,
                 "technique": "manifest-analysis",
-                "value": "node_modules/@napi-rs/wasm-runtime/package.json"
+                "value": "regex-set/node_modules/@napi-rs/wasm-runtime/package.json"
               }
             ]
           }
@@ -2265,6 +2265,12 @@
           },
           {
             "location": "wasi-worker.mjs#9"
+          },
+          {
+            "location": "wasm/dist/wasi-worker-browser.mjs#1"
+          },
+          {
+            "location": "wasm/dist/wasm.mjs#1"
           }
         ]
       },
@@ -2291,7 +2297,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "node_modules/@napi-rs/wasm-runtime/package.json"
+          "value": "regex-set/node_modules/@napi-rs/wasm-runtime/package.json"
         },
         {
           "name": "ImportedModules",
@@ -2314,14 +2320,14 @@
       "evidence": {
         "identity": [
           {
-            "concludedValue": "node_modules/vite/package.json",
+            "concludedValue": "regex-set/node_modules/vite/package.json",
             "confidence": 0.7,
             "field": "purl",
             "methods": [
               {
                 "confidence": 0.7,
                 "technique": "manifest-analysis",
-                "value": "node_modules/vite/package.json"
+                "value": "regex-set/node_modules/vite/package.json"
               }
             ]
           }
@@ -2355,7 +2361,7 @@
       "properties": [
         {
           "name": "SrcFile",
-          "value": "node_modules/vite/package.json"
+          "value": "regex-set/node_modules/vite/package.json"
         },
         {
           "name": "ImportedModules",
@@ -2713,7 +2719,7 @@
           "version": "0.1.1"
         }
       ],
-      "description": "Multi-pattern regex for Node.js/Bun. 2-9x faster than JS RegExp, backtracking-immune, Unicode word boundaries. Rust DFA engine via NAPI-RS.",
+      "description": "Single-pass multi-pattern regex for Node.js/Bun. Backtracking-immune, Unicode-aware Rust engine via NAPI-RS.",
       "externalReferences": [
         {
           "type": "vcs",
@@ -2741,20 +2747,6 @@
     "lifecycles": [
       {
         "phase": "pre-build"
-      }
-    ],
-    "properties": [
-      {
-        "name": "cdx:bom:componentTypes",
-        "value": "cargo\\nnpm"
-      },
-      {
-        "name": "cdx:bom:componentNamespaces",
-        "value": "@napi-rs"
-      },
-      {
-        "name": "cdx:bom:componentSrcFiles",
-        "value": "Cargo.lock\\nnode_modules/@napi-rs/wasm-runtime/package.json\\nnode_modules/vite/package.json"
       }
     ],
     "tools": {

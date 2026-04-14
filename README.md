@@ -15,25 +15,19 @@ Built on the same regex engine that powers
 
 ## Install
 
-The first public npm release is prepared, but not
-published yet.
-
-Until then, build from source:
-
 ```bash
-bun install
-bun run build
-bun run build:js
+npm install @stll/regex-set
+# or
+bun add @stll/regex-set
 ```
 
-The public release will also include the companion
-`@stll/regex-set-wasm` package for browser builds.
+The companion `@stll/regex-set-wasm` package is
+available for browser builds.
 
-Once public releases start, GitHub releases will
-also publish npm tarballs, an SBOM, and third-party
-notices.
+GitHub releases include npm tarballs, an SBOM, and
+third-party notices.
 
-The public release will ship prebuilts for:
+Prebuilts are available for:
 
 | Platform      | Architecture |
 | ------------- | ------------ |
