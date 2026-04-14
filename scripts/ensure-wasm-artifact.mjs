@@ -6,17 +6,33 @@ import { fileURLToPath } from "node:url";
 const wasmPath = fileURLToPath(
   new URL("../regex-set.wasm32-wasi.wasm", import.meta.url),
 );
+const napiPath = fileURLToPath(
+  new URL(
+    `../node_modules/.bin/${process.platform === "win32" ? "napi.cmd" : "napi"}`,
+    import.meta.url,
+  ),
+);
 
 try {
   await access(wasmPath, constants.F_OK);
-} catch {
-  const result = spawnSync("bun", ["run", "build:wasm"], {
-    stdio: "inherit",
-  });
+} catch (error) {
+  if (error?.code !== "ENOENT") {
+    throw error;
+  }
+
+  const result = spawnSync(
+    napiPath,
+    ["build", "--platform", "--target", "wasm32-wasip1-threads", "--release"],
+    {
+      stdio: "inherit",
+    },
+  );
 
   if (result.error) {
     throw result.error;
   }
 
-  process.exit(result.status ?? 1);
+  if ((result.status ?? 1) !== 0) {
+    process.exit(result.status ?? 1);
+  }
 }
