@@ -21,7 +21,7 @@ bun test            # run tests
 bun run test:props  # property tests
 bun run lint        # oxlint
 bun run format      # oxfmt + rustfmt
-cargo clippy --all-targets -- -Dwarnings
+cargo clippy --all-targets --all-features -- -Dwarnings
 cargo fmt -- --check
 ```
 
@@ -33,7 +33,7 @@ cargo fmt -- --check
   submitting.
 - Run `bun run lint && bun run format` before
   submitting.
-- Run `cargo clippy --all-targets -- -Dwarnings`
+- Run `cargo clippy --all-targets --all-features -- -Dwarnings`
   and `cargo fmt -- --check` before submitting.
 - Use [Conventional Commits](https://www.conventionalcommits.org/):
   `feat:`, `fix:`, `chore:`, `docs:`.
