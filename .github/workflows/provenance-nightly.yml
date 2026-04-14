@@ -1,0 +1,13 @@
+name: Provenance Nightly
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  provenance-update:
+    uses: stella/.github/.github/workflows/provenance-update.yml@b18b9a2d7133b1d1efa956222988d7513bbfc3b5
+    with:
+      install-command: bun install --frozen-lockfile
+      provenance-version: v0.1.0
