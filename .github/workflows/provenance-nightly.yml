@@ -14,8 +14,8 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    uses: stella/.github/.github/workflows/provenance-update.yml@27c264db9f53ff3128118c773879d71cf9e586b8
+    uses: stella/.github/.github/workflows/provenance-update.yml@f8027309fa1541b5c7a394a0cdd3fd0baeb9a523
     secrets: inherit
     with:
       install-command: bun install --frozen-lockfile
-      provenance-version: v0.1.0
+      provenance-version: v0.1.1
