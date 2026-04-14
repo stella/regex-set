@@ -2309,7 +2309,7 @@
           "name": "Evan You"
         }
       ],
-      "bom-ref": "pkg:npm/vite@7.3.2",
+      "bom-ref": "pkg:npm/vite@8.0.8",
       "description": "Native-ESM powered web dev build tool",
       "evidence": {
         "identity": [
@@ -2362,13 +2362,13 @@
           "value": "vite,Plugin,vite/Plugin,UserConfig,vite/UserConfig"
         }
       ],
-      "purl": "pkg:npm/vite@7.3.2",
+      "purl": "pkg:npm/vite@8.0.8",
       "scope": "required",
       "tags": [
         "web"
       ],
       "type": "library",
-      "version": "7.3.2"
+      "version": "8.0.8"
     }
   ],
   "compositions": [
@@ -2741,6 +2741,20 @@
     "lifecycles": [
       {
         "phase": "pre-build"
+      }
+    ],
+    "properties": [
+      {
+        "name": "cdx:bom:componentTypes",
+        "value": "cargo\\nnpm"
+      },
+      {
+        "name": "cdx:bom:componentNamespaces",
+        "value": "@napi-rs"
+      },
+      {
+        "name": "cdx:bom:componentSrcFiles",
+        "value": "Cargo.lock\\nnode_modules/@napi-rs/wasm-runtime/package.json\\nnode_modules/vite/package.json"
       }
     ],
     "tools": {
