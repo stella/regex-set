@@ -189,7 +189,8 @@ bun run bench
 bun run bench:fallback
 ```
 
-Latest public rerun on this machine:
+Representative baseline from the checked-in public
+harness:
 - runtime: Bun `1.3.10`
 - platform: macOS `26.4.1` (`Darwin arm64`)
 
@@ -204,7 +205,8 @@ Latest public rerun on this machine:
 | Bible, 5 patterns, 4.0 MB | 12.20 ms | 57.52 ms | `4.7x` faster |
 | Bible, 3 lookaround patterns, 4.0 MB | 25.93 ms | 77.33 ms | `3.0x` faster |
 
-Fallback-path microbench on the same machine:
+Fallback-path microbenchmark in the same
+environment:
 
 | Scenario | Time |
 | --- | ---: |
@@ -212,7 +214,7 @@ Fallback-path microbench on the same machine:
 | verifier present, no fallback | 0.134 ms |
 | verifier + `fancy-regex` fallback | 0.829 ms |
 
-What the checked-in harness covers:
+The benchmark harness covers:
 - multi-pattern scanning on public corpora
 - lookaround-heavy scans
 - catastrophic backtracking resistance
@@ -233,9 +235,9 @@ Benchmark notes:
   the Stella stack
 - we intentionally do not publish internal corpora
   or non-reproducible benchmark claims in this repo
-- the table above includes both wins and losses; we
-  keep the losing single-pattern rows because they
-  are public and independently reproducible
+- the table above includes both wins and losses
+  because the benchmark suite is intended to remain
+  independently reproducible
 
 <details>
 <summary>Alternatives tested</summary>
