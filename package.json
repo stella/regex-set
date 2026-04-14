@@ -55,14 +55,14 @@
     "bench:download": "bash __bench__/download-corpus.sh"
   },
   "devDependencies": {
-    "@emnapi/core": "^1.9.1",
-    "@emnapi/runtime": "^1.9.1",
+    "@emnapi/core": "^1.9.2",
+    "@emnapi/runtime": "^1.9.2",
     "@napi-rs/cli": "^3.6.0",
-    "@napi-rs/wasm-runtime": "^1.1.1",
+    "@napi-rs/wasm-runtime": "^1.1.3",
     "@tybys/wasm-util": "^0.10.1",
     "@types/node": "^25.5.0",
     "bun-types": "^1.3.11",
-    "emnapi": "^1.9.1",
+    "emnapi": "^1.9.2",
     "fast-check": "^4.6.0",
     "oxfmt": "^0.42.0",
     "oxlint": "^1.57.0",
