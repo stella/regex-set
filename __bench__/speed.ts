@@ -7,6 +7,12 @@
  * - Catastrophic backtracking resistance
  * - Multi-pattern scenarios
  *
+ * Notes:
+ * - multi-pattern JS baselines apply the same
+ *   non-overlapping selection policy as RegexSet
+ * - the mariomka patterns are ASCII-normalized for
+ *   JS/Rust parity
+ *
  * Run: bun run bench
  */
 import { readFileSync } from "node:fs";
@@ -74,6 +80,41 @@ const jsRegexBench = (
   return bench(name, fn, n);
 };
 
+const jsRegexSetBench = (
+  name: string,
+  patterns: RegExp[],
+  hay: string,
+  n: number,
+) => {
+  const fn = () => {
+    const all: Array<[start: number, end: number]> = [];
+    for (const re of patterns) {
+      re.lastIndex = 0;
+      let m;
+      while ((m = re.exec(hay)) !== null) {
+        const text = m[0]!;
+        all.push([m.index!, m.index! + text.length]);
+        if (text.length === 0) {
+          re.lastIndex++;
+        }
+      }
+    }
+    all.sort(
+      (a, b) => a[0] - b[0] || (b[1] - b[0]) - (a[1] - a[0]),
+    );
+    let count = 0;
+    let lastEnd = 0;
+    for (const [start, end] of all) {
+      if (start >= lastEnd) {
+        count++;
+        lastEnd = end;
+      }
+    }
+    return count;
+  };
+  return bench(name, fn, n);
+};
+
 const reportCountAgreement = (
   label: string,
   left: number,
@@ -100,9 +141,11 @@ console.log(
     `(${(mariomka.length / 1e6).toFixed(1)} MB)\n`,
 );
 
+// Use explicit ASCII classes here so JS RegExp and
+// Rust regex operate on the same character set.
 const mariomkaPatterns = [
-  "[\\w\\.+-]+@[\\w\\.-]+\\.[\\w\\.-]+",
-  "[\\w]+://[^/\\s?#]+[^\\s?#]+(?:\\?[^\\s#]*)?(?:#[^\\s]*)?",
+  "[A-Za-z0-9_.+-]+@[A-Za-z0-9.-]+\\.[A-Za-z0-9.-]+",
+  "[A-Za-z0-9_]+://[^/\\s?#]+[^\\s?#]+(?:\\?[^\\s#]*)?(?:#[^\\s]*)?",
   "(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9])",
 ];
 
@@ -113,8 +156,8 @@ const mariomkaRust = bench(
   N,
 );
 
-const mariomkaJs = jsRegexBench(
-  "JS RegExp (3 patterns, 3 passes)",
+const mariomkaJs = jsRegexSetBench(
+  "JS RegExp (3 patterns, 3 passes + select)",
   mariomkaPatterns.map((p) => new RegExp(p, "g")),
   mariomka,
   N,
@@ -256,8 +299,8 @@ const multiRust = bench(
   () => rsMulti.findIter(bible).length,
   N,
 );
-const multiJs = jsRegexBench(
-  "JS RegExp (5 patterns, 5 passes)",
+const multiJs = jsRegexSetBench(
+  "JS RegExp (5 patterns, 5 passes + select)",
   multiPatterns.map((p) => new RegExp(p, "g")),
   bible,
   N,
@@ -314,8 +357,8 @@ const lookRust = bench(
   () => rsLook.findIter(bible).length,
   N,
 );
-const lookJs = jsRegexBench(
-  "JS RegExp (3 patterns, lookaround)",
+const lookJs = jsRegexSetBench(
+  "JS RegExp (3 patterns, lookaround + select)",
   [
     /[0-9]{2}\.[0-9]{2}\.[0-9]{4}/g,
     /(?<!\p{L})\b[A-Z][a-z]+\b/gu,

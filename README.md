@@ -171,54 +171,43 @@ lookaround are unaffected.
 
 ## Benchmarks
 
-Benchmarks below were produced from the checked-in
-scripts in `__bench__/`
-after:
+The repository includes only public, reproducible
+benchmark inputs and scripts in `__bench__/`.
 
-`bun install && bun run build && bun run bench:download && bun run bench`
+Inputs:
+- [mariomka/regex-benchmark](https://github.com/mariomka/regex-benchmark)
+- [rust-leipzig/regex-performance](https://github.com/rust-leipzig/regex-performance)
+- [Canterbury Large Corpus](https://corpus.canterbury.ac.nz/)
 
-Current local run:
-- hardware: Apple M3, 24 GB RAM
-- OS: macOS 25.3.0
-- runtime: Bun 1.3.10
+Run them locally:
 
-Treat these as example results, not promises. Rerun
-the scripts on your own hardware before relying on
-specific absolute timings.
+```bash
+bun install
+bun run build
+bun run bench:download
+bun run bench
+bun run bench:fallback
+```
 
-Only scenarios with identical match counts between
-`@stll/regex-set` and JS `RegExp` are included.
+What the checked-in harness covers:
+- multi-pattern scanning on public corpora
+- lookaround-heavy scans
+- catastrophic backtracking resistance
+- the verifier + `fancy-regex` fallback path
 
-Corpora:
-[mariomka/regex-benchmark](https://github.com/mariomka/regex-benchmark),
-[rust-leipzig/regex-performance](https://github.com/rust-leipzig/regex-performance),
-[Canterbury Large Corpus](https://corpus.canterbury.ac.nz/).
-
-### Independently reproducible scenarios
-
-| Scenario                     | @stll/regex-set | JS RegExp | Speedup |
-| ---------------------------- | --------------- | --------- | ------- |
-| Twain 16 MB char class       | **20.64 ms**    | 30.31 ms  | 1.5x    |
-| Twain 16 MB word boundary    | **58.30 ms**    | 115.01 ms | 2.0x    |
-| Twain 16 MB alternation      | **14.30 ms**    | 42.27 ms  | 3.0x    |
-| Twain 16 MB suffix match     | **27.59 ms**    | 134.16 ms | 4.9x    |
-| Bible 4 MB, 5 patterns       | **16.88 ms**    | 80.14 ms  | 4.7x    |
-| Bible 4 MB, 3 + lookaround   | **35.39 ms**    | 105.94 ms | 3.0x    |
-
-Not included:
-- the `mariomka` email/URI/IPv4 row, because the
-  current benchmark script reports a match-count
-  mismatch (`5395` vs `5398`)
-- unpublished internal corpora
-- single-literal search, where V8 is faster and
-  `@stll/aho-corasick` is the better fit
-
-### Backtracking resistance
-
-| Pattern   | Input                       | @stll/regex-set | JS RegExp |
-| --------- | --------------------------- | --------------- | --------- |
-| `(a+)+b`  | `"a" × 30 + "X"`            | **0.07 ms**     | may hang  |
-| `.*.*=.*` | `"x" × 30 + "=" + "y" × 30` | **0.02 ms**     | may hang  |
+Benchmark notes:
+- the JS multi-pattern baseline applies the same
+  non-overlapping selection policy as
+  `RegexSet.findIter()`
+- the `mariomka` benchmark uses explicit ASCII
+  classes so JS and Rust are compared on the same
+  pattern semantics
+- single-literal search is not a target use case;
+  V8 is often faster there, and
+  [@stll/aho-corasick](https://github.com/stella/aho-corasick)
+  is the better fit for literal-only workloads
+- we intentionally do not publish internal corpora
+  or non-reproducible benchmark claims in this repo
 
 For pure literal patterns, use
 [@stll/aho-corasick](https://github.com/stella/aho-corasick)
