@@ -14,7 +14,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    uses: stella/.github/.github/workflows/provenance-update.yml@f8027309fa1541b5c7a394a0cdd3fd0baeb9a523
+    uses: stella/.github/.github/workflows/provenance-update.yml@ed5dd1557340fbdd580bf1ffa24103734dc5e74a
     secrets: inherit
     with:
       install-command: bun install --frozen-lockfile
