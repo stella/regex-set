@@ -12,7 +12,7 @@
     "wasi-worker.mjs",
     "wasi-worker-browser.mjs"
   ],
-  "description": "Multi-pattern regex for Node.js/Bun. 2-9x faster than JS RegExp, backtracking-immune, Unicode word boundaries. Rust DFA engine via NAPI-RS.",
+  "description": "Single-pass multi-pattern regex for Node.js/Bun. Backtracking-immune, Unicode-aware Rust engine via NAPI-RS.",
   "keywords": [
     "regex",
     "regex-set",
@@ -38,6 +38,6 @@
   },
   "browser": "regex-set.wasi-browser.js",
   "dependencies": {
-    "@napi-rs/wasm-runtime": "^1.1.1"
+    "@napi-rs/wasm-runtime": "^1.1.3"
   }
 }

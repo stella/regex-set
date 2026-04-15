@@ -50,7 +50,10 @@ jobs:
           const expected = tag.replace(/^v/, "");
           const manifests = [
             "package.json",
-            ...fs.readdirSync("npm").map((dir) => path.join("npm", dir, "package.json")),
+            ...fs
+              .readdirSync("npm", { withFileTypes: true })
+              .filter((entry) => entry.isDirectory())
+              .map((entry) => path.join("npm", entry.name, "package.json")),
             "wasm/package.json",
           ];
 
@@ -334,10 +337,10 @@ jobs:
         run: |
           while IFS= read -r tarball; do
             [[ -n "$tarball" ]] || continue
-            npm publish "$tarball" --access public
+            npm publish "$tarball" --provenance --access public
           done <<< "$AUX_TARBALLS"
 
-          npm publish "$ROOT_TARBALL" --access public
+          npm publish "$ROOT_TARBALL" --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           AUX_TARBALLS: ${{ steps.pack.outputs.aux_tarballs }}
