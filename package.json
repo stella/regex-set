@@ -38,9 +38,9 @@
   },
   "scripts": {
     "fix:loader": "node scripts/fix-napi-loader.mjs",
-    "build": "napi build --platform --release && node scripts/fix-napi-loader.mjs",
-    "build:debug": "napi build --platform && node scripts/fix-napi-loader.mjs",
-    "build:wasm": "napi build --platform --target wasm32-wasip1-threads --release && node scripts/fix-napi-loader.mjs",
+    "build": "node scripts/build-native.mjs --platform --release",
+    "build:debug": "node scripts/build-native.mjs --platform",
+    "build:wasm": "node scripts/build-native.mjs --platform --target wasm32-wasip1-threads --release",
     "build:js": "node scripts/ensure-wasm-artifact.mjs && tsdown",
     "artifacts": "napi artifacts",
     "universal": "napi universal",
