@@ -2743,20 +2743,6 @@
         "phase": "pre-build"
       }
     ],
-    "properties": [
-      {
-        "name": "cdx:bom:componentTypes",
-        "value": "cargo\\nnpm"
-      },
-      {
-        "name": "cdx:bom:componentNamespaces",
-        "value": "@napi-rs"
-      },
-      {
-        "name": "cdx:bom:componentSrcFiles",
-        "value": "Cargo.lock\\nnode_modules/@napi-rs/wasm-runtime/package.json\\nnode_modules/vite/package.json"
-      }
-    ],
     "tools": {
       "components": [
         {

@@ -8,7 +8,6 @@ env:
 on:
   push:
     branches: [main]
-    tags: ["v*"]
   pull_request:
     types:
       [
@@ -180,8 +179,7 @@ jobs:
     name: Provenance
     if: >-
       always()
-      && (startsWith(github.ref, 'refs/tags/v')
-          || needs.check-changes.outputs.provenance-changed == 'true')
+      && needs.check-changes.outputs.provenance-changed == 'true'
       && (github.event_name != 'pull_request'
           || needs.trust-check.outputs.trusted == 'true')
     needs: [check-changes, trust-check]
@@ -194,14 +192,13 @@ jobs:
         with:
           provenance-version: v0.1.1
 
-  # ── Build (push to main + tags only) ──────────
+  # ── Build (push to main only) ─────────────────
   build:
     name: Build - ${{ matrix.settings.target }}
     needs: [check-changes]
     if: >-
       github.event_name != 'pull_request'
-      && (startsWith(github.ref, 'refs/tags/v')
-          || needs.check-changes.outputs.rust-changed == 'true')
+      && needs.check-changes.outputs.rust-changed == 'true'
     runs-on: ${{ matrix.settings.os }}
     strategy:
       fail-fast: false
@@ -295,129 +292,3 @@ jobs:
           ls -la -- *.wasm 2>/dev/null || echo "No .wasm files"
 
       - run: bun test
-
-  # ── Publish (tags only) ───────────────────────
-  publish:
-    name: Publish
-    if: >-
-      always()
-      && startsWith(github.ref, 'refs/tags/v')
-      && !contains(needs.*.result, 'failure')
-      && !contains(needs.*.result, 'cancelled')
-    needs: [test, lint, runtime-compat, rust-checks, provenance]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      attestations: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          registry-url: https://registry.npmjs.org
-
-      - uses: oven-sh/setup-bun@v2
-      - run: bun install --frozen-lockfile
-
-      - uses: actions/download-artifact@v8
-        with:
-          path: artifacts
-
-      - name: Prepare npm packages
-        run: bun x @napi-rs/cli artifacts
-
-      - name: Build JS/TS entrypoints
-        run: bun run build:js
-
-      - name: Pack release tarballs
-        id: pack
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p release-artifacts
-
-          root_json="$(npm pack --json --ignore-scripts --pack-destination release-artifacts)"
-          root_file="$(echo "$root_json" | jq -r '.[0].filename')"
-          root_tarball="release-artifacts/$root_file"
-
-          while IFS= read -r pkg; do
-            (
-              cd "$pkg"
-              npm pack --json --ignore-scripts --pack-destination "$GITHUB_WORKSPACE/release-artifacts" >/dev/null
-            )
-          done < <(find npm -mindepth 1 -maxdepth 1 -type d | sort)
-
-          (
-            cd wasm
-            npm pack --json --ignore-scripts --pack-destination "$GITHUB_WORKSPACE/release-artifacts" >/dev/null
-          )
-
-          mapfile -t aux_tarballs < <(find release-artifacts -maxdepth 1 -name '*.tgz' ! -name "$root_file" | sort)
-
-          echo "root_tarball=$root_tarball" >> "$GITHUB_OUTPUT"
-          {
-            echo 'aux_tarballs<<EOF'
-            printf '%s\n' "${aux_tarballs[@]}"
-            echo EOF
-          } >> "$GITHUB_OUTPUT"
-
-          ls -la release-artifacts
-
-      - name: Generate release checksums
-        shell: bash
-        run: |
-          set -euo pipefail
-          (
-            cd release-artifacts
-            sha256sum *.tgz > SHA256SUMS
-          )
-
-      - name: Attest root package tarball with SBOM
-        uses: actions/attest@281a49d4cbb0a72c9575a50d18f6deb515a11deb
-        with:
-          subject-path: ${{ steps.pack.outputs.root_tarball }}
-          sbom-path: provenance/sbom.cdx.json
-
-      - name: Attest auxiliary package tarballs
-        if: steps.pack.outputs.aux_tarballs != ''
-        uses: actions/attest@281a49d4cbb0a72c9575a50d18f6deb515a11deb
-        with:
-          subject-path: ${{ steps.pack.outputs.aux_tarballs }}
-
-      - name: Create or update GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          tag="${GITHUB_REF_NAME}"
-          assets=(
-            release-artifacts/*.tgz
-            release-artifacts/SHA256SUMS
-            provenance/sbom.cdx.json
-            provenance/THIRD-PARTY-NOTICES.txt
-            provenance/report.json
-          )
-
-          if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" "${assets[@]}" --clobber
-          else
-            gh release create "$tag" "${assets[@]}" \
-              --verify-tag \
-              --generate-notes \
-              --title "$tag"
-          fi
-
-      - name: Publish to npm
-        run: |
-          while IFS= read -r tarball; do
-            [[ -n "$tarball" ]] || continue
-            npm publish "$tarball" --access public
-          done <<< "$AUX_TARBALLS"
-
-          npm publish "$ROOT_TARBALL" --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          AUX_TARBALLS: ${{ steps.pack.outputs.aux_tarballs }}
-          ROOT_TARBALL: ${{ steps.pack.outputs.root_tarball }}
