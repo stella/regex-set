@@ -1,0 +1,43 @@
+{
+  "name": "@stll/regex-set-wasm32-wasi",
+  "version": "1.0.0-rc.2",
+  "cpu": [
+    "wasm32"
+  ],
+  "main": "regex-set.wasi.cjs",
+  "files": [
+    "regex-set.wasm32-wasi.wasm",
+    "regex-set.wasi.cjs",
+    "regex-set.wasi-browser.js",
+    "wasi-worker.mjs",
+    "wasi-worker-browser.mjs"
+  ],
+  "description": "Single-pass multi-pattern regex for Node.js/Bun. Backtracking-immune, Unicode-aware Rust engine via NAPI-RS.",
+  "keywords": [
+    "regex",
+    "regex-set",
+    "multi-pattern",
+    "napi-rs",
+    "native",
+    "rust"
+  ],
+  "homepage": "https://github.com/stella/regex-set#readme",
+  "license": "MIT",
+  "engines": {
+    "node": ">= 18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stella/regex-set.git"
+  },
+  "bugs": {
+    "url": "https://github.com/stella/regex-set/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "browser": "regex-set.wasi-browser.js",
+  "dependencies": {
+    "@napi-rs/wasm-runtime": "^1.1.3"
+  }
+}

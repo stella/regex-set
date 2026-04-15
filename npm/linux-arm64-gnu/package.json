@@ -1,0 +1,41 @@
+{
+  "name": "@stll/regex-set-linux-arm64-gnu",
+  "version": "1.0.0-rc.2",
+  "cpu": [
+    "arm64"
+  ],
+  "main": "regex-set.linux-arm64-gnu.node",
+  "files": [
+    "regex-set.linux-arm64-gnu.node"
+  ],
+  "description": "Single-pass multi-pattern regex for Node.js/Bun. Backtracking-immune, Unicode-aware Rust engine via NAPI-RS.",
+  "keywords": [
+    "regex",
+    "regex-set",
+    "multi-pattern",
+    "napi-rs",
+    "native",
+    "rust"
+  ],
+  "homepage": "https://github.com/stella/regex-set#readme",
+  "license": "MIT",
+  "engines": {
+    "node": ">= 18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stella/regex-set.git"
+  },
+  "bugs": {
+    "url": "https://github.com/stella/regex-set/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "os": [
+    "linux"
+  ],
+  "libc": [
+    "glibc"
+  ]
+}

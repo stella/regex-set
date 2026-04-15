@@ -1,0 +1,87 @@
+# @stll/regex-set
+
+> NAPI-RS bindings to Rust regex-automata for
+> multi-pattern regex matching in Node.js and Bun.
+> Single-pass on the main DFA path. Some
+> lookaround cases use a small fallback verifier.
+
+Install:
+
+  npm install @stll/regex-set
+  # or
+  bun add @stll/regex-set
+
+## Quick start
+
+```typescript
+import { RegexSet } from "@stll/regex-set";
+
+const rs = new RegexSet([
+  "\\d{2}\\.\\d{2}\\.\\d{4}",
+  "\\+?\\d{9,12}",
+  "[A-Z]{2}\\d{6}",
+]);
+
+rs.findIter("Born 15.03.1990, ID CZ123456");
+// [{ pattern: 0, ..., text: "15.03.1990" },
+//  { pattern: 2, ..., text: "CZ123456" }]
+
+rs.replaceAll(text, ["[DATE]", "[PHONE]", "[ID]"]);
+```
+
+## API
+
+Constructor:
+`new RegexSet(patterns: PatternEntry[], options?: Options)`
+
+PatternEntry:
+- `string`
+- `RegExp`
+- `{ pattern: string | RegExp; name?: string }`
+
+Options:
+- `wholeWords`: `boolean` (default `false`, wraps patterns with `\b...\b`)
+- `unicodeBoundaries`: `boolean` (default `true`)
+
+Methods:
+- `findIter(haystack: string): Match[]`
+- `isMatch(haystack: string): boolean`
+- `whichMatch(haystack: string): number[]`
+- `replaceAll(haystack: string, replacements: string[]): string`
+- `patternCount: number`
+
+Match type (same as @stll/aho-corasick):
+```typescript
+type Match = {
+  pattern: number;
+  start: number;
+  end: number;
+  text: string;
+};
+```
+
+Offsets are UTF-16 code units, compatible with
+`String.prototype.slice()`.
+
+## Lookaround
+
+Lookahead (`(?=...)`, `(?!...)`) and lookbehind
+(`(?<=...)`, `(?<!...)`) are supported. Internally,
+assertions are stripped from patterns, cores are
+compiled into a single DFA, and assertions are
+verified as inline char checks (~1ns per match).
+Complex assertions fall back to fancy-regex on a
+small window.
+
+## Important notes
+
+- Standard DFA scans are O(m * n) and avoid
+  catastrophic backtracking.
+- Some lookaround cases use a small `fancy-regex`
+  fallback window to preserve correctness.
+- Rust regex syntax: no backreferences.
+- `\d`, `\w`, `\s` are Unicode-aware by default.
+- `replaceAll` throws if `replacements.length !== patternCount`.
+- For pure literal patterns, use @stll/aho-corasick instead (faster for literals).
+- Composable with @stll/aho-corasick (same Match type, same UTF-16 offsets).
+- For browsers, use the separate `@stll/regex-set-wasm` package.
