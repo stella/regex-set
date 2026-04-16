@@ -262,7 +262,7 @@ jobs:
           set -euo pipefail
           (
             cd release-artifacts
-            sha256sum *.tgz > SHA256SUMS
+            sha256sum -- ./*.tgz > SHA256SUMS
           )
 
       - name: Generate attestation SBOM
