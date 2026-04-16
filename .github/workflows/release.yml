@@ -2,6 +2,7 @@ name: Release
 
 env:
   NODE_VERSION: "22"
+  NPM_VERSION: "11.11.1"
   CDXGEN_VERSION: "12.1.5"
   CARGO_INCREMENTAL: 0
 
@@ -211,6 +212,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: https://registry.npmjs.org
 
+      - name: Install npm for trusted publishing
+        run: npm install --global "npm@${{ env.NPM_VERSION }}"
+
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
 
@@ -380,24 +384,7 @@ jobs:
               done
             fi
 
-            for attempt in 1 2 3 4 5; do
-              if npm dist-tag add "${package_name}@${package_version}" latest; then
-                return 0
-              fi
-
-              current_latest="$(npm view "$package_name" dist-tags.latest --json 2>/dev/null || true)"
-              if [[ "$current_latest" == "\"${package_version}\"" ]]; then
-                echo "Detected ${package_name}@${package_version} as latest after attempt ${attempt}"
-                return 0
-              fi
-
-              if [[ "$attempt" -eq 5 ]]; then
-                echo "Failed to promote ${package_name}@${package_version} to latest after ${attempt} attempts" >&2
-                return 1
-              fi
-
-              sleep $((attempt * 10))
-            done
+            return 0
           }
 
           PACKAGE_VERSION="$(node -p "require('./package.json').version")"
