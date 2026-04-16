@@ -1,6 +1,6 @@
 {
   "name": "@stll/regex-set-linux-arm64-gnu",
-  "version": "1.0.0-rc.2",
+  "version": "1.0.0-rc.3",
   "cpu": [
     "arm64"
   ],
