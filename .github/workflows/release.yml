@@ -364,7 +364,7 @@ jobs:
 
             if [[ "$published" != "true" ]]; then
               for attempt in 1 2 3 4 5; do
-                if npm publish "$tarball" --access public --tag "$NPM_DIST_TAG"; then
+                if npm publish "$tarball" --provenance --access public --tag "$NPM_DIST_TAG"; then
                   published=true
                   break
                 fi
@@ -387,7 +387,12 @@ jobs:
             return 0
           }
 
-          NPM_DIST_TAG="latest"
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          if [[ "$PACKAGE_VERSION" == *-* ]]; then
+            NPM_DIST_TAG="next"
+          else
+            NPM_DIST_TAG="latest"
+          fi
 
           while IFS= read -r tarball; do
             [[ -n "$tarball" ]] || continue
