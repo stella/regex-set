@@ -15,6 +15,10 @@ const napiPath = fileURLToPath(
 
 try {
   await access(wasmPath, constants.F_OK);
+  await access(
+    fileURLToPath(new URL("../regex-set.wasi-browser.js", import.meta.url)),
+    constants.F_OK,
+  );
 } catch (error) {
   if (error?.code !== "ENOENT") {
     throw error;
