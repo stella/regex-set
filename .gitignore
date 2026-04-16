@@ -4,6 +4,7 @@ node_modules
 # Build outputs
 target
 dist
+index.js
 *.node
 *.wasm
 
@@ -27,10 +28,6 @@ __bench__/node_modules
 __bench__/bun.lock
 
 # WASM build artifacts
-regex-set.wasi.cjs
-regex-set.wasi-browser.js
-wasi-worker.mjs
-wasi-worker-browser.mjs
 browser.js
 
 # Misc
