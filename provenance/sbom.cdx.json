@@ -1973,7 +1973,7 @@
       "version": "0.4.12"
     },
     {
-      "bom-ref": "pkg:cargo/stella-regex-set@1.0.0-rc.3",
+      "bom-ref": "pkg:cargo/stella-regex-set@1.0.0-rc.4",
       "evidence": {
         "identity": [
           {
@@ -1998,9 +1998,9 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/stella-regex-set@1.0.0-rc.3",
+      "purl": "pkg:cargo/stella-regex-set@1.0.0-rc.4",
       "type": "library",
-      "version": "1.0.0-rc.3"
+      "version": "1.0.0-rc.4"
     },
     {
       "bom-ref": "pkg:cargo/syn@2.0.117",
@@ -2374,7 +2374,7 @@
   "compositions": [
     {
       "aggregate": "incomplete",
-      "bom-ref": "pkg:npm/@stll/regex-set@1.0.0-rc.3"
+      "bom-ref": "pkg:npm/@stll/regex-set@1.0.0-rc.4"
     }
   ],
   "dependencies": [
@@ -2656,7 +2656,7 @@
         "pkg:cargo/regex@1.12.3",
         "pkg:cargo/unicode-segmentation@1.13.2"
       ],
-      "ref": "pkg:cargo/stella-regex-set@1.0.0-rc.3"
+      "ref": "pkg:cargo/stella-regex-set@1.0.0-rc.4"
     },
     {
       "dependsOn": [
@@ -2684,7 +2684,7 @@
     },
     {
       "dependsOn": [],
-      "ref": "pkg:npm/@stll/regex-set@1.0.0-rc.3"
+      "ref": "pkg:npm/@stll/regex-set@1.0.0-rc.4"
     }
   ],
   "metadata": {
@@ -2694,10 +2694,10 @@
       }
     ],
     "component": {
-      "bom-ref": "pkg:npm/@stll/regex-set@1.0.0-rc.3",
+      "bom-ref": "pkg:npm/@stll/regex-set@1.0.0-rc.4",
       "components": [
         {
-          "bom-ref": "pkg:cargo/stella-regex-set@1.0.0-rc.3",
+          "bom-ref": "pkg:cargo/stella-regex-set@1.0.0-rc.4",
           "group": "",
           "licenses": [
             {
@@ -2708,9 +2708,9 @@
             }
           ],
           "name": "stella-regex-set",
-          "purl": "pkg:cargo/stella-regex-set@1.0.0-rc.3",
+          "purl": "pkg:cargo/stella-regex-set@1.0.0-rc.4",
           "type": "application",
-          "version": "1.0.0-rc.3"
+          "version": "1.0.0-rc.4"
         }
       ],
       "description": "Single-pass multi-pattern regex for Node.js/Bun. Backtracking-immune, Unicode-aware Rust engine via NAPI-RS.",
@@ -2734,9 +2734,9 @@
         }
       ],
       "name": "regex-set",
-      "purl": "pkg:npm/%40stll/regex-set@1.0.0-rc.3",
+      "purl": "pkg:npm/%40stll/regex-set@1.0.0-rc.4",
       "type": "application",
-      "version": "1.0.0-rc.3"
+      "version": "1.0.0-rc.4"
     },
     "lifecycles": [
       {
