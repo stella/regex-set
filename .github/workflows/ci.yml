@@ -40,6 +40,7 @@ jobs:
               - 'Cargo.toml'
               - 'Cargo.lock'
               - '.github/workflows/ci.yml'
+              - '.github/workflows/rust-napi-ci.local.yml'
             build:
               - 'src/**'
               - 'build.rs'
@@ -54,6 +55,7 @@ jobs:
               - 'npm/**'
               - '.github/workflows/ci.yml'
               - '.github/workflows/release.yml'
+              - '.github/workflows/rust-napi-ci.local.yml'
             provenance:
               - 'bun.lock'
               - 'Cargo.lock'
@@ -67,6 +69,8 @@ jobs:
               - '.provenance.yml'
               - 'provenance/**'
               - '.github/workflows/ci.yml'
+              - '.github/workflows/rust-napi-ci.local.yml'
+              - '.github/actions/provenance-check/**'
 
   trust-check:
     if: github.event_name == 'pull_request'
