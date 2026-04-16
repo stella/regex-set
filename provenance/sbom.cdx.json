@@ -2265,6 +2265,12 @@
           },
           {
             "location": "wasi-worker.mjs#9"
+          },
+          {
+            "location": "wasm/dist/wasi-worker-browser.mjs#1"
+          },
+          {
+            "location": "wasm/dist/wasm.mjs#1"
           }
         ]
       },

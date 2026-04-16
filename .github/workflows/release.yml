@@ -77,7 +77,7 @@ jobs:
 
       - uses: ./.github/actions/provenance-check
         with:
-          provenance-version: v0.1.1
+          provenance-version: v0.1.2
 
       - run: bun run build
       - run: bun run build:js

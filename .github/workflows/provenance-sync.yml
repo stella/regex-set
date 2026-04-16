@@ -54,7 +54,7 @@ jobs:
 
       - name: Install provenance
         env:
-          PROVENANCE_VERSION: v0.1.1
+          PROVENANCE_VERSION: v0.1.2
         run: |
           set -euo pipefail
 
