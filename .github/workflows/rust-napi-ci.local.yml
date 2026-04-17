@@ -123,54 +123,77 @@ jobs:
 
   rust-checks:
     name: Rust checks
-    if: inputs.trusted == 'true' && inputs.rust-changed == 'true'
+    if: inputs.trusted == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
+      - name: Skip when Rust checks are not required
+        if: inputs.rust-changed != 'true'
+        run: echo "No Rust-affecting changes; Rust checks skipped."
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        if: inputs.rust-changed == 'true'
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
+        if: inputs.rust-changed == 'true'
         with:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        if: inputs.rust-changed == 'true'
         with:
           shared-key: rust-checks
       - name: Clippy
+        if: inputs.rust-changed == 'true'
         run: cargo clippy --all-targets --all-features -- -Dwarnings
       - name: Format
+        if: inputs.rust-changed == 'true'
         run: $RUST_FORMAT_CMD
         env:
           RUST_FORMAT_CMD: ${{ inputs.rust-format-command }}
       - name: Tests
+        if: inputs.rust-changed == 'true'
         run: cargo test --all-targets --all-features
       - name: License audit
+        if: inputs.rust-changed == 'true'
         run: |
           cargo install cargo-deny --locked
           cargo deny check
       - name: Docs
+        if: inputs.rust-changed == 'true'
         run: cargo doc --no-deps
         env:
           RUSTDOCFLAGS: -Dwarnings
 
   provenance:
     name: Provenance
-    if: inputs.trusted == 'true' && inputs.provenance-changed == 'true'
+    if: inputs.trusted == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: read
     steps:
+      - name: Skip when provenance is not required
+        if: inputs.provenance-changed != 'true'
+        run: echo "No provenance-affecting changes; provenance skipped."
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        if: inputs.provenance-changed == 'true'
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        if: inputs.provenance-changed == 'true'
       - run: bun install --frozen-lockfile
+        if: inputs.provenance-changed == 'true'
       - uses: ./.github/actions/provenance-check
+        if: inputs.provenance-changed == 'true'
         with:
           provenance-version: ${{ inputs.provenance-version }}
 
   build:
     name: Build - ${{ matrix.settings.target }}
-    if: inputs.trusted == 'true' && inputs.build-changed == 'true'
-    runs-on: ${{ matrix.settings.os }}
+    if: inputs.trusted == 'true'
+    runs-on: >-
+      ${{
+        inputs.build-changed == 'true'
+        && matrix.settings.os
+        || 'ubuntu-latest'
+      }}
     permissions:
       contents: read
     strategy:
@@ -189,35 +212,49 @@ jobs:
           - target: wasm32-wasip1-threads
             os: ubuntu-latest
     steps:
+      - name: Skip when builds are not required
+        if: inputs.build-changed != 'true'
+        run: echo "No build-affecting changes; build skipped."
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        if: inputs.build-changed == 'true'
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        if: inputs.build-changed == 'true'
         with:
           node-version: ${{ inputs.node-version }}
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
+        if: inputs.build-changed == 'true'
         with:
           targets: ${{ matrix.settings.target }}
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        if: inputs.build-changed == 'true'
         with:
           shared-key: build-${{ matrix.settings.target }}
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        if: inputs.build-changed == 'true'
       - run: bun install --frozen-lockfile
+        if: inputs.build-changed == 'true'
       - name: Build (native)
         if: >-
+          inputs.build-changed == 'true'
+          &&
           !matrix.settings.use-cross
           && matrix.settings.target != 'wasm32-wasip1-threads'
         run: >
           bun run build
           --target ${{ matrix.settings.target }}
       - name: Build (cross-compile)
-        if: ${{ matrix.settings.use-cross }}
+        if: ${{ inputs.build-changed == 'true' && matrix.settings.use-cross }}
         run: >
           bun run build
           --target ${{ matrix.settings.target }}
           --use-napi-cross
       - name: Build (WASM)
-        if: matrix.settings.target == 'wasm32-wasip1-threads'
+        if: >-
+          inputs.build-changed == 'true'
+          && matrix.settings.target == 'wasm32-wasip1-threads'
         run: bun run build:wasm
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: inputs.build-changed == 'true'
         with:
           name: bindings-${{ matrix.settings.target }}
           path: |
@@ -231,9 +268,14 @@ jobs:
 
   test:
     name: Test (${{ matrix.os }})
-    if: inputs.trusted == 'true' && inputs.build-changed == 'true'
+    if: inputs.trusted == 'true'
     needs: [build]
-    runs-on: ${{ matrix.os }}
+    runs-on: >-
+      ${{
+        inputs.build-changed == 'true'
+        && matrix.os
+        || 'ubuntu-latest'
+      }}
     permissions:
       contents: read
     strategy:
@@ -241,13 +283,21 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-15]
     steps:
+      - name: Skip when tests are not required
+        if: inputs.build-changed != 'true'
+        run: echo "No build-affecting changes; tests skipped."
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        if: inputs.build-changed == 'true'
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        if: inputs.build-changed == 'true'
       - run: bun install --frozen-lockfile
+        if: inputs.build-changed == 'true'
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        if: inputs.build-changed == 'true'
         with:
           path: artifacts
       - name: Move artifacts
+        if: inputs.build-changed == 'true'
         shell: bash
         run: |
           ls -R artifacts/
@@ -261,8 +311,12 @@ jobs:
           ls -la -- *.node 2>/dev/null || echo "No .node files"
           ls -la -- *.wasm 2>/dev/null || echo "No .wasm files"
       - run: bun test
+        if: inputs.build-changed == 'true'
       - name: Property tests
-        if: matrix.os == 'ubuntu-latest' && inputs.property-test-command != ''
+        if: >-
+          inputs.build-changed == 'true'
+          && matrix.os == 'ubuntu-latest'
+          && inputs.property-test-command != ''
         run: $PROPERTY_TEST_CMD
         env:
           PROPERTY_TEST_CMD: ${{ inputs.property-test-command }}
