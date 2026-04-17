@@ -188,7 +188,12 @@ jobs:
   build:
     name: Build - ${{ matrix.settings.target }}
     if: inputs.trusted == 'true'
-    runs-on: ${{ matrix.settings.os }}
+    runs-on: >-
+      ${{
+        inputs.build-changed == 'true'
+        && matrix.settings.os
+        || 'ubuntu-latest'
+      }}
     permissions:
       contents: read
     strategy:
@@ -265,7 +270,12 @@ jobs:
     name: Test (${{ matrix.os }})
     if: inputs.trusted == 'true'
     needs: [build]
-    runs-on: ${{ matrix.os }}
+    runs-on: >-
+      ${{
+        inputs.build-changed == 'true'
+        && matrix.os
+        || 'ubuntu-latest'
+      }}
     permissions:
       contents: read
     strategy:
