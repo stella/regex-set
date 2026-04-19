@@ -3,6 +3,8 @@
  * (NAPI-RS or WASM).
  * Call initBinding() before constructing classes. */
 
+const encoder = new TextEncoder();
+
 // -- Native binding types --------------------------------
 
 export type NativeBinding = {
@@ -10,7 +12,7 @@ export type NativeBinding = {
     patterns: string[],
     options?: NativeOptions | undefined | null,
   ) => NativeRegexSetInstance;
-  _uax29Boundaries: (haystack: Buffer) => number[];
+  _uax29Boundaries: (haystack: Buffer | Uint8Array) => number[];
 };
 
 type NativeOptions = {
@@ -21,9 +23,9 @@ type NativeOptions = {
 type NativeRegexSetInstance = {
   patternCount: number;
   isMatch(haystack: string): boolean;
-  _isMatchBuf(haystack: Buffer): boolean;
+  _isMatchBuf(haystack: Buffer | Uint8Array): boolean;
   _findIterPacked(haystack: string): Uint32Array;
-  _findIterPackedBuf(haystack: Buffer): Uint32Array;
+  _findIterPackedBuf(haystack: Buffer | Uint8Array): Uint32Array;
   whichMatch(haystack: string): number[];
   replaceAll(
     haystack: string,
@@ -593,13 +595,13 @@ export class RegexSet {
 
   /** Returns `true` if any pattern matches. */
   isMatch(haystack: string): boolean {
-    return this._inner._isMatchBuf(Buffer.from(haystack));
+    return this._inner._isMatchBuf(encoder.encode(haystack));
   }
 
   /** Find all non-overlapping matches. */
   findIter(haystack: string): Match[] {
     return unpack(
-      this._inner._findIterPackedBuf(Buffer.from(haystack)),
+      this._inner._findIterPackedBuf(encoder.encode(haystack)),
       haystack,
       this._hasNames ? this._names : null,
     );
