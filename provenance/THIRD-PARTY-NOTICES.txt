@@ -53,6 +53,6 @@ Project: root
 - syn 2.0.117 — Apache-2.0 OR MIT
 - unicode-ident 1.0.24 — (MIT OR Apache-2.0) AND Unicode-3.0
 - unicode-segmentation 1.13.2 — Apache-2.0 OR MIT
-- vite 8.0.8 — MIT
+- vite 8.0.9 — MIT
 - windows-link 0.2.1 — Apache-2.0 OR MIT
 - zmij 1.0.21 — MIT
