@@ -9,7 +9,7 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-fancy-regex = "0.17"
+fancy-regex = "0.18"
 regex = "1"
 regex-automata = { version = "0.4", features = [
   "meta",
