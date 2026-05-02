@@ -477,7 +477,7 @@
       "version": "0.3.0"
     },
     {
-      "bom-ref": "pkg:cargo/fancy-regex@0.17.0",
+      "bom-ref": "pkg:cargo/fancy-regex@0.18.0",
       "evidence": {
         "identity": [
           {
@@ -498,7 +498,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "72cf461f865c862bb7dc573f643dd6a2b6842f7c30b07882b56bd148cc2761b8"
+          "content": "e1e1dacd0d2082dfcf1351c4bdd566bbe89a2b263235a2b50058f1e130a47277"
         }
       ],
       "licenses": [
@@ -515,9 +515,9 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/fancy-regex@0.17.0",
+      "purl": "pkg:cargo/fancy-regex@0.18.0",
       "type": "library",
-      "version": "0.17.0"
+      "version": "0.18.0"
     },
     {
       "bom-ref": "pkg:cargo/futures-channel@0.3.32",
@@ -2421,7 +2421,7 @@
         "pkg:cargo/regex-automata@0.4.14",
         "pkg:cargo/regex-syntax@0.8.10"
       ],
-      "ref": "pkg:cargo/fancy-regex@0.17.0"
+      "ref": "pkg:cargo/fancy-regex@0.18.0"
     },
     {
       "dependsOn": [
@@ -2633,7 +2633,7 @@
     },
     {
       "dependsOn": [
-        "pkg:cargo/fancy-regex@0.17.0",
+        "pkg:cargo/fancy-regex@0.18.0",
         "pkg:cargo/napi-build@2.3.1",
         "pkg:cargo/napi-derive@3.5.3",
         "pkg:cargo/napi@3.8.4",
