@@ -57,8 +57,10 @@ jobs:
           shared-key: release-verify
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
 
-      - run: bun install --frozen-lockfile
+      - run: bun install --frozen-lockfile --no-verify
       - run: bun run lint
       - run: cargo clippy --all-targets --all-features -- -Dwarnings
       - run: cargo fmt -- --check
@@ -121,8 +123,10 @@ jobs:
           shared-key: release-build-${{ matrix.settings.target }}
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
 
-      - run: bun install --frozen-lockfile
+      - run: bun install --frozen-lockfile --no-verify
 
       - name: Build (native)
         if: >-
@@ -169,7 +173,9 @@ jobs:
           ref: refs/tags/${{ inputs.tag }}
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-      - run: bun install --frozen-lockfile
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile --no-verify
 
       - name: Install cdxgen
         run: npm install --global "@cyclonedx/cdxgen@${{ env.CDXGEN_VERSION }}"
@@ -216,7 +222,9 @@ jobs:
         run: npm install --global "npm@${{ env.NPM_VERSION }}"
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-      - run: bun install --frozen-lockfile
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile --no-verify
 
       - name: Install cdxgen
         run: npm install --global "@cyclonedx/cdxgen@${{ env.CDXGEN_VERSION }}"
@@ -339,68 +347,26 @@ jobs:
               --title "$RELEASE_TAG"
           fi
 
-      - name: Publish to npm
+      - name: Determine dist-tag
         if: ${{ inputs.publish_to_npm }}
+        id: dist-tag
         run: |
           set -euo pipefail
-
-          publish_tarball() {
-            local tarball="$1"
-            local package_json
-            local package_name
-            local package_version
-            local attempt
-            local published=false
-
-            tarball="$(realpath "$tarball")"
-            package_json="$(tar -xOf "$tarball" package/package.json)"
-            package_name="$(jq -r '.name' <<<"$package_json")"
-            package_version="$(jq -r '.version' <<<"$package_json")"
-
-            if npm view "${package_name}@${package_version}" version --json >/dev/null 2>&1; then
-              echo "Skipping already-published ${package_name}@${package_version}"
-              published=true
-            fi
-
-            if [[ "$published" != "true" ]]; then
-              for attempt in 1 2 3 4 5; do
-                if npm publish "$tarball" --provenance --access public --tag "$NPM_DIST_TAG"; then
-                  published=true
-                  break
-                fi
-
-                if npm view "${package_name}@${package_version}" version --json >/dev/null 2>&1; then
-                  echo "Detected ${package_name}@${package_version} after publish attempt ${attempt}"
-                  published=true
-                  break
-                fi
-
-                if [[ "$attempt" -eq 5 ]]; then
-                  echo "Failed to publish ${package_name}@${package_version} after ${attempt} attempts" >&2
-                  return 1
-                fi
-
-                sleep $((attempt * 10))
-              done
-            fi
-
-            return 0
-          }
-
-          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
-          if [[ "$PACKAGE_VERSION" == *-* ]]; then
-            NPM_DIST_TAG="next"
+          version="$(node -p "require('./package.json').version")"
+          if [[ "$version" == *-* ]]; then
+            echo "tag=next" >> "$GITHUB_OUTPUT"
           else
-            NPM_DIST_TAG="latest"
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
           fi
 
-          while IFS= read -r tarball; do
-            [[ -n "$tarball" ]] || continue
-            publish_tarball "$tarball"
-          done <<< "$AUX_TARBALLS"
-
-          publish_tarball "$ROOT_TARBALL"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          AUX_TARBALLS: ${{ steps.pack.outputs.aux_tarballs }}
-          ROOT_TARBALL: ${{ steps.pack.outputs.root_tarball }}
+      - name: Publish to npm
+        if: ${{ inputs.publish_to_npm }}
+        uses: stella/.github/.github/actions/npm-publish-hardened@4292546b5b6e5bd8660bd727913b4038644c3d0b
+        with:
+          tag: ${{ steps.dist-tag.outputs.tag }}
+          # Platform sub-packages first so the meta-package (root) can
+          # resolve them as registry-visible optional deps at install
+          # time. Composite publishes the list in order.
+          tarballs: |
+            ${{ steps.pack.outputs.aux_tarballs }}
+            ${{ steps.pack.outputs.root_tarball }}
