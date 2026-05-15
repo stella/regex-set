@@ -7,7 +7,7 @@ This file is a generated inventory of detected third-party components and declar
 Some licenses may require additional attribution text or redistribution steps.
 
 Project: root
-- @napi-rs/wasm-runtime 1.1.3 — MIT
+- @napi-rs/wasm-runtime 1.1.4 — MIT
 - aho-corasick 1.1.4 — MIT OR Unlicense
 - bit-set 0.8.0 — Apache-2.0 OR MIT
 - bit-vec 0.8.0 — Apache-2.0 OR MIT
@@ -53,6 +53,6 @@ Project: root
 - syn 2.0.117 — Apache-2.0 OR MIT
 - unicode-ident 1.0.24 — (MIT OR Apache-2.0) AND Unicode-3.0
 - unicode-segmentation 1.13.2 — Apache-2.0 OR MIT
-- vite 8.0.8 — MIT
+- vite 8.0.11 — MIT
 - windows-link 0.2.1 — Apache-2.0 OR MIT
 - zmij 1.0.21 — MIT
