@@ -41,7 +41,6 @@ jobs:
               - 'Cargo.toml'
               - 'Cargo.lock'
               - '.github/workflows/ci.yml'
-              - '.github/workflows/rust-napi-ci.local.yml'
             build:
               - '.github/workflows/**'
               - 'src/**'
@@ -57,7 +56,6 @@ jobs:
               - 'npm/**'
               - '.github/workflows/ci.yml'
               - '.github/workflows/release.yml'
-              - '.github/workflows/rust-napi-ci.local.yml'
             provenance:
               - '.github/workflows/**'
               - 'bun.lock'
@@ -72,8 +70,6 @@ jobs:
               - '.provenance.yml'
               - 'provenance/**'
               - '.github/workflows/ci.yml'
-              - '.github/workflows/rust-napi-ci.local.yml'
-              - '.github/actions/provenance-check/**'
 
   trust-check:
     if: github.event_name == 'pull_request'
@@ -102,7 +98,7 @@ jobs:
   napi-ci:
     if: ${{ always() && !cancelled() && needs.check-changes.result == 'success' && (needs.trust-check.result == 'success' || needs.trust-check.result == 'skipped') }}
     needs: [check-changes, trust-check]
-    uses: ./.github/workflows/rust-napi-ci.local.yml
+    uses: stella/.github/.github/workflows/rust-napi-ci.yml@90c81b47c5fee6dc88e67d432cc6951e88a6724e
     with:
       node-version: "22"
       trusted: ${{ (github.event_name != 'pull_request' || needs.trust-check.outputs.trusted == 'true') && 'true' || 'false' }}
@@ -110,5 +106,5 @@ jobs:
       build-changed: ${{ needs.check-changes.outputs.build-changed }}
       provenance-changed: ${{ needs.check-changes.outputs.provenance-changed }}
       provenance-version: v0.1.3
-      rust-format-command: cargo fmt -- --check
+      property-test-command: bun run test:props
     secrets: inherit
