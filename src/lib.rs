@@ -6,9 +6,11 @@ use regex_automata::Input;
 use std::panic;
 use unicode_segmentation::UnicodeSegmentation;
 
-/// Safe wrapper for fancy-regex calls that may panic
-/// (known bug in fancy-regex v0.14 with certain
-/// pattern combinations). Converts panics to None.
+/// Safe wrapper for fancy-regex calls. Historically
+/// older fancy-regex versions could panic on certain
+/// pattern/input combinations; the guard remains as
+/// defence in depth and converts any panic or error
+/// (e.g. backtracking-limit exceeded) to `None`.
 /// Returns (start, end) byte positions.
 fn safe_fancy_find(
   re: &fancy_regex::Regex,

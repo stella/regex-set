@@ -3,6 +3,10 @@ name: Release
 env:
   NODE_VERSION: "22"
   NPM_VERSION: "11.11.1"
+  # Pinned — bun's `latest` channel autoupdate has bitten release CI;
+  # 1.3.12 is the version used successfully by sibling repos.
+  # See https://github.com/oven-sh/bun/issues/19088 for context.
+  BUN_VERSION: "1.3.12"
   CDXGEN_VERSION: "12.1.5"
   CARGO_INCREMENTAL: 0
 
@@ -85,6 +89,9 @@ jobs:
       - run: bun run build:js
       - run: bun run test:runtime:bun
       - run: node scripts/runtime-smoke.mjs
+
+      - name: Property tests
+        run: bun run test:props
 
   build:
     name: Build - ${{ matrix.settings.target }}
