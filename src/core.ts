@@ -10,14 +10,14 @@ const encoder = new TextEncoder();
 export type NativeBinding = {
   RegexSet: new (
     patterns: string[],
-    options?: NativeOptions | undefined | null,
+    options?: NativeOptions | null,
   ) => NativeRegexSetInstance;
   _uax29Boundaries: (haystack: Buffer | Uint8Array) => number[];
 };
 
 type NativeOptions = {
-  wholeWords?: boolean | undefined;
-  unicodeBoundaries?: boolean | undefined;
+  wholeWords?: boolean;
+  unicodeBoundaries?: boolean;
 };
 
 type NativeRegexSetInstance = {
@@ -212,11 +212,11 @@ function regexpToRust(re: RegExp): string {
     src = src.slice(2);
   }
   if (src.length >= 2) {
-    const last = src.charAt(src.length - 1);
+    const last = src.at(-1);
     if (last === "b" || last === "B") {
       let bs = 0;
       let k = src.length - 2;
-      while (k >= 0 && src.charAt(k) === "\\") {
+      while (k >= 0 && src[k] === "\\") {
         bs++;
         k--;
       }
@@ -295,11 +295,11 @@ function scopeInlineFlags(src: string): string {
       rest = rest.slice(2);
     }
     if (rest.length >= 2) {
-      const last = rest.charAt(rest.length - 1);
+      const last = rest.at(-1);
       if (last === "b" || last === "B") {
         let bs = 0;
         let k = rest.length - 2;
-        while (k >= 0 && rest.charAt(k) === "\\") {
+        while (k >= 0 && rest[k] === "\\") {
           bs++;
           k--;
         }
@@ -414,7 +414,7 @@ type NormalizedEntry = {
  * Normalize a pattern entry to { pattern, name }.
  */
 function normalizeEntry(
-  p: PatternEntry,
+  p: unknown,
   i: number,
 ): NormalizedEntry {
   if (typeof p === "string") {
@@ -429,44 +429,39 @@ function normalizeEntry(
       name: undefined,
     };
   }
-  if (
-    typeof p === "object" &&
-    p !== null &&
-    "pattern" in p
-  ) {
-    if (
-      typeof p.pattern !== "string" &&
-      !(p.pattern instanceof RegExp)
-    ) {
-      throw new TypeError(
-        `Pattern at index ${i}: "pattern" ` +
-          "field must be a string or RegExp",
-      );
-    }
-    const inner =
-      p.pattern instanceof RegExp
-        ? { pattern: regexpToRust(p.pattern) }
-        : {
-            pattern: scopeInlineFlags(p.pattern),
-          };
-    if (
-      p.name !== undefined &&
-      typeof p.name !== "string"
-    ) {
-      throw new TypeError(
-        `Pattern at index ${i}: "name" ` +
-          "field must be a string",
-      );
-    }
-    return {
-      pattern: inner.pattern,
-      name: p.name,
-    };
+  if (typeof p !== "object" || p === null || !("pattern" in p)) {
+    throw new TypeError(
+      `Pattern at index ${i} must be a string, ` +
+        "RegExp, or { pattern, name }",
+    );
   }
-  throw new TypeError(
-    `Pattern at index ${i} must be a string, ` +
-      "RegExp, or { pattern, name }",
-  );
+
+  const pattern = p.pattern;
+  if (
+    typeof pattern !== "string" &&
+    !(pattern instanceof RegExp)
+  ) {
+    throw new TypeError(
+      `Pattern at index ${i}: "pattern" ` +
+        "field must be a string or RegExp",
+    );
+  }
+
+  const name = "name" in p ? p.name : undefined;
+  if (name !== undefined && typeof name !== "string") {
+    throw new TypeError(
+      `Pattern at index ${i}: "name" ` +
+        "field must be a string",
+    );
+  }
+
+  return {
+    pattern:
+      pattern instanceof RegExp
+        ? regexpToRust(pattern)
+        : scopeInlineFlags(pattern),
+    name,
+  };
 }
 
 // -- RegexSet class --------------------------------------
@@ -548,11 +543,11 @@ export class RegexSet {
           src = src.slice(2);
         }
         if (src.length >= 2) {
-          const last = src.charAt(src.length - 1);
+          const last = src.at(-1);
           if (last === "b" || last === "B") {
             let bs = 0;
             let k = src.length - 2;
-            while (k >= 0 && src.charAt(k) === "\\") {
+            while (k >= 0 && src[k] === "\\") {
               bs++;
               k--;
             }
@@ -577,8 +572,12 @@ export class RegexSet {
     // Strip JS-only options before passing to native
     const nativeOpts: NativeOptions | undefined = options
       ? {
-          wholeWords: options.wholeWords,
-          unicodeBoundaries: options.unicodeBoundaries,
+          ...(options.wholeWords !== undefined
+            ? { wholeWords: options.wholeWords }
+            : {}),
+          ...(options.unicodeBoundaries !== undefined
+            ? { unicodeBoundaries: options.unicodeBoundaries }
+            : {}),
         }
       : undefined;
 
