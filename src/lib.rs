@@ -902,6 +902,16 @@ fn split_large_alternation(
       }
       b'('
         if !in_class
+          && is_negative_lookaround_at(bytes, i) =>
+      {
+        if let Some(end) = find_matching_paren(pattern, i) {
+          i = end + 1;
+        } else {
+          i += 1;
+        }
+      }
+      b'('
+        if !in_class
           && i + 2 < bytes.len()
           && bytes[i + 1] == b'?'
           && bytes[i + 2] == b':' =>
@@ -997,6 +1007,22 @@ fn is_lookaround_at(bytes: &[u8], i: usize) -> bool {
     || (i + 3 < bytes.len()
       && bytes[i + 2] == b'<'
       && (bytes[i + 3] == b'=' || bytes[i + 3] == b'!'))
+}
+
+fn is_negative_lookaround_at(
+  bytes: &[u8],
+  i: usize,
+) -> bool {
+  if i + 2 >= bytes.len()
+    || bytes[i] != b'('
+    || bytes[i + 1] != b'?'
+  {
+    return false;
+  }
+  bytes[i + 2] == b'!'
+    || (i + 3 < bytes.len()
+      && bytes[i + 2] == b'<'
+      && bytes[i + 3] == b'!')
 }
 
 fn find_matching_paren(
@@ -2020,4 +2046,40 @@ pub fn uax29_boundaries(
   boundaries.sort_unstable();
   boundaries.dedup();
   Ok(boundaries)
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn split_large_alternation_skips_negative_lookaround_groups(
+  ) {
+    let alts = (0..140)
+      .map(|i| format!("BAD{i}"))
+      .collect::<Vec<_>>()
+      .join("|");
+    let pattern = format!(r"foo(?!(?:{alts}))\w+");
+
+    assert!(
+      split_large_alternation(&pattern, 128).is_none()
+    );
+  }
+
+  #[test]
+  fn split_large_alternation_keeps_negative_assertion_intact(
+  ) {
+    let alts = (0..140)
+      .map(|i| format!("GOOD{i}"))
+      .collect::<Vec<_>>()
+      .join("|");
+    let pattern = format!(r"(?:{alts})(?!BAD)");
+
+    let chunks = split_large_alternation(&pattern, 128)
+      .expect("outer alternation should split");
+    assert_eq!(chunks.len(), 2);
+    assert!(chunks
+      .iter()
+      .all(|chunk| chunk.ends_with("(?!BAD)")));
+  }
 }

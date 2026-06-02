@@ -763,8 +763,12 @@ export class RegexSet {
           const name = this._names[fb.pattern];
           if (name !== undefined) match.name = name;
           matches.push(match);
+          if (text.length === 0) {
+            fb.re.lastIndex = nextRegexStart(haystack, start);
+          }
+        } else {
+          fb.re.lastIndex = nextRegexStart(haystack, start);
         }
-        if (text.length === 0) fb.re.lastIndex++;
       }
     }
     return matches;
@@ -800,7 +804,7 @@ export class RegexSet {
       if (this.acceptJsFallbackMatch(haystack, start, end)) {
         return true;
       }
-      if (text.length === 0) fb.re.lastIndex++;
+      fb.re.lastIndex = nextRegexStart(haystack, start);
     }
   }
 
@@ -862,6 +866,22 @@ function countAlternations(pattern: string): number {
     else if (ch === "|" && !inClass) count++;
   }
   return count;
+}
+
+function nextRegexStart(text: string, index: number): number {
+  if (index >= text.length) return index + 1;
+  const first = text.charCodeAt(index);
+  if (
+    first >= 0xd800 &&
+    first <= 0xdbff &&
+    index + 1 < text.length
+  ) {
+    const second = text.charCodeAt(index + 1);
+    if (second >= 0xdc00 && second <= 0xdfff) {
+      return index + 2;
+    }
+  }
+  return index + 1;
 }
 
 function selectNonOverlapping(matches: Match[]): Match[] {

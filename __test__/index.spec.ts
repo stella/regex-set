@@ -896,6 +896,25 @@ describe("large JS-compatible lookaround fallback", () => {
     expect(asciiBoundaries.findIter("čTwitterInc ")).toHaveLength(1);
   });
 
+  test("retries rejected wholeWords matches from the next start", () => {
+    const suffixes = Array.from(
+      { length: 140 },
+      (_, i) => `ZZ${i}`,
+    );
+    suffixes[73] = "bar";
+    const pattern =
+      String.raw`(?:foo-(?:` +
+      suffixes.join("|") +
+      String.raw`)|bar)(?=\s)`;
+    const rs = new RegexSet([pattern], { wholeWords: true });
+
+    expect(rs.isMatch("xfoo-bar ")).toBe(true);
+    expect(rs.findIter("xfoo-bar ").map((m) => m.text)).toEqual([
+      "bar",
+    ]);
+    expect(rs.replaceAll("xfoo-bar ", ["ORG"])).toBe("xfoo-ORG ");
+  });
+
   test("merges JS fallback matches before native pruning", () => {
     const suffixes = Array.from(
       { length: 140 },
