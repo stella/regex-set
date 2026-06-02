@@ -956,6 +956,22 @@ describe("large JS-compatible lookaround fallback", () => {
     ]);
   });
 
+  test("preserves Rust Unicode shorthand classes", () => {
+    const suffixes = Array.from(
+      { length: 140 },
+      (_, i) => `ZZ${i}`,
+    );
+    suffixes[73] = "X";
+    const pattern =
+      String.raw`\d(?=X)(?:` +
+      suffixes.join("|") +
+      String.raw`)`;
+    const rs = new RegexSet([pattern]);
+
+    expect(new RegExp(pattern, "gu").test("٣X")).toBe(false);
+    expect(rs.findIter("٣X").map((m) => m.text)).toEqual(["٣X"]);
+  });
+
   test("merges JS fallback matches before native pruning", () => {
     const suffixes = Array.from(
       { length: 140 },

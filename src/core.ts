@@ -836,6 +836,7 @@ function jsFallbackRegExp(
   if (
     !hasLookaround(pattern) ||
     (unicodeBoundaries && hasRegexWordBoundary(pattern)) ||
+    hasRustUnicodeShorthand(pattern) ||
     hasRustClassSetOperation(pattern) ||
     countAlternations(pattern) < 128
   ) {
@@ -887,6 +888,26 @@ function hasRegexWordBoundary(pattern: string): boolean {
     }
     if (ch === "[") inClass = true;
     else if (ch === "]") inClass = false;
+  }
+  return false;
+}
+
+function hasRustUnicodeShorthand(pattern: string): boolean {
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i];
+    if (ch !== "\\") continue;
+    const next = pattern[i + 1];
+    if (
+      next === "d" ||
+      next === "D" ||
+      next === "w" ||
+      next === "W" ||
+      next === "s" ||
+      next === "S"
+    ) {
+      return true;
+    }
+    i++;
   }
   return false;
 }
