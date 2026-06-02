@@ -38,6 +38,11 @@ type JsFallback = {
   re: RegExp;
 };
 
+type BoundaryOptions = {
+  wholeWords: boolean;
+  unicodeBoundaries: boolean;
+};
+
 // -- Late-bound native binding ---------------------------
 
 let binding: NativeBinding;
@@ -507,6 +512,7 @@ export class RegexSet {
   private _patternCount: number;
   private _nativeIndexMap: number[];
   private _jsFallbacks: JsFallback[];
+  private _boundaryOptions: BoundaryOptions;
 
   constructor(patterns: PatternEntry[], options?: Options) {
     const entries = patterns.map(normalizeEntry);
@@ -517,7 +523,12 @@ export class RegexSet {
     this._patternCount = entries.length;
 
     const unicode = options?.unicodeBoundaries ?? true;
+    const wholeWords = options?.wholeWords ?? false;
     const ci = options?.caseInsensitive ?? false;
+    this._boundaryOptions = {
+      wholeWords,
+      unicodeBoundaries: unicode,
+    };
 
     let processed = entries.map((e) => e.pattern);
 
@@ -630,8 +641,7 @@ export class RegexSet {
       return true;
     }
     for (const fb of this._jsFallbacks) {
-      fb.re.lastIndex = 0;
-      if (fb.re.test(haystack)) return true;
+      if (this.findFirstJsFallback(haystack, fb)) return true;
     }
     return false;
   }
@@ -661,8 +671,9 @@ export class RegexSet {
       seen.add(original);
     }
     for (const fb of this._jsFallbacks) {
-      fb.re.lastIndex = 0;
-      if (fb.re.test(haystack)) seen.add(fb.pattern);
+      if (this.findFirstJsFallback(haystack, fb)) {
+        seen.add(fb.pattern);
+      }
     }
     return [...seen];
   }
@@ -719,19 +730,59 @@ export class RegexSet {
         const text = m[0];
         const start = m.index;
         const end = start + text.length;
-        const match: Match = {
-          pattern: fb.pattern,
-          start,
-          end,
-          text,
-        };
-        const name = this._names[fb.pattern];
-        if (name !== undefined) match.name = name;
-        matches.push(match);
+        if (this.acceptJsFallbackMatch(haystack, start, end)) {
+          const match: Match = {
+            pattern: fb.pattern,
+            start,
+            end,
+            text,
+          };
+          const name = this._names[fb.pattern];
+          if (name !== undefined) match.name = name;
+          matches.push(match);
+        }
         if (text.length === 0) fb.re.lastIndex++;
       }
     }
     return matches;
+  }
+
+  private findFirstJsFallback(
+    haystack: string,
+    fb: JsFallback,
+  ): boolean {
+    fb.re.lastIndex = 0;
+    for (;;) {
+      const m = fb.re.exec(haystack);
+      if (!m) return false;
+      const text = m[0];
+      const start = m.index;
+      const end = start + text.length;
+      if (this.acceptJsFallbackMatch(haystack, start, end)) {
+        return true;
+      }
+      if (text.length === 0) fb.re.lastIndex++;
+    }
+  }
+
+  private acceptJsFallbackMatch(
+    haystack: string,
+    start: number,
+    end: number,
+  ): boolean {
+    if (!this._boundaryOptions.wholeWords) return true;
+    return (
+      isWordBoundary(
+        haystack,
+        start,
+        this._boundaryOptions.unicodeBoundaries,
+      ) &&
+      isWordBoundary(
+        haystack,
+        end,
+        this._boundaryOptions.unicodeBoundaries,
+      )
+    );
   }
 }
 
@@ -791,4 +842,41 @@ function selectNonOverlapping(matches: Match[]): Match[] {
     }
   }
   return selected;
+}
+
+function isWordBoundary(
+  text: string,
+  pos: number,
+  unicode: boolean,
+): boolean {
+  const before = previousCodePoint(text, pos);
+  const after = nextCodePoint(text, pos);
+  return isWordChar(before, unicode) !== isWordChar(after, unicode);
+}
+
+function previousCodePoint(
+  text: string,
+  pos: number,
+): string | undefined {
+  if (pos <= 0) return undefined;
+  return Array.from(text.slice(0, pos)).at(-1);
+}
+
+function nextCodePoint(
+  text: string,
+  pos: number,
+): string | undefined {
+  if (pos >= text.length) return undefined;
+  const cp = text.codePointAt(pos);
+  return cp === undefined ? undefined : String.fromCodePoint(cp);
+}
+
+function isWordChar(
+  ch: string | undefined,
+  unicode: boolean,
+): boolean {
+  if (ch === undefined) return false;
+  return unicode
+    ? /^[\p{Alphabetic}\p{Number}_]$/u.test(ch)
+    : /^[A-Za-z0-9_]$/.test(ch);
 }

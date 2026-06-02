@@ -49,11 +49,13 @@ fn next_char_pos(haystack: &str, pos: usize) -> usize {
   if pos >= haystack.len() {
     return pos + 1;
   }
-  pos
-    + haystack[pos..]
-      .chars()
-      .next()
-      .map_or(1, char::len_utf8)
+  let mut next = pos + 1;
+  while next < haystack.len()
+    && !haystack.is_char_boundary(next)
+  {
+    next += 1;
+  }
+  next
 }
 
 /// Options for constructing a `RegexSet`.
@@ -917,7 +919,7 @@ fn split_large_alternation(
           {
             best = Some((i + 3, end, alts));
           }
-          i = end + 1;
+          i += 3;
         } else {
           i += 1;
         }

@@ -868,6 +868,26 @@ describe("large JS-compatible lookaround fallback", () => {
       [1, "Twitter, Inc."],
     ]);
   });
+
+  test("preserves wholeWords for JS-routed patterns", () => {
+    const suffixes = Array.from(
+      { length: 140 },
+      (_, i) => `ZZ${i}`,
+    );
+    suffixes[73] = "Inc";
+    const pattern =
+      String.raw`Twitter(?:` +
+      suffixes.join("|") +
+      String.raw`)(?![A-Za-z0-9])`;
+    const rs = new RegexSet([pattern], { wholeWords: true });
+
+    expect(rs.isMatch("xTwitterInc ")).toBe(false);
+    expect(rs.findIter("xTwitterInc ")).toEqual([]);
+    expect(rs.whichMatch("xTwitterInc ")).toEqual([]);
+    expect(rs.replaceAll("xTwitterInc TwitterInc ", ["ORG"])).toBe(
+      "xTwitterInc ORG ",
+    );
+  });
 });
 
 // ─── Negated bracket expression in lookahead ──
