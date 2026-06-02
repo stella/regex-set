@@ -882,11 +882,18 @@ describe("large JS-compatible lookaround fallback", () => {
     const rs = new RegexSet([pattern], { wholeWords: true });
 
     expect(rs.isMatch("xTwitterInc ")).toBe(false);
+    expect(rs.isMatch("čTwitterInc ")).toBe(false);
     expect(rs.findIter("xTwitterInc ")).toEqual([]);
     expect(rs.whichMatch("xTwitterInc ")).toEqual([]);
     expect(rs.replaceAll("xTwitterInc TwitterInc ", ["ORG"])).toBe(
       "xTwitterInc ORG ",
     );
+
+    const asciiBoundaries = new RegexSet([pattern], {
+      wholeWords: true,
+      unicodeBoundaries: false,
+    });
+    expect(asciiBoundaries.findIter("čTwitterInc ")).toHaveLength(1);
   });
 
   test("merges JS fallback matches before native pruning", () => {
