@@ -888,6 +888,25 @@ describe("large JS-compatible lookaround fallback", () => {
       "xTwitterInc ORG ",
     );
   });
+
+  test("merges JS fallback matches before native pruning", () => {
+    const suffixes = Array.from(
+      { length: 140 },
+      (_, i) => `ZZ${i}`,
+    );
+    suffixes[73] = "b";
+    const jsPattern =
+      String.raw`a(?:` + suffixes.join("|") + String.raw`)(?=c)`;
+    const rs = new RegexSet([jsPattern, "bc", "cd"]);
+
+    expect(rs.findIter("abcd").map((m) => [m.pattern, m.text])).toEqual([
+      [0, "ab"],
+      [2, "cd"],
+    ]);
+    expect(rs.replaceAll("abcd", ["AB", "BC", "CD"])).toBe(
+      "ABCD",
+    );
+  });
 });
 
 // ─── Negated bracket expression in lookahead ──

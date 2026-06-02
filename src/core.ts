@@ -38,6 +38,11 @@ type JsFallback = {
   re: RegExp;
 };
 
+type NativeSingle = {
+  pattern: number;
+  inner: NativeRegexSetInstance;
+};
+
 type BoundaryOptions = {
   wholeWords: boolean;
   unicodeBoundaries: boolean;
@@ -512,6 +517,7 @@ export class RegexSet {
   private _patternCount: number;
   private _nativeIndexMap: number[];
   private _jsFallbacks: JsFallback[];
+  private _nativeSingles: NativeSingle[];
   private _boundaryOptions: BoundaryOptions;
 
   constructor(patterns: PatternEntry[], options?: Options) {
@@ -609,6 +615,7 @@ export class RegexSet {
     const nativePatterns: string[] = [];
     this._nativeIndexMap = [];
     this._jsFallbacks = [];
+    this._nativeSingles = [];
 
     for (let i = 0; i < processed.length; i++) {
       const pattern = processed[i];
@@ -628,6 +635,18 @@ export class RegexSet {
     }
 
     this._inner = new binding.RegexSet(nativePatterns, nativeOpts);
+    if (this._jsFallbacks.length > 0) {
+      this._nativeSingles = nativePatterns.map((pattern, i) => {
+        const original = this._nativeIndexMap[i];
+        if (original === undefined) {
+          throw new Error(`Missing native index map ${i}`);
+        }
+        return {
+          pattern: original,
+          inner: new binding.RegexSet([pattern], nativeOpts),
+        };
+      });
+    }
   }
 
   /** Number of patterns. */
@@ -648,16 +667,20 @@ export class RegexSet {
 
   /** Find all non-overlapping matches. */
   findIter(haystack: string): Match[] {
+    if (this._jsFallbacks.length > 0) {
+      const all = this.findNativeSingles(haystack).concat(
+        this.findJsFallbacks(haystack),
+      );
+      return selectNonOverlapping(all);
+    }
+
     const native = unpack(
       this._inner._findIterPackedBuf(encoder.encode(haystack)),
       haystack,
       this._hasNames ? this._names : null,
       this._nativeIndexMap,
     );
-    if (this._jsFallbacks.length === 0) return native;
-
-    const all = native.concat(this.findJsFallbacks(haystack));
-    return selectNonOverlapping(all);
+    return native;
   }
 
   /** Which pattern indices matched (not where). */
@@ -743,6 +766,22 @@ export class RegexSet {
         }
         if (text.length === 0) fb.re.lastIndex++;
       }
+    }
+    return matches;
+  }
+
+  private findNativeSingles(haystack: string): Match[] {
+    const encoded = encoder.encode(haystack);
+    const matches: Match[] = [];
+    for (const single of this._nativeSingles) {
+      matches.push(
+        ...unpack(
+          single.inner._findIterPackedBuf(encoded),
+          haystack,
+          this._hasNames ? this._names : null,
+          [single.pattern],
+        ),
+      );
     }
     return matches;
   }
