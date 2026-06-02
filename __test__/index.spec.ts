@@ -974,6 +974,22 @@ describe("large JS-compatible lookaround fallback", () => {
       "ABCD",
     );
   });
+
+  test("preserves pattern order for equal-span fallback ties", () => {
+    const suffixes = Array.from(
+      { length: 140 },
+      (_, i) => `ZZ${i}`,
+    );
+    suffixes[73] = "b";
+    const jsPattern =
+      String.raw`a(?:` + suffixes.join("|") + String.raw`)(?=c)`;
+    const rs = new RegexSet([jsPattern, "ab"]);
+
+    expect(rs.findIter("abc").map((m) => [m.pattern, m.text])).toEqual([
+      [0, "ab"],
+    ]);
+    expect(rs.replaceAll("abc", ["JS", "NATIVE"])).toBe("JSc");
+  });
 });
 
 // ─── Negated bracket expression in lookahead ──

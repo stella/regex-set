@@ -941,7 +941,9 @@ function selectNonOverlapping(matches: Match[]): Match[] {
 
   matches.sort((a, b) => {
     if (a.start !== b.start) return a.start - b.start;
-    return b.end - b.start - (a.end - a.start);
+    const lengthOrder = b.end - b.start - (a.end - a.start);
+    if (lengthOrder !== 0) return lengthOrder;
+    return a.pattern - b.pattern;
   });
 
   const selected: Match[] = [];
