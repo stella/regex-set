@@ -33,6 +33,11 @@ type NativeRegexSetInstance = {
   ): string;
 };
 
+type JsFallback = {
+  pattern: number;
+  re: RegExp;
+};
+
 // -- Late-bound native binding ---------------------------
 
 let binding: NativeBinding;
@@ -116,6 +121,7 @@ function unpack(
   packed: Uint32Array,
   haystack: string,
   names: (string | undefined)[] | null,
+  indexMap?: number[],
 ): Match[] {
   const len = packed.length;
   // eslint-disable-next-line unicorn/no-new-array
@@ -133,14 +139,18 @@ function unpack(
         `Corrupt packed match data at offset ${i}`,
       );
     }
+    const pattern = indexMap ? indexMap[idx] : idx;
+    if (pattern === undefined) {
+      throw new Error(`Missing native index map ${idx}`);
+    }
     const m: Match = {
-      pattern: idx,
+      pattern,
       start: s,
       end: e,
       text: haystack.slice(s, e),
     };
-    if (names && names[idx] !== undefined)
-      m.name = names[idx];
+    if (names && names[pattern] !== undefined)
+      m.name = names[pattern];
     matches[j] = m;
   }
   return matches;
@@ -494,6 +504,9 @@ export class RegexSet {
   private _inner: NativeRegexSetInstance;
   private _names: (string | undefined)[];
   private _hasNames: boolean;
+  private _patternCount: number;
+  private _nativeIndexMap: number[];
+  private _jsFallbacks: JsFallback[];
 
   constructor(patterns: PatternEntry[], options?: Options) {
     const entries = patterns.map(normalizeEntry);
@@ -501,6 +514,7 @@ export class RegexSet {
     this._hasNames = entries.some(
       (e) => e.name !== undefined,
     );
+    this._patternCount = entries.length;
 
     const unicode = options?.unicodeBoundaries ?? true;
     const ci = options?.caseInsensitive ?? false;
@@ -581,34 +595,76 @@ export class RegexSet {
         }
       : undefined;
 
-    this._inner = new binding.RegexSet(
-      processed,
-      nativeOpts,
-    );
+    const nativePatterns: string[] = [];
+    this._nativeIndexMap = [];
+    this._jsFallbacks = [];
+
+    for (let i = 0; i < processed.length; i++) {
+      const pattern = processed[i];
+      if (pattern === undefined) {
+        throw new Error(`Missing processed pattern ${i}`);
+      }
+      const jsFallback = jsFallbackRegExp(pattern);
+      if (jsFallback) {
+        this._jsFallbacks.push({
+          pattern: i,
+          re: jsFallback,
+        });
+      } else {
+        this._nativeIndexMap.push(i);
+        nativePatterns.push(pattern);
+      }
+    }
+
+    this._inner = new binding.RegexSet(nativePatterns, nativeOpts);
   }
 
   /** Number of patterns. */
   get patternCount(): number {
-    return this._inner.patternCount;
+    return this._patternCount;
   }
 
   /** Returns `true` if any pattern matches. */
   isMatch(haystack: string): boolean {
-    return this._inner._isMatchBuf(encoder.encode(haystack));
+    if (this._inner._isMatchBuf(encoder.encode(haystack))) {
+      return true;
+    }
+    for (const fb of this._jsFallbacks) {
+      fb.re.lastIndex = 0;
+      if (fb.re.test(haystack)) return true;
+    }
+    return false;
   }
 
   /** Find all non-overlapping matches. */
   findIter(haystack: string): Match[] {
-    return unpack(
+    const native = unpack(
       this._inner._findIterPackedBuf(encoder.encode(haystack)),
       haystack,
       this._hasNames ? this._names : null,
+      this._nativeIndexMap,
     );
+    if (this._jsFallbacks.length === 0) return native;
+
+    const all = native.concat(this.findJsFallbacks(haystack));
+    return selectNonOverlapping(all);
   }
 
   /** Which pattern indices matched (not where). */
   whichMatch(haystack: string): number[] {
-    return this._inner.whichMatch(haystack);
+    const seen = new Set<number>();
+    for (const pattern of this._inner.whichMatch(haystack)) {
+      const original = this._nativeIndexMap[pattern];
+      if (original === undefined) {
+        throw new Error(`Missing native index map ${pattern}`);
+      }
+      seen.add(original);
+    }
+    for (const fb of this._jsFallbacks) {
+      fb.re.lastIndex = 0;
+      if (fb.re.test(haystack)) seen.add(fb.pattern);
+    }
+    return [...seen];
   }
 
   /**
@@ -619,6 +675,120 @@ export class RegexSet {
     haystack: string,
     replacements: string[],
   ): string {
-    return this._inner.replaceAll(haystack, replacements);
+    if (
+      this._jsFallbacks.length === 0 &&
+      this._nativeIndexMap.length === this._patternCount &&
+      this._nativeIndexMap.every((idx, i) => idx === i)
+    ) {
+      return this._inner.replaceAll(haystack, replacements);
+    }
+    if (replacements.length !== this._patternCount) {
+      throw new Error(
+        `Expected ${this._patternCount} ` +
+          `replacements, got ${replacements.length}`,
+      );
+    }
+
+    const matches = this.findIter(haystack);
+    let result = "";
+    let last = 0;
+
+    for (const m of matches) {
+      result += haystack.slice(last, m.start);
+      const replacement = replacements[m.pattern];
+      if (replacement === undefined) {
+        throw new Error(
+          `Missing replacement for pattern ${m.pattern}`,
+        );
+      }
+      result += replacement;
+      last = m.end;
+    }
+
+    result += haystack.slice(last);
+    return result;
   }
+
+  private findJsFallbacks(haystack: string): Match[] {
+    const matches: Match[] = [];
+    for (const fb of this._jsFallbacks) {
+      fb.re.lastIndex = 0;
+      for (;;) {
+        const m = fb.re.exec(haystack);
+        if (!m) break;
+        const text = m[0];
+        const start = m.index;
+        const end = start + text.length;
+        const match: Match = {
+          pattern: fb.pattern,
+          start,
+          end,
+          text,
+        };
+        const name = this._names[fb.pattern];
+        if (name !== undefined) match.name = name;
+        matches.push(match);
+        if (text.length === 0) fb.re.lastIndex++;
+      }
+    }
+    return matches;
+  }
+}
+
+function jsFallbackRegExp(pattern: string): RegExp | undefined {
+  if (
+    !hasLookaround(pattern) ||
+    countAlternations(pattern) < 128
+  ) {
+    return undefined;
+  }
+  try {
+    return new RegExp(pattern, "gu");
+  } catch {
+    return undefined;
+  }
+}
+
+function hasLookaround(pattern: string): boolean {
+  return (
+    pattern.includes("(?=") ||
+    pattern.includes("(?!") ||
+    pattern.includes("(?<=") ||
+    pattern.includes("(?<!")
+  );
+}
+
+function countAlternations(pattern: string): number {
+  let count = 0;
+  let inClass = false;
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i];
+    if (ch === "\\") {
+      i++;
+      continue;
+    }
+    if (ch === "[") inClass = true;
+    else if (ch === "]") inClass = false;
+    else if (ch === "|" && !inClass) count++;
+  }
+  return count;
+}
+
+function selectNonOverlapping(matches: Match[]): Match[] {
+  if (matches.length <= 1) return matches;
+
+  matches.sort((a, b) => {
+    if (a.start !== b.start) return a.start - b.start;
+    return b.end - b.start - (a.end - a.start);
+  });
+
+  const selected: Match[] = [];
+  let lastEnd = 0;
+  for (const m of matches) {
+    if (m.start >= lastEnd) {
+      selected.push(m);
+      lastEnd = m.end;
+    }
+  }
+  return selected;
 }
