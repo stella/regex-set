@@ -832,6 +832,7 @@ export class RegexSet {
 function jsFallbackRegExp(pattern: string): RegExp | undefined {
   if (
     !hasLookaround(pattern) ||
+    hasRustClassSetOperation(pattern) ||
     countAlternations(pattern) < 128
   ) {
     return undefined;
@@ -866,6 +867,35 @@ function countAlternations(pattern: string): number {
     else if (ch === "|" && !inClass) count++;
   }
   return count;
+}
+
+function hasRustClassSetOperation(pattern: string): boolean {
+  let inClass = false;
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i];
+    if (ch === "\\") {
+      i++;
+      continue;
+    }
+    if (ch === "[") {
+      inClass = true;
+      continue;
+    }
+    if (ch === "]") {
+      inClass = false;
+      continue;
+    }
+    if (
+      inClass &&
+      i + 1 < pattern.length &&
+      ((ch === "&" && pattern[i + 1] === "&") ||
+        (ch === "-" && pattern[i + 1] === "-") ||
+        (ch === "~" && pattern[i + 1] === "~"))
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function nextRegexStart(text: string, index: number): number {

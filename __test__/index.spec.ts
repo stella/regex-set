@@ -915,6 +915,24 @@ describe("large JS-compatible lookaround fallback", () => {
     expect(rs.replaceAll("xfoo-bar ", ["ORG"])).toBe("xfoo-ORG ");
   });
 
+  test("does not route Rust-only class set syntax through JS", () => {
+    const suffixes = Array.from(
+      { length: 140 },
+      (_, i) => `ZZ${i}`,
+    );
+    suffixes[73] = "X";
+    const pattern =
+      String.raw`[a&&b](?=X)(?:` +
+      suffixes.join("|") +
+      String.raw`)`;
+    const rs = new RegexSet([pattern]);
+
+    expect(new RegExp(pattern, "gu").test("aX")).toBe(true);
+    expect(rs.isMatch("aX")).toBe(false);
+    expect(rs.findIter("aX")).toEqual([]);
+    expect(rs.replaceAll("aX", ["NOPE"])).toBe("aX");
+  });
+
   test("merges JS fallback matches before native pruning", () => {
     const suffixes = Array.from(
       { length: 140 },
