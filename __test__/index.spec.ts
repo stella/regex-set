@@ -933,6 +933,29 @@ describe("large JS-compatible lookaround fallback", () => {
     expect(rs.replaceAll("aX", ["NOPE"])).toBe("aX");
   });
 
+  test("preserves explicit Unicode word boundaries", () => {
+    const suffixes = Array.from(
+      { length: 140 },
+      (_, i) => `ZZ${i}`,
+    );
+    suffixes[73] = "Inc";
+    const pattern =
+      String.raw`\bTwitter(?:` +
+      suffixes.join("|") +
+      String.raw`)(?![A-Za-z0-9])`;
+    const rs = new RegexSet([pattern], {
+      unicodeBoundaries: true,
+    });
+
+    expect(new RegExp(pattern, "gu").test("čTwitterInc ")).toBe(
+      true,
+    );
+    expect(rs.findIter("čTwitterInc ")).toEqual([]);
+    expect(rs.findIter(" TwitterInc ").map((m) => m.text)).toEqual([
+      "TwitterInc",
+    ]);
+  });
+
   test("merges JS fallback matches before native pruning", () => {
     const suffixes = Array.from(
       { length: 140 },

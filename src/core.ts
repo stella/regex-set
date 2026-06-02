@@ -622,7 +622,7 @@ export class RegexSet {
       if (pattern === undefined) {
         throw new Error(`Missing processed pattern ${i}`);
       }
-      const jsFallback = jsFallbackRegExp(pattern);
+      const jsFallback = jsFallbackRegExp(pattern, unicode);
       if (jsFallback) {
         this._jsFallbacks.push({
           pattern: i,
@@ -829,9 +829,13 @@ export class RegexSet {
   }
 }
 
-function jsFallbackRegExp(pattern: string): RegExp | undefined {
+function jsFallbackRegExp(
+  pattern: string,
+  unicodeBoundaries: boolean,
+): RegExp | undefined {
   if (
     !hasLookaround(pattern) ||
+    (unicodeBoundaries && hasRegexWordBoundary(pattern)) ||
     hasRustClassSetOperation(pattern) ||
     countAlternations(pattern) < 128
   ) {
@@ -867,6 +871,24 @@ function countAlternations(pattern: string): number {
     else if (ch === "|" && !inClass) count++;
   }
   return count;
+}
+
+function hasRegexWordBoundary(pattern: string): boolean {
+  let inClass = false;
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i];
+    if (ch === "\\") {
+      const next = pattern[i + 1];
+      if (!inClass && (next === "b" || next === "B")) {
+        return true;
+      }
+      i++;
+      continue;
+    }
+    if (ch === "[") inClass = true;
+    else if (ch === "]") inClass = false;
+  }
+  return false;
 }
 
 function hasRustClassSetOperation(pattern: string): boolean {
