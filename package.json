@@ -51,7 +51,7 @@
     "test:runtime:node": "node scripts/runtime-smoke.mjs",
     "version:sync": "node scripts/version-sync.mjs sync",
     "version:check": "node scripts/version-sync.mjs check",
-    "format": "oxfmt . && rustfmt src/lib.rs",
+    "format": "oxfmt . \"!.ai/**\" \"!.agents/**\" \"!.claude/**\" \"!AGENTS.md\" \"!CLAUDE.md\" \"!GEMINI.md\" && rustfmt src/lib.rs",
     "typecheck": "tsc --noEmit",
     "lint": "bun --bun oxlint -c oxlint.config.ts --report-unused-disable-directives-severity=error --deny-warnings --type-aware .",
     "lint:fix": "bun --bun oxlint -c oxlint.config.ts --type-aware --fix .",
@@ -60,12 +60,14 @@
     "bench:all": "bun run bench && bun run bench:fallback",
     "bench:fallback": "bun __bench__/fancy-fallback.ts",
     "bench:install": "cd __bench__ && bun install",
-    "bench:download": "bash __bench__/download-corpus.sh"
+    "bench:download": "bash __bench__/download-corpus.sh",
+    "sync-ai": "bash scripts/sync-ai-skills.sh",
+    "sync-ai:check": "bash scripts/sync-ai-skills.sh --check"
   },
   "devDependencies": {
     "@emnapi/core": "^1.10.0",
     "@emnapi/runtime": "^1.10.0",
-    "@napi-rs/cli": "^3.6.2",
+    "@napi-rs/cli": "^3.7.0",
     "@napi-rs/wasm-runtime": "^1.1.4",
     "@stll/oxlint-config": "^0.2.0",
     "@stll/typescript-config": "^0.2.0",
@@ -74,10 +76,10 @@
     "bun-types": "^1.3.14",
     "emnapi": "^1.10.0",
     "fast-check": "^4.8.0",
-    "oxfmt": "^0.48.0",
+    "oxfmt": "^0.52.0",
     "oxlint": "^1.67.0",
     "oxlint-tsgolint": "^0.23.0",
-    "tsdown": "^0.22.0",
+    "tsdown": "^0.22.1",
     "typescript": "^6.0.3",
     "vite": "^8.0.14"
   },
