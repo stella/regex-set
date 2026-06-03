@@ -36,7 +36,10 @@ export function injectWasmFetchGuard(
     return null;
   }
 
-  return code.replace(FETCH_NEEDLE, buildReplacement(packageName));
+  return code.replace(
+    FETCH_NEEDLE,
+    buildReplacement(packageName),
+  );
 }
 
 export function wasmFetchGuardPlugin(packageName: string) {

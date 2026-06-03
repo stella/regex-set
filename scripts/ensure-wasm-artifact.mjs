@@ -1,6 +1,6 @@
-import { access } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { constants } from "node:fs";
+import { access } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const wasmPath = fileURLToPath(
@@ -16,7 +16,12 @@ const napiPath = fileURLToPath(
 try {
   await access(wasmPath, constants.F_OK);
   await access(
-    fileURLToPath(new URL("../regex-set.wasi-browser.js", import.meta.url)),
+    fileURLToPath(
+      new URL(
+        "../regex-set.wasi-browser.js",
+        import.meta.url,
+      ),
+    ),
     constants.F_OK,
   );
 } catch (error) {
@@ -26,7 +31,13 @@ try {
 
   const result = spawnSync(
     napiPath,
-    ["build", "--platform", "--target", "wasm32-wasip1-threads", "--release"],
+    [
+      "build",
+      "--platform",
+      "--target",
+      "wasm32-wasip1-threads",
+      "--release",
+    ],
     {
       stdio: "inherit",
     },

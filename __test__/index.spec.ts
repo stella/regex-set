@@ -863,10 +863,12 @@ describe("large JS-compatible lookaround fallback", () => {
       '42 (this "Agreement"), among Twitter, Inc.',
     );
 
-    expect(matches.map((m) => [m.pattern, m.text])).toEqual([
-      [0, "42"],
-      [1, "Twitter, Inc."],
-    ]);
+    expect(matches.map((m) => [m.pattern, m.text])).toEqual(
+      [
+        [0, "42"],
+        [1, "Twitter, Inc."],
+      ],
+    );
   });
 
   test("preserves wholeWords for JS-routed patterns", () => {
@@ -879,21 +881,25 @@ describe("large JS-compatible lookaround fallback", () => {
       String.raw`Twitter(?:` +
       suffixes.join("|") +
       String.raw`)(?![A-Za-z0-9])`;
-    const rs = new RegexSet([pattern], { wholeWords: true });
+    const rs = new RegexSet([pattern], {
+      wholeWords: true,
+    });
 
     expect(rs.isMatch("xTwitterInc ")).toBe(false);
     expect(rs.isMatch("čTwitterInc ")).toBe(false);
     expect(rs.findIter("xTwitterInc ")).toEqual([]);
     expect(rs.whichMatch("xTwitterInc ")).toEqual([]);
-    expect(rs.replaceAll("xTwitterInc TwitterInc ", ["ORG"])).toBe(
-      "xTwitterInc ORG ",
-    );
+    expect(
+      rs.replaceAll("xTwitterInc TwitterInc ", ["ORG"]),
+    ).toBe("xTwitterInc ORG ");
 
     const asciiBoundaries = new RegexSet([pattern], {
       wholeWords: true,
       unicodeBoundaries: false,
     });
-    expect(asciiBoundaries.findIter("čTwitterInc ")).toHaveLength(1);
+    expect(
+      asciiBoundaries.findIter("čTwitterInc "),
+    ).toHaveLength(1);
   });
 
   test("retries rejected wholeWords matches from the next start", () => {
@@ -906,13 +912,17 @@ describe("large JS-compatible lookaround fallback", () => {
       String.raw`(?:foo-(?:` +
       suffixes.join("|") +
       String.raw`)|bar)(?=\s)`;
-    const rs = new RegexSet([pattern], { wholeWords: true });
+    const rs = new RegexSet([pattern], {
+      wholeWords: true,
+    });
 
     expect(rs.isMatch("xfoo-bar ")).toBe(true);
-    expect(rs.findIter("xfoo-bar ").map((m) => m.text)).toEqual([
-      "bar",
-    ]);
-    expect(rs.replaceAll("xfoo-bar ", ["ORG"])).toBe("xfoo-ORG ");
+    expect(
+      rs.findIter("xfoo-bar ").map((m) => m.text),
+    ).toEqual(["bar"]);
+    expect(rs.replaceAll("xfoo-bar ", ["ORG"])).toBe(
+      "xfoo-ORG ",
+    );
   });
 
   test("does not route Rust-only class set syntax through JS", () => {
@@ -947,13 +957,13 @@ describe("large JS-compatible lookaround fallback", () => {
       unicodeBoundaries: true,
     });
 
-    expect(new RegExp(pattern, "gu").test("čTwitterInc ")).toBe(
-      true,
-    );
+    expect(
+      new RegExp(pattern, "gu").test("čTwitterInc "),
+    ).toBe(true);
     expect(rs.findIter("čTwitterInc ")).toEqual([]);
-    expect(rs.findIter(" TwitterInc ").map((m) => m.text)).toEqual([
-      "TwitterInc",
-    ]);
+    expect(
+      rs.findIter(" TwitterInc ").map((m) => m.text),
+    ).toEqual(["TwitterInc"]);
   });
 
   test("preserves Rust Unicode shorthand classes", () => {
@@ -968,8 +978,12 @@ describe("large JS-compatible lookaround fallback", () => {
       String.raw`)`;
     const rs = new RegexSet([pattern]);
 
-    expect(new RegExp(pattern, "gu").test("٣X")).toBe(false);
-    expect(rs.findIter("٣X").map((m) => m.text)).toEqual(["٣X"]);
+    expect(new RegExp(pattern, "gu").test("٣X")).toBe(
+      false,
+    );
+    expect(rs.findIter("٣X").map((m) => m.text)).toEqual([
+      "٣X",
+    ]);
   });
 
   test("merges JS fallback matches before native pruning", () => {
@@ -979,10 +993,14 @@ describe("large JS-compatible lookaround fallback", () => {
     );
     suffixes[73] = "b";
     const jsPattern =
-      String.raw`a(?:` + suffixes.join("|") + String.raw`)(?=c)`;
+      String.raw`a(?:` +
+      suffixes.join("|") +
+      String.raw`)(?=c)`;
     const rs = new RegexSet([jsPattern, "bc", "cd"]);
 
-    expect(rs.findIter("abcd").map((m) => [m.pattern, m.text])).toEqual([
+    expect(
+      rs.findIter("abcd").map((m) => [m.pattern, m.text]),
+    ).toEqual([
       [0, "ab"],
       [2, "cd"],
     ]);
@@ -998,13 +1016,17 @@ describe("large JS-compatible lookaround fallback", () => {
     );
     suffixes[73] = "b";
     const jsPattern =
-      String.raw`a(?:` + suffixes.join("|") + String.raw`)(?=c)`;
+      String.raw`a(?:` +
+      suffixes.join("|") +
+      String.raw`)(?=c)`;
     const rs = new RegexSet([jsPattern, "ab"]);
 
-    expect(rs.findIter("abc").map((m) => [m.pattern, m.text])).toEqual([
-      [0, "ab"],
-    ]);
-    expect(rs.replaceAll("abc", ["JS", "NATIVE"])).toBe("JSc");
+    expect(
+      rs.findIter("abc").map((m) => [m.pattern, m.text]),
+    ).toEqual([[0, "ab"]]);
+    expect(rs.replaceAll("abc", ["JS", "NATIVE"])).toBe(
+      "JSc",
+    );
   });
 });
 

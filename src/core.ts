@@ -12,7 +12,9 @@ export type NativeBinding = {
     patterns: string[],
     options?: NativeOptions | null,
   ) => NativeRegexSetInstance;
-  _uax29Boundaries: (haystack: Buffer | Uint8Array) => number[];
+  _uax29Boundaries: (
+    haystack: Buffer | Uint8Array,
+  ) => number[];
 };
 
 type NativeOptions = {
@@ -25,7 +27,9 @@ type NativeRegexSetInstance = {
   isMatch(haystack: string): boolean;
   _isMatchBuf(haystack: Buffer | Uint8Array): boolean;
   _findIterPacked(haystack: string): Uint32Array;
-  _findIterPackedBuf(haystack: Buffer | Uint8Array): Uint32Array;
+  _findIterPackedBuf(
+    haystack: Buffer | Uint8Array,
+  ): Uint32Array;
   whichMatch(haystack: string): number[];
   replaceAll(
     haystack: string,
@@ -449,7 +453,11 @@ function normalizeEntry(
       name: undefined,
     };
   }
-  if (typeof p !== "object" || p === null || !("pattern" in p)) {
+  if (
+    typeof p !== "object" ||
+    p === null ||
+    !("pattern" in p)
+  ) {
     throw new TypeError(
       `Pattern at index ${i} must be a string, ` +
         "RegExp, or { pattern, name }",
@@ -607,7 +615,10 @@ export class RegexSet {
             ? { wholeWords: options.wholeWords }
             : {}),
           ...(options.unicodeBoundaries !== undefined
-            ? { unicodeBoundaries: options.unicodeBoundaries }
+            ? {
+                unicodeBoundaries:
+                  options.unicodeBoundaries,
+              }
             : {}),
         }
       : undefined;
@@ -634,18 +645,28 @@ export class RegexSet {
       }
     }
 
-    this._inner = new binding.RegexSet(nativePatterns, nativeOpts);
+    this._inner = new binding.RegexSet(
+      nativePatterns,
+      nativeOpts,
+    );
     if (this._jsFallbacks.length > 0) {
-      this._nativeSingles = nativePatterns.map((pattern, i) => {
-        const original = this._nativeIndexMap[i];
-        if (original === undefined) {
-          throw new Error(`Missing native index map ${i}`);
-        }
-        return {
-          pattern: original,
-          inner: new binding.RegexSet([pattern], nativeOpts),
-        };
-      });
+      this._nativeSingles = nativePatterns.map(
+        (pattern, i) => {
+          const original = this._nativeIndexMap[i];
+          if (original === undefined) {
+            throw new Error(
+              `Missing native index map ${i}`,
+            );
+          }
+          return {
+            pattern: original,
+            inner: new binding.RegexSet(
+              [pattern],
+              nativeOpts,
+            ),
+          };
+        },
+      );
     }
   }
 
@@ -660,7 +681,8 @@ export class RegexSet {
       return true;
     }
     for (const fb of this._jsFallbacks) {
-      if (this.findFirstJsFallback(haystack, fb)) return true;
+      if (this.findFirstJsFallback(haystack, fb))
+        return true;
     }
     return false;
   }
@@ -675,7 +697,9 @@ export class RegexSet {
     }
 
     const native = unpack(
-      this._inner._findIterPackedBuf(encoder.encode(haystack)),
+      this._inner._findIterPackedBuf(
+        encoder.encode(haystack),
+      ),
       haystack,
       this._hasNames ? this._names : null,
       this._nativeIndexMap,
@@ -686,10 +710,14 @@ export class RegexSet {
   /** Which pattern indices matched (not where). */
   whichMatch(haystack: string): number[] {
     const seen = new Set<number>();
-    for (const pattern of this._inner.whichMatch(haystack)) {
+    for (const pattern of this._inner.whichMatch(
+      haystack,
+    )) {
       const original = this._nativeIndexMap[pattern];
       if (original === undefined) {
-        throw new Error(`Missing native index map ${pattern}`);
+        throw new Error(
+          `Missing native index map ${pattern}`,
+        );
       }
       seen.add(original);
     }
@@ -753,7 +781,9 @@ export class RegexSet {
         const text = m[0];
         const start = m.index;
         const end = start + text.length;
-        if (this.acceptJsFallbackMatch(haystack, start, end)) {
+        if (
+          this.acceptJsFallbackMatch(haystack, start, end)
+        ) {
           const match: Match = {
             pattern: fb.pattern,
             start,
@@ -764,7 +794,10 @@ export class RegexSet {
           if (name !== undefined) match.name = name;
           matches.push(match);
           if (text.length === 0) {
-            fb.re.lastIndex = nextRegexStart(haystack, start);
+            fb.re.lastIndex = nextRegexStart(
+              haystack,
+              start,
+            );
           }
         } else {
           fb.re.lastIndex = nextRegexStart(haystack, start);
@@ -801,7 +834,9 @@ export class RegexSet {
       const text = m[0];
       const start = m.index;
       const end = start + text.length;
-      if (this.acceptJsFallbackMatch(haystack, start, end)) {
+      if (
+        this.acceptJsFallbackMatch(haystack, start, end)
+      ) {
         return true;
       }
       fb.re.lastIndex = nextRegexStart(haystack, start);
@@ -912,7 +947,9 @@ function hasRustUnicodeShorthand(pattern: string): boolean {
   return false;
 }
 
-function hasRustClassSetOperation(pattern: string): boolean {
+function hasRustClassSetOperation(
+  pattern: string,
+): boolean {
   let inClass = false;
   for (let i = 0; i < pattern.length; i++) {
     const ch = pattern[i];
@@ -941,7 +978,10 @@ function hasRustClassSetOperation(pattern: string): boolean {
   return false;
 }
 
-function nextRegexStart(text: string, index: number): number {
+function nextRegexStart(
+  text: string,
+  index: number,
+): number {
   if (index >= text.length) return index + 1;
   const first = text.charCodeAt(index);
   if (
@@ -985,7 +1025,10 @@ function isWordBoundary(
 ): boolean {
   const before = previousCodePoint(text, pos);
   const after = nextCodePoint(text, pos);
-  return isWordChar(before, unicode) !== isWordChar(after, unicode);
+  return (
+    isWordChar(before, unicode) !==
+    isWordChar(after, unicode)
+  );
 }
 
 function previousCodePoint(
@@ -1002,7 +1045,9 @@ function nextCodePoint(
 ): string | undefined {
   if (pos >= text.length) return undefined;
   const cp = text.codePointAt(pos);
-  return cp === undefined ? undefined : String.fromCodePoint(cp);
+  return cp === undefined
+    ? undefined
+    : String.fromCodePoint(cp);
 }
 
 function isWordChar(

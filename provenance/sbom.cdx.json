@@ -2111,10 +2111,10 @@
         ],
         "occurrences": [
           {
-            "location": "wasi-worker-browser.mjs#1"
+            "location": "wasi-worker-browser.mjs#5"
           },
           {
-            "location": "wasi-worker.mjs#9"
+            "location": "wasi-worker.mjs#13"
           }
         ]
       },
