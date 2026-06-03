@@ -1,6 +1,6 @@
 {
   "name": "@stll/regex-set-darwin-arm64",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "cpu": [
     "arm64"
   ],

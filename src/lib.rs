@@ -366,6 +366,101 @@ fn has_non_ascii(pattern: &str) -> bool {
   !pattern.is_ascii()
 }
 
+fn bracket_class_is_word_like(s: &str) -> bool {
+  let Some(inner) =
+    s.strip_prefix('[').and_then(|v| v.strip_suffix(']'))
+  else {
+    return false;
+  };
+  !inner.starts_with('^')
+    && inner.chars().all(|ch| {
+      ch.is_ascii_alphanumeric() || ch == '_' || ch == '-'
+    })
+}
+
+fn starts_with_word_like_token(s: &str) -> bool {
+  if s.starts_with("\\w") || s.starts_with("\\d") {
+    return true;
+  }
+  if s.starts_with("\\p{L}")
+    || s.starts_with("\\p{N}")
+    || s.starts_with("\\p{Alphabetic}")
+    || s.starts_with("\\p{Numeric}")
+    || s.starts_with("\\p{Letter}")
+    || s.starts_with("\\p{Number}")
+  {
+    return true;
+  }
+  if s
+    .chars()
+    .next()
+    .is_some_and(|ch| ch.is_alphanumeric() || ch == '_')
+  {
+    return true;
+  }
+  if !s.starts_with('[') {
+    return false;
+  }
+  let Some(end) = s.find(']') else {
+    return false;
+  };
+  bracket_class_is_word_like(&s[..=end])
+}
+
+fn strip_trailing_quantifier(s: &str) -> &str {
+  if s.ends_with('?')
+    || s.ends_with('+')
+    || s.ends_with('*')
+  {
+    return &s[..s.len() - 1];
+  }
+
+  let Some(close) = s.strip_suffix('}') else {
+    return s;
+  };
+  let Some(open) = close.rfind('{') else {
+    return s;
+  };
+  let quantifier = &close[open + 1..];
+  if !quantifier
+    .chars()
+    .all(|ch| ch.is_ascii_digit() || ch == ',')
+  {
+    return s;
+  }
+  &close[..open]
+}
+
+fn ends_with_word_like_token(s: &str) -> bool {
+  let s = strip_trailing_quantifier(s);
+  if s.ends_with("\\w") || s.ends_with("\\d") {
+    return true;
+  }
+  if s.ends_with("\\p{L}")
+    || s.ends_with("\\p{N}")
+    || s.ends_with("\\p{Alphabetic}")
+    || s.ends_with("\\p{Numeric}")
+    || s.ends_with("\\p{Letter}")
+    || s.ends_with("\\p{Number}")
+  {
+    return true;
+  }
+  if s
+    .chars()
+    .next_back()
+    .is_some_and(|ch| ch.is_alphanumeric() || ch == '_')
+  {
+    return true;
+  }
+  if !s.ends_with(']') {
+    return false;
+  }
+  let Some(open) = s.rfind('[') else {
+    return false;
+  };
+  bracket_class_is_word_like(&s[open..])
+}
+
 /// Strip leading/trailing `\b` or `\B` from a
 /// pattern string.
 fn strip_edge_boundaries(
@@ -410,6 +505,26 @@ fn strip_edge_boundaries(
       }
       end -= 2;
     }
+  }
+
+  const LEADING_NOT_WORD: &str = "(?<!\\w)";
+  if pattern[start..end].starts_with(LEADING_NOT_WORD)
+    && starts_with_word_like_token(
+      &pattern[start + LEADING_NOT_WORD.len()..end],
+    )
+  {
+    eb.leading_b = true;
+    start += LEADING_NOT_WORD.len();
+  }
+
+  const TRAILING_NOT_WORD: &str = "(?!\\w)";
+  if pattern[start..end].ends_with(TRAILING_NOT_WORD)
+    && ends_with_word_like_token(
+      &pattern[start..end - TRAILING_NOT_WORD.len()],
+    )
+  {
+    eb.trailing_b = true;
+    end -= TRAILING_NOT_WORD.len();
   }
 
   (pattern[start..end].to_string(), eb)

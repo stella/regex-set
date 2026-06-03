@@ -4,6 +4,9 @@
  * Call initBinding() before constructing classes. */
 
 const encoder = new TextEncoder();
+const ALTERNATION_CHUNK_MIN_BRANCHES = 64;
+const ALTERNATION_CHUNK_SIZE = 20;
+const ALTERNATION_CHUNK_MAX_BODY_START = 32;
 
 // -- Native binding types --------------------------------
 
@@ -50,6 +53,12 @@ type NativeSingle = {
 type BoundaryOptions = {
   wholeWords: boolean;
   unicodeBoundaries: boolean;
+};
+
+type AlternationGroup = {
+  bodyStart: number;
+  bodyEnd: number;
+  branches: string[];
 };
 
 // -- Late-bound native binding ---------------------------
@@ -492,6 +501,152 @@ function normalizeEntry(
   };
 }
 
+function expandLargeAlternation(pattern: string): string[] {
+  const group = findLargestChunkableAlternation(pattern);
+  if (!group) return [pattern];
+  if (group.branches.length < ALTERNATION_CHUNK_MIN_BRANCHES) {
+    return [pattern];
+  }
+
+  const expanded: string[] = [];
+  for (
+    let i = 0;
+    i < group.branches.length;
+    i += ALTERNATION_CHUNK_SIZE
+  ) {
+    expanded.push(
+      pattern.slice(0, group.bodyStart) +
+        group.branches
+          .slice(i, i + ALTERNATION_CHUNK_SIZE)
+          .join("|") +
+        pattern.slice(group.bodyEnd),
+    );
+  }
+  return expanded;
+}
+
+function findLargestChunkableAlternation(
+  pattern: string,
+): AlternationGroup | undefined {
+  let best: AlternationGroup | undefined;
+  let inClass = false;
+
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern.charAt(i);
+    if (ch === "\\") {
+      i++;
+      continue;
+    }
+    if (ch === "[") {
+      inClass = true;
+      continue;
+    }
+    if (ch === "]") {
+      inClass = false;
+      continue;
+    }
+    if (
+      inClass ||
+      ch !== "(" ||
+      pattern.charAt(i + 1) !== "?" ||
+      pattern.charAt(i + 2) !== ":"
+    ) {
+      continue;
+    }
+
+    const bodyStart = i + 3;
+    const bodyEnd = findGroupEnd(pattern, bodyStart);
+    if (bodyEnd === undefined) continue;
+
+    const branches = splitTopLevelAlternatives(
+      pattern.slice(bodyStart, bodyEnd),
+    );
+    const shouldChunk =
+      bodyStart <= ALTERNATION_CHUNK_MAX_BODY_START &&
+      branches.length >= ALTERNATION_CHUNK_MIN_BRANCHES &&
+      pattern.slice(bodyStart, bodyEnd).includes("(?i:");
+
+    if (shouldChunk && (!best || branches.length > best.branches.length)) {
+      best = { bodyStart, bodyEnd, branches };
+    }
+  }
+
+  return best;
+}
+
+function findGroupEnd(
+  pattern: string,
+  bodyStart: number,
+): number | undefined {
+  let depth = 0;
+  let inClass = false;
+
+  for (let i = bodyStart; i < pattern.length; i++) {
+    const ch = pattern.charAt(i);
+    if (ch === "\\") {
+      i++;
+      continue;
+    }
+    if (ch === "[") {
+      inClass = true;
+      continue;
+    }
+    if (ch === "]") {
+      inClass = false;
+      continue;
+    }
+    if (inClass) continue;
+    if (ch === "(") {
+      depth++;
+      continue;
+    }
+    if (ch !== ")") continue;
+    if (depth === 0) return i;
+    depth--;
+  }
+
+  return undefined;
+}
+
+function splitTopLevelAlternatives(body: string): string[] {
+  const branches: string[] = [];
+  let depth = 0;
+  let inClass = false;
+  let start = 0;
+
+  for (let i = 0; i < body.length; i++) {
+    const ch = body.charAt(i);
+    if (ch === "\\") {
+      i++;
+      continue;
+    }
+    if (ch === "[") {
+      inClass = true;
+      continue;
+    }
+    if (ch === "]") {
+      inClass = false;
+      continue;
+    }
+    if (inClass) continue;
+    if (ch === "(") {
+      depth++;
+      continue;
+    }
+    if (ch === ")") {
+      depth--;
+      continue;
+    }
+    if (ch === "|" && depth === 0) {
+      branches.push(body.slice(start, i));
+      start = i + 1;
+    }
+  }
+
+  branches.push(body.slice(start));
+  return branches;
+}
+
 // -- RegexSet class --------------------------------------
 
 /**
@@ -633,15 +788,21 @@ export class RegexSet {
       if (pattern === undefined) {
         throw new Error(`Missing processed pattern ${i}`);
       }
-      const jsFallback = jsFallbackRegExp(pattern, unicode);
-      if (jsFallback) {
-        this._jsFallbacks.push({
-          pattern: i,
-          re: jsFallback,
-        });
-      } else {
-        this._nativeIndexMap.push(i);
-        nativePatterns.push(pattern);
+      const expanded = expandLargeAlternation(pattern);
+      for (const expandedPattern of expanded) {
+        const jsFallback = jsFallbackRegExp(
+          expandedPattern,
+          unicode,
+        );
+        if (jsFallback) {
+          this._jsFallbacks.push({
+            pattern: i,
+            re: jsFallback,
+          });
+        } else {
+          this._nativeIndexMap.push(i);
+          nativePatterns.push(expandedPattern);
+        }
       }
     }
 

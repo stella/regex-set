@@ -1546,7 +1546,7 @@
       "version": "2.1.2"
     },
     {
-      "bom-ref": "pkg:cargo/semver@1.0.28",
+      "bom-ref": "pkg:cargo/semver@1.0.38",
       "evidence": {
         "identity": [
           {
@@ -1589,12 +1589,12 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/semver@1.0.28",
+      "purl": "pkg:cargo/semver@1.0.38",
       "type": "library",
-      "version": "1.0.28"
+      "version": "1.0.38"
     },
     {
-      "bom-ref": "pkg:cargo/serde@1.0.228",
+      "bom-ref": "pkg:cargo/serde@1.0.328",
       "evidence": {
         "identity": [
           {
@@ -1637,12 +1637,12 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/serde@1.0.228",
+      "purl": "pkg:cargo/serde@1.0.328",
       "type": "library",
-      "version": "1.0.228"
+      "version": "1.0.328"
     },
     {
-      "bom-ref": "pkg:cargo/serde_core@1.0.228",
+      "bom-ref": "pkg:cargo/serde_core@1.0.328",
       "evidence": {
         "identity": [
           {
@@ -1685,12 +1685,12 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/serde_core@1.0.228",
+      "purl": "pkg:cargo/serde_core@1.0.328",
       "type": "library",
-      "version": "1.0.228"
+      "version": "1.0.328"
     },
     {
-      "bom-ref": "pkg:cargo/serde_derive@1.0.228",
+      "bom-ref": "pkg:cargo/serde_derive@1.0.328",
       "evidence": {
         "identity": [
           {
@@ -1733,9 +1733,9 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/serde_derive@1.0.228",
+      "purl": "pkg:cargo/serde_derive@1.0.328",
       "type": "library",
-      "version": "1.0.228"
+      "version": "1.0.328"
     },
     {
       "bom-ref": "pkg:cargo/serde_json@1.0.150",
@@ -1829,7 +1829,7 @@
       "version": "0.4.12"
     },
     {
-      "bom-ref": "pkg:cargo/stella-regex-set@1.0.2",
+      "bom-ref": "pkg:cargo/stella-regex-set@1.0.3",
       "evidence": {
         "identity": [
           {
@@ -1854,9 +1854,9 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/stella-regex-set@1.0.2",
+      "purl": "pkg:cargo/stella-regex-set@1.0.3",
       "type": "library",
-      "version": "1.0.2"
+      "version": "1.0.3"
     },
     {
       "bom-ref": "pkg:cargo/syn@2.0.117",
@@ -1907,7 +1907,7 @@
       "version": "2.0.117"
     },
     {
-      "bom-ref": "pkg:cargo/unicode-ident@1.0.24",
+      "bom-ref": "pkg:cargo/unicode-ident@1.0.34",
       "evidence": {
         "identity": [
           {
@@ -1943,9 +1943,9 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/unicode-ident@1.0.24",
+      "purl": "pkg:cargo/unicode-ident@1.0.34",
       "type": "library",
-      "version": "1.0.24"
+      "version": "1.0.34"
     },
     {
       "bom-ref": "pkg:cargo/unicode-segmentation@1.13.3",
@@ -2044,7 +2044,7 @@
       "version": "0.2.1"
     },
     {
-      "bom-ref": "pkg:cargo/zmij@1.0.21",
+      "bom-ref": "pkg:cargo/zmij@1.0.31",
       "evidence": {
         "identity": [
           {
@@ -2082,9 +2082,9 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/zmij@1.0.21",
+      "purl": "pkg:cargo/zmij@1.0.31",
       "type": "library",
-      "version": "1.0.21"
+      "version": "1.0.31"
     },
     {
       "authors": [
@@ -2216,7 +2216,7 @@
   "compositions": [
     {
       "aggregate": "incomplete",
-      "bom-ref": "pkg:npm/@stll/regex-set@1.0.2"
+      "bom-ref": "pkg:npm/@stll/regex-set@1.0.3"
     }
   ],
   "dependencies": [
@@ -2351,7 +2351,7 @@
         "pkg:cargo/napi-sys@3.2.1",
         "pkg:cargo/nohash-hasher@0.2.0",
         "pkg:cargo/rustc-hash@2.1.2",
-        "pkg:cargo/serde@1.0.228",
+        "pkg:cargo/serde@1.0.328",
         "pkg:cargo/serde_json@1.0.150"
       ],
       "ref": "pkg:cargo/napi@3.9.0"
@@ -2376,7 +2376,7 @@
         "pkg:cargo/convert_case@0.11.0",
         "pkg:cargo/proc-macro2@1.0.106",
         "pkg:cargo/quote@1.0.45",
-        "pkg:cargo/semver@1.0.28",
+        "pkg:cargo/semver@1.0.38",
         "pkg:cargo/syn@2.0.117"
       ],
       "ref": "pkg:cargo/napi-derive-backend@5.0.4"
@@ -2397,7 +2397,7 @@
     },
     {
       "dependsOn": [
-        "pkg:cargo/unicode-ident@1.0.24"
+        "pkg:cargo/unicode-ident@1.0.34"
       ],
       "ref": "pkg:cargo/proc-macro2@1.0.106"
     },
@@ -2434,19 +2434,19 @@
     },
     {
       "dependsOn": [],
-      "ref": "pkg:cargo/semver@1.0.28"
+      "ref": "pkg:cargo/semver@1.0.38"
     },
     {
       "dependsOn": [
-        "pkg:cargo/serde_core@1.0.228"
+        "pkg:cargo/serde_core@1.0.328"
       ],
-      "ref": "pkg:cargo/serde@1.0.228"
+      "ref": "pkg:cargo/serde@1.0.328"
     },
     {
       "dependsOn": [
-        "pkg:cargo/serde_derive@1.0.228"
+        "pkg:cargo/serde_derive@1.0.328"
       ],
-      "ref": "pkg:cargo/serde_core@1.0.228"
+      "ref": "pkg:cargo/serde_core@1.0.328"
     },
     {
       "dependsOn": [
@@ -2454,15 +2454,15 @@
         "pkg:cargo/quote@1.0.45",
         "pkg:cargo/syn@2.0.117"
       ],
-      "ref": "pkg:cargo/serde_derive@1.0.228"
+      "ref": "pkg:cargo/serde_derive@1.0.328"
     },
     {
       "dependsOn": [
         "pkg:cargo/itoa@1.0.18",
         "pkg:cargo/memchr@2.8.1",
-        "pkg:cargo/serde@1.0.228",
-        "pkg:cargo/serde_core@1.0.228",
-        "pkg:cargo/zmij@1.0.21"
+        "pkg:cargo/serde@1.0.328",
+        "pkg:cargo/serde_core@1.0.328",
+        "pkg:cargo/zmij@1.0.31"
       ],
       "ref": "pkg:cargo/serde_json@1.0.150"
     },
@@ -2481,19 +2481,19 @@
         "pkg:cargo/regex@1.12.3",
         "pkg:cargo/unicode-segmentation@1.13.3"
       ],
-      "ref": "pkg:cargo/stella-regex-set@1.0.2"
+      "ref": "pkg:cargo/stella-regex-set@1.0.3"
     },
     {
       "dependsOn": [
         "pkg:cargo/proc-macro2@1.0.106",
         "pkg:cargo/quote@1.0.45",
-        "pkg:cargo/unicode-ident@1.0.24"
+        "pkg:cargo/unicode-ident@1.0.34"
       ],
       "ref": "pkg:cargo/syn@2.0.117"
     },
     {
       "dependsOn": [],
-      "ref": "pkg:cargo/unicode-ident@1.0.24"
+      "ref": "pkg:cargo/unicode-ident@1.0.34"
     },
     {
       "dependsOn": [],
@@ -2505,11 +2505,11 @@
     },
     {
       "dependsOn": [],
-      "ref": "pkg:cargo/zmij@1.0.21"
+      "ref": "pkg:cargo/zmij@1.0.31"
     },
     {
       "dependsOn": [],
-      "ref": "pkg:npm/@stll/regex-set@1.0.2"
+      "ref": "pkg:npm/@stll/regex-set@1.0.3"
     }
   ],
   "metadata": {
@@ -2519,10 +2519,10 @@
       }
     ],
     "component": {
-      "bom-ref": "pkg:npm/@stll/regex-set@1.0.2",
+      "bom-ref": "pkg:npm/@stll/regex-set@1.0.3",
       "components": [
         {
-          "bom-ref": "pkg:cargo/stella-regex-set@1.0.2",
+          "bom-ref": "pkg:cargo/stella-regex-set@1.0.3",
           "group": "",
           "licenses": [
             {
@@ -2533,9 +2533,9 @@
             }
           ],
           "name": "stella-regex-set",
-          "purl": "pkg:cargo/stella-regex-set@1.0.2",
+          "purl": "pkg:cargo/stella-regex-set@1.0.3",
           "type": "application",
-          "version": "1.0.2"
+          "version": "1.0.3"
         }
       ],
       "description": "Single-pass multi-pattern regex for Node.js/Bun. Backtracking-immune, Unicode-aware Rust engine via NAPI-RS.",
@@ -2559,9 +2559,9 @@
         }
       ],
       "name": "regex-set",
-      "purl": "pkg:npm/%40stll/regex-set@1.0.2",
+      "purl": "pkg:npm/%40stll/regex-set@1.0.3",
       "type": "application",
-      "version": "1.0.2"
+      "version": "1.0.3"
     },
     "lifecycles": [
       {

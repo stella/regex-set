@@ -108,3 +108,44 @@ jobs:
       provenance-version: v0.1.3
       property-test-command: bun run test:props
     secrets: inherit
+
+  contract-perf:
+    name: Contract fixture perf
+    if: >-
+      always()
+      && !cancelled()
+      && (github.event_name != 'pull_request'
+          || needs.trust-check.outputs.trusted == 'true')
+    needs: [check-changes, trust-check]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Skip when perf checks are not required
+        if: needs.check-changes.outputs.build-changed != 'true'
+        run: echo "No trusted build changes; contract perf skipped."
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        if: needs.check-changes.outputs.build-changed == 'true'
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        if: needs.check-changes.outputs.build-changed == 'true'
+        with:
+          repository: stella/anonymize
+          path: .perf/anonymize
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        if: needs.check-changes.outputs.build-changed == 'true'
+        with:
+          node-version: "22"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        if: needs.check-changes.outputs.build-changed == 'true'
+      - run: npm install --include=optional
+        if: needs.check-changes.outputs.build-changed == 'true'
+      - run: bun run build
+        if: needs.check-changes.outputs.build-changed == 'true'
+      - run: bun install --frozen-lockfile
+        if: needs.check-changes.outputs.build-changed == 'true'
+        working-directory: .perf/anonymize
+      - name: Run contract fixture perf guard
+        if: needs.check-changes.outputs.build-changed == 'true'
+        env:
+          ANONYMIZE_PACKAGE_DIR: ${{ github.workspace }}/.perf/anonymize/packages/anonymize
+        run: timeout 180s bun run perf:contracts

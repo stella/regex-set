@@ -1,6 +1,6 @@
 {
   "name": "@stll/regex-set",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Single-pass multi-pattern regex for Node.js/Bun. Backtracking-immune, Unicode-aware Rust engine via NAPI-RS.",
   "keywords": [
     "multi-pattern",
@@ -47,6 +47,7 @@
     "prepublishOnly": "napi prepublish -t npm && tsdown && node scripts/fix-napi-loader.mjs",
     "test": "bun test __test__/index.spec.ts",
     "test:props": "bun test __test__/properties.spec.ts",
+    "perf:contracts": "bun scripts/contract-fixture-perf.mjs",
     "test:runtime:bun": "bun scripts/runtime-smoke.mjs",
     "test:runtime:node": "node scripts/runtime-smoke.mjs",
     "version:sync": "node scripts/version-sync.mjs sync",
@@ -84,11 +85,11 @@
     "vite": "^8.0.14"
   },
   "optionalDependencies": {
-    "@stll/regex-set-darwin-arm64": "1.0.2",
-    "@stll/regex-set-darwin-x64": "1.0.2",
-    "@stll/regex-set-linux-arm64-gnu": "1.0.2",
-    "@stll/regex-set-linux-x64-gnu": "1.0.2",
-    "@stll/regex-set-wasm32-wasi": "1.0.2"
+    "@stll/regex-set-darwin-arm64": "1.0.3",
+    "@stll/regex-set-darwin-x64": "1.0.3",
+    "@stll/regex-set-linux-arm64-gnu": "1.0.3",
+    "@stll/regex-set-linux-x64-gnu": "1.0.3",
+    "@stll/regex-set-wasm32-wasi": "1.0.3"
   },
   "napi": {
     "binaryName": "regex-set",
