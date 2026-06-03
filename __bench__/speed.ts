@@ -100,7 +100,7 @@ const jsRegexSetBench = (
       }
     }
     all.sort(
-      (a, b) => a[0] - b[0] || (b[1] - b[0]) - (a[1] - a[0]),
+      (a, b) => a[0] - b[0] || b[1] - b[0] - (a[1] - a[0]),
     );
     let count = 0;
     let lastEnd = 0;

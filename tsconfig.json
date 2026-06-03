@@ -4,10 +4,6 @@
     "allowImportingTsExtensions": true,
     "types": ["node"]
   },
-  "include": [
-    "*.d.ts",
-    "src/**/*.ts",
-    "tsdown.config.ts"
-  ],
+  "include": ["*.d.ts", "src/**/*.ts", "tsdown.config.ts"],
   "exclude": ["node_modules", "dist", "wasm/dist", "npm"]
 }

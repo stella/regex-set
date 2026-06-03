@@ -843,63 +843,66 @@ describe("property: named patterns", () => {
 // to be meaningful on fast runners.
 
 describe("property: no catastrophic slowdown", () => {
-  perfPropertyTest("RegexSet within 20x of JS RegExp", () => {
-    fc.assert(
-      fc.property(
-        fc.array(allPatterns, {
-          minLength: 1,
-          maxLength: 5,
-        }),
-        optionCombos,
-        (pats, opts) => {
-          const jsRegs: (RegExp | null)[] =
-            pats.map(toJsRegExp);
-          if (jsRegs.some((r) => r === null)) return;
+  perfPropertyTest(
+    "RegexSet within 20x of JS RegExp",
+    () => {
+      fc.assert(
+        fc.property(
+          fc.array(allPatterns, {
+            minLength: 1,
+            maxLength: 5,
+          }),
+          optionCombos,
+          (pats, opts) => {
+            const jsRegs: (RegExp | null)[] =
+              pats.map(toJsRegExp);
+            if (jsRegs.some((r) => r === null)) return;
 
-          let rs;
-          try {
-            rs = new RegexSet(pats, opts);
-          } catch {
-            return;
-          }
+            let rs;
+            try {
+              rs = new RegexSet(pats, opts);
+            } catch {
+              return;
+            }
 
-          const h =
-            "Ing. Jan Novák test 123 foo bar " +
-            "email@test.cz 29.5.2026 850315/0007 ";
-          const text = h.repeat(
-            Math.ceil((10 * 1024) / h.length),
-          );
+            const h =
+              "Ing. Jan Novák test 123 foo bar " +
+              "email@test.cz 29.5.2026 850315/0007 ";
+            const text = h.repeat(
+              Math.ceil((10 * 1024) / h.length),
+            );
 
-          const t0 = performance.now();
-          rs.findIter(text);
-          const rsTime = performance.now() - t0;
+            const t0 = performance.now();
+            rs.findIter(text);
+            const rsTime = performance.now() - t0;
 
-          const t1 = performance.now();
-          for (const re of jsRegs) {
-            re!.lastIndex = 0;
-            let m;
-            while ((m = re!.exec(text)) !== null) {
-              if (m[0]!.length === 0) {
-                re!.lastIndex++;
+            const t1 = performance.now();
+            for (const re of jsRegs) {
+              re!.lastIndex = 0;
+              let m;
+              while ((m = re!.exec(text)) !== null) {
+                if (m[0]!.length === 0) {
+                  re!.lastIndex++;
+                }
               }
             }
-          }
-          const jsTime = performance.now() - t1;
+            const jsTime = performance.now() - t1;
 
-          // RS should not be catastrophically slow on
-          // this 10KB workload even when JS is faster
-          // on trivial patterns.
-          expect(rsTime).toBeLessThan(50);
+            // RS should not be catastrophically slow on
+            // this 10KB workload even when JS is faster
+            // on trivial patterns.
+            expect(rsTime).toBeLessThan(50);
 
-          // Relative comparisons are only stable once
-          // the JS baseline is comfortably above timer
-          // noise on fast macOS runners.
-          if (jsTime > 0.5) {
-            expect(rsTime / jsTime).toBeLessThan(20);
-          }
-        },
-      ),
-      { ...PARAMS, numRuns: 100 },
-    );
-  });
+            // Relative comparisons are only stable once
+            // the JS baseline is comfortably above timer
+            // noise on fast macOS runners.
+            if (jsTime > 0.5) {
+              expect(rsTime / jsTime).toBeLessThan(20);
+            }
+          },
+        ),
+        { ...PARAMS, numRuns: 100 },
+      );
+    },
+  );
 });

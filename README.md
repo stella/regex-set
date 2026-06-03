@@ -174,6 +174,7 @@ The repository includes only public, reproducible
 benchmark inputs and scripts in `__bench__/`.
 
 Inputs:
+
 - [mariomka/regex-benchmark](https://github.com/mariomka/regex-benchmark)
 - [rust-leipzig/regex-performance](https://github.com/rust-leipzig/regex-performance)
 - [Canterbury Large Corpus](https://corpus.canterbury.ac.nz/)
@@ -190,30 +191,32 @@ bun run bench:fallback
 
 Representative baseline from the checked-in public
 harness:
+
 - runtime: Bun `1.3.10`
 - platform: macOS `26.4.1` (`Darwin arm64`)
 
-| Scenario | `@stll/regex-set` | JS `RegExp` | Relative |
-| --- | ---: | ---: | ---: |
-| mariomka, 3 patterns, 6.2 MB | 19.08 ms | 102.67 ms | `5.4x` faster |
-| Twain literal `Twain`, 16.0 MB | 9.47 ms | 1.21 ms | `0.13x` |
-| Twain char class `[a-z]shing`, 16.0 MB | 10.38 ms | 8.01 ms | `0.77x` |
-| Twain word boundary `\\b\\w+nn\\b`, 16.0 MB | 13.00 ms | 55.59 ms | `4.3x` faster |
-| Twain alternation <code>Tom&#124;Sawyer&#124;...</code>, 16.0 MB | 9.20 ms | 20.77 ms | `2.3x` faster |
-| Twain suffix `[a-zA-Z]+ing`, 16.0 MB | 15.79 ms | 91.93 ms | `5.8x` faster |
-| Bible, 5 patterns, 4.0 MB | 12.20 ms | 57.52 ms | `4.7x` faster |
-| Bible, 3 lookaround patterns, 4.0 MB | 25.93 ms | 77.33 ms | `3.0x` faster |
+| Scenario                                                         | `@stll/regex-set` | JS `RegExp` |      Relative |
+| ---------------------------------------------------------------- | ----------------: | ----------: | ------------: |
+| mariomka, 3 patterns, 6.2 MB                                     |          19.08 ms |   102.67 ms | `5.4x` faster |
+| Twain literal `Twain`, 16.0 MB                                   |           9.47 ms |     1.21 ms |       `0.13x` |
+| Twain char class `[a-z]shing`, 16.0 MB                           |          10.38 ms |     8.01 ms |       `0.77x` |
+| Twain word boundary `\\b\\w+nn\\b`, 16.0 MB                      |          13.00 ms |    55.59 ms | `4.3x` faster |
+| Twain alternation <code>Tom&#124;Sawyer&#124;...</code>, 16.0 MB |           9.20 ms |    20.77 ms | `2.3x` faster |
+| Twain suffix `[a-zA-Z]+ing`, 16.0 MB                             |          15.79 ms |    91.93 ms | `5.8x` faster |
+| Bible, 5 patterns, 4.0 MB                                        |          12.20 ms |    57.52 ms | `4.7x` faster |
+| Bible, 3 lookaround patterns, 4.0 MB                             |          25.93 ms |    77.33 ms | `3.0x` faster |
 
 Fallback-path microbenchmark in the same
 environment:
 
-| Scenario | Time |
-| --- | ---: |
-| baseline DFA, no lookaround | 0.168 ms |
-| verifier present, no fallback | 0.134 ms |
+| Scenario                          |     Time |
+| --------------------------------- | -------: |
+| baseline DFA, no lookaround       | 0.168 ms |
+| verifier present, no fallback     | 0.134 ms |
 | verifier + `fancy-regex` fallback | 0.829 ms |
 
 The benchmark harness covers:
+
 - multi-pattern scanning on public corpora
 - lookaround-heavy scans
 - catastrophic backtracking resistance

@@ -35,11 +35,16 @@ describe("stllRegexSetWasmVite", () => {
     const plugin = stllRegexSetWasmVite();
 
     expect(plugin.name).toBe("stll-regex-set-wasm");
-    expect(plugin.config?.({
-      optimizeDeps: { exclude: ["existing-package"] },
-    })).toEqual({
+    expect(
+      plugin.config?.({
+        optimizeDeps: { exclude: ["existing-package"] },
+      }),
+    ).toEqual({
       optimizeDeps: {
-        exclude: ["existing-package", ...WASM_VITE_PACKAGES],
+        exclude: [
+          "existing-package",
+          ...WASM_VITE_PACKAGES,
+        ],
       },
       ssr: {
         external: [...WASM_VITE_PACKAGES],
@@ -60,9 +65,13 @@ const bytes = await fetch(__wasmUrl).then((res) => res.arrayBuffer())
       "@stll/regex-set-wasm",
     );
 
-    expect(transformed).toContain("const view = new Uint8Array(bytes)");
+    expect(transformed).toContain(
+      "const view = new Uint8Array(bytes)",
+    );
     expect(transformed).toContain("view[0] !== 0x00");
-    expect(transformed).toContain("@stll/regex-set-wasm/vite");
+    expect(transformed).toContain(
+      "@stll/regex-set-wasm/vite",
+    );
   });
 
   test("warns when napi-rs loader format changes", () => {
