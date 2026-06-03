@@ -803,6 +803,211 @@ describe("greedy quantifier + lookahead across newline", () => {
   });
 });
 
+// ─── Wide trailing lookahead class ────────────
+// Regression: a rejected early prefix match must not
+// stop scanning before later valid legal-form matches.
+// This came from contract preambles where a wide
+// Unicode-aware suffix boundary used to behave
+// differently from an ASCII-only boundary.
+
+describe("wide trailing lookahead class", () => {
+  test("Unicode suffix boundary finds later legal-form matches", () => {
+    const lower =
+      "a-záčďéěíňóřšťúůýžäöüßàâæçèêëîïôùûÿñąćęłńśźż\\u0131";
+    const upper =
+      "A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽÄÖÜÀÂÆÇÈÊËÎÏÔÙÛŸÑĄĆĘŁŃŚŹŻ\\u0130";
+    const hspace = String.raw`[^\S\n]`;
+    const simpleSep = `(?:${hspace}|[&,.-]){1,4}`;
+    const capWord = `[${upper}][${lower}${upper}]+`;
+    const capOrNum = `(?:${capWord}|[${upper}](?![${lower}${upper}])|\\d{1,4})`;
+    const head = `(?:${capOrNum})(?:${simpleSep}(?:${capOrNum})){0,10}`;
+    const suffixAlt = String.raw`LLC|Inc\.|AG|SE|PA|AD`;
+    const base = `${head}(?:${hspace}+|,${hspace}*)(?:${suffixAlt})`;
+    const wideBoundary = `${base}(?![${lower}${upper}\\p{N}])`;
+    const asciiBoundary = `${base}(?![A-Za-z0-9])`;
+    const text =
+      "THIS AGREEMENT AND PLAN OF MERGER, dated as of April 25, 2022 " +
+      '(this "Agreement"), is made by and among Twitter, Inc., ' +
+      'a Delaware corporation (the "Company"), X Holdings I, Inc.';
+
+    const wide = new RegexSet([wideBoundary])
+      .findIter(text)
+      .map((m) => m.text);
+    const ascii = new RegexSet([asciiBoundary])
+      .findIter(text)
+      .map((m) => m.text);
+
+    expect(wide).toEqual(ascii);
+    expect(wide).toEqual([
+      "Twitter, Inc.",
+      "X Holdings I, Inc.",
+    ]);
+  });
+});
+
+describe("large JS-compatible lookaround fallback", () => {
+  test("routes large lookaround alternations without losing pattern indices", () => {
+    const suffixes = Array.from(
+      { length: 140 },
+      (_, i) => `ZZ${i}`,
+    );
+    suffixes[73] = String.raw`Inc\.`;
+    const pattern =
+      String.raw`[A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+){0,4}` +
+      String.raw`(?:\s+|,\s*)(?:` +
+      suffixes.join("|") +
+      String.raw`)(?![A-Za-z0-9])`;
+
+    const rs = new RegexSet([String.raw`\d+`, pattern]);
+    const matches = rs.findIter(
+      '42 (this "Agreement"), among Twitter, Inc.',
+    );
+
+    expect(matches.map((m) => [m.pattern, m.text])).toEqual([
+      [0, "42"],
+      [1, "Twitter, Inc."],
+    ]);
+  });
+
+  test("preserves wholeWords for JS-routed patterns", () => {
+    const suffixes = Array.from(
+      { length: 140 },
+      (_, i) => `ZZ${i}`,
+    );
+    suffixes[73] = "Inc";
+    const pattern =
+      String.raw`Twitter(?:` +
+      suffixes.join("|") +
+      String.raw`)(?![A-Za-z0-9])`;
+    const rs = new RegexSet([pattern], { wholeWords: true });
+
+    expect(rs.isMatch("xTwitterInc ")).toBe(false);
+    expect(rs.isMatch("čTwitterInc ")).toBe(false);
+    expect(rs.findIter("xTwitterInc ")).toEqual([]);
+    expect(rs.whichMatch("xTwitterInc ")).toEqual([]);
+    expect(rs.replaceAll("xTwitterInc TwitterInc ", ["ORG"])).toBe(
+      "xTwitterInc ORG ",
+    );
+
+    const asciiBoundaries = new RegexSet([pattern], {
+      wholeWords: true,
+      unicodeBoundaries: false,
+    });
+    expect(asciiBoundaries.findIter("čTwitterInc ")).toHaveLength(1);
+  });
+
+  test("retries rejected wholeWords matches from the next start", () => {
+    const suffixes = Array.from(
+      { length: 140 },
+      (_, i) => `ZZ${i}`,
+    );
+    suffixes[73] = "bar";
+    const pattern =
+      String.raw`(?:foo-(?:` +
+      suffixes.join("|") +
+      String.raw`)|bar)(?=\s)`;
+    const rs = new RegexSet([pattern], { wholeWords: true });
+
+    expect(rs.isMatch("xfoo-bar ")).toBe(true);
+    expect(rs.findIter("xfoo-bar ").map((m) => m.text)).toEqual([
+      "bar",
+    ]);
+    expect(rs.replaceAll("xfoo-bar ", ["ORG"])).toBe("xfoo-ORG ");
+  });
+
+  test("does not route Rust-only class set syntax through JS", () => {
+    const suffixes = Array.from(
+      { length: 140 },
+      (_, i) => `ZZ${i}`,
+    );
+    suffixes[73] = "X";
+    const pattern =
+      String.raw`[a&&b](?=X)(?:` +
+      suffixes.join("|") +
+      String.raw`)`;
+    const rs = new RegexSet([pattern]);
+
+    expect(new RegExp(pattern, "gu").test("aX")).toBe(true);
+    expect(rs.isMatch("aX")).toBe(false);
+    expect(rs.findIter("aX")).toEqual([]);
+    expect(rs.replaceAll("aX", ["NOPE"])).toBe("aX");
+  });
+
+  test("preserves explicit Unicode word boundaries", () => {
+    const suffixes = Array.from(
+      { length: 140 },
+      (_, i) => `ZZ${i}`,
+    );
+    suffixes[73] = "Inc";
+    const pattern =
+      String.raw`\bTwitter(?:` +
+      suffixes.join("|") +
+      String.raw`)(?![A-Za-z0-9])`;
+    const rs = new RegexSet([pattern], {
+      unicodeBoundaries: true,
+    });
+
+    expect(new RegExp(pattern, "gu").test("čTwitterInc ")).toBe(
+      true,
+    );
+    expect(rs.findIter("čTwitterInc ")).toEqual([]);
+    expect(rs.findIter(" TwitterInc ").map((m) => m.text)).toEqual([
+      "TwitterInc",
+    ]);
+  });
+
+  test("preserves Rust Unicode shorthand classes", () => {
+    const suffixes = Array.from(
+      { length: 140 },
+      (_, i) => `ZZ${i}`,
+    );
+    suffixes[73] = "X";
+    const pattern =
+      String.raw`\d(?=X)(?:` +
+      suffixes.join("|") +
+      String.raw`)`;
+    const rs = new RegexSet([pattern]);
+
+    expect(new RegExp(pattern, "gu").test("٣X")).toBe(false);
+    expect(rs.findIter("٣X").map((m) => m.text)).toEqual(["٣X"]);
+  });
+
+  test("merges JS fallback matches before native pruning", () => {
+    const suffixes = Array.from(
+      { length: 140 },
+      (_, i) => `ZZ${i}`,
+    );
+    suffixes[73] = "b";
+    const jsPattern =
+      String.raw`a(?:` + suffixes.join("|") + String.raw`)(?=c)`;
+    const rs = new RegexSet([jsPattern, "bc", "cd"]);
+
+    expect(rs.findIter("abcd").map((m) => [m.pattern, m.text])).toEqual([
+      [0, "ab"],
+      [2, "cd"],
+    ]);
+    expect(rs.replaceAll("abcd", ["AB", "BC", "CD"])).toBe(
+      "ABCD",
+    );
+  });
+
+  test("preserves pattern order for equal-span fallback ties", () => {
+    const suffixes = Array.from(
+      { length: 140 },
+      (_, i) => `ZZ${i}`,
+    );
+    suffixes[73] = "b";
+    const jsPattern =
+      String.raw`a(?:` + suffixes.join("|") + String.raw`)(?=c)`;
+    const rs = new RegexSet([jsPattern, "ab"]);
+
+    expect(rs.findIter("abc").map((m) => [m.pattern, m.text])).toEqual([
+      [0, "ab"],
+    ]);
+    expect(rs.replaceAll("abc", ["JS", "NATIVE"])).toBe("JSc");
+  });
+});
+
 // ─── Negated bracket expression in lookahead ──
 
 describe("negated bracket expression [^...] in lookahead", () => {

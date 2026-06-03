@@ -6,6 +6,18 @@ use regex_automata::Input;
 use std::panic;
 use unicode_segmentation::UnicodeSegmentation;
 
+const FANCY_BACKTRACK_LIMIT: usize = 1_000_000;
+const FALLBACK_ALT_CHUNK_SIZE: usize = 128;
+
+fn build_fancy_regex(
+  pattern: &str,
+) -> std::result::Result<fancy_regex::Regex, String> {
+  fancy_regex::RegexBuilder::new(pattern)
+    .backtrack_limit(FANCY_BACKTRACK_LIMIT)
+    .build()
+    .map_err(|e| format!("{e}"))
+}
+
 /// Safe wrapper for fancy-regex calls. Historically
 /// older fancy-regex versions could panic on certain
 /// pattern/input combinations; the guard remains as
@@ -17,14 +29,33 @@ fn safe_fancy_find(
   haystack: &str,
   pos: usize,
 ) -> Option<(usize, usize)> {
+  safe_fancy_find_result(re, haystack, pos).ok().flatten()
+}
+
+fn safe_fancy_find_result(
+  re: &fancy_regex::Regex,
+  haystack: &str,
+  pos: usize,
+) -> std::result::Result<Option<(usize, usize)>, ()> {
   panic::catch_unwind(panic::AssertUnwindSafe(|| {
     re.find_from_pos(haystack, pos)
-      .ok()
-      .flatten()
-      .map(|m| (m.start(), m.end()))
   }))
-  .ok()
-  .flatten()
+  .map_err(|_| ())?
+  .map(|m| m.map(|m| (m.start(), m.end())))
+  .map_err(|_| ())
+}
+
+fn next_char_pos(haystack: &str, pos: usize) -> usize {
+  if pos >= haystack.len() {
+    return pos + 1;
+  }
+  let mut next = pos + 1;
+  while next < haystack.len()
+    && !haystack.is_char_boundary(next)
+  {
+    next += 1;
+  }
+  next
 }
 
 /// Options for constructing a `RegexSet`.
@@ -720,8 +751,7 @@ fn build_verifier(
   // as lookaround on [a-zA-Z0-9_].
   let core_stripped = strip_lookaround_str(pattern);
   let fancy_pat = ascii_boundary_for_fancy(pattern);
-  let verifier = fancy_regex::Regex::new(&fancy_pat)
-    .map_err(|e| format!("{e}"))?;
+  let verifier = build_fancy_regex(&fancy_pat)?;
 
   Ok((core_stripped, Verifier::Complex(verifier)))
 }
@@ -793,6 +823,206 @@ fn strip_lookaround_str(pattern: &str) -> String {
     }
   }
   result
+}
+
+fn strip_all_lookaround_str(pattern: &str) -> String {
+  let bytes = pattern.as_bytes();
+  let mut result = String::with_capacity(pattern.len());
+  let mut seg_start = 0;
+  let mut in_class = false;
+  let mut escaped = false;
+  let mut i = 0;
+
+  while i < bytes.len() {
+    if escaped {
+      escaped = false;
+      i += 1;
+      continue;
+    }
+
+    match bytes[i] {
+      b'\\' => {
+        escaped = true;
+        i += 1;
+      }
+      b'[' if !in_class => {
+        in_class = true;
+        i += 1;
+      }
+      b']' if in_class => {
+        in_class = false;
+        i += 1;
+      }
+      b'(' if !in_class && is_lookaround_at(bytes, i) => {
+        if let Some(end) = find_matching_paren(pattern, i) {
+          result.push_str(&pattern[seg_start..i]);
+          i = end + 1;
+          seg_start = i;
+        } else {
+          i += 1;
+        }
+      }
+      _ => i += 1,
+    }
+  }
+
+  result.push_str(&pattern[seg_start..]);
+  result
+}
+
+fn split_large_alternation(
+  pattern: &str,
+  chunk_size: usize,
+) -> Option<Vec<String>> {
+  let bytes = pattern.as_bytes();
+  let mut best: Option<(usize, usize, Vec<String>)> = None;
+  let mut in_class = false;
+  let mut escaped = false;
+  let mut i = 0;
+
+  while i < bytes.len() {
+    if escaped {
+      escaped = false;
+      i += 1;
+      continue;
+    }
+
+    match bytes[i] {
+      b'\\' => {
+        escaped = true;
+        i += 1;
+      }
+      b'[' if !in_class => {
+        in_class = true;
+        i += 1;
+      }
+      b']' if in_class => {
+        in_class = false;
+        i += 1;
+      }
+      b'('
+        if !in_class
+          && is_negative_lookaround_at(bytes, i) =>
+      {
+        if let Some(end) = find_matching_paren(pattern, i) {
+          i = end + 1;
+        } else {
+          i += 1;
+        }
+      }
+      b'('
+        if !in_class
+          && i + 2 < bytes.len()
+          && bytes[i + 1] == b'?'
+          && bytes[i + 2] == b':' =>
+      {
+        if let Some(end) = find_matching_paren(pattern, i) {
+          let alts = split_top_level_alternatives(
+            &pattern[i + 3..end],
+          );
+          if alts.len() > chunk_size
+            && best.as_ref().is_none_or(
+              |(_, _, best_alts)| {
+                alts.len() > best_alts.len()
+              },
+            )
+          {
+            best = Some((i + 3, end, alts));
+          }
+          i += 3;
+        } else {
+          i += 1;
+        }
+      }
+      _ => i += 1,
+    }
+  }
+
+  let (inner_start, inner_end, alts) = best?;
+  let mut chunks = Vec::new();
+  for chunk in alts.chunks(chunk_size) {
+    let mut pat = String::with_capacity(pattern.len());
+    pat.push_str(&pattern[..inner_start]);
+    pat.push_str(&chunk.join("|"));
+    pat.push_str(&pattern[inner_end..]);
+    chunks.push(pat);
+  }
+  Some(chunks)
+}
+
+fn split_top_level_alternatives(s: &str) -> Vec<String> {
+  let bytes = s.as_bytes();
+  let mut out = Vec::new();
+  let mut start = 0;
+  let mut depth = 0i32;
+  let mut in_class = false;
+  let mut escaped = false;
+  let mut i = 0;
+
+  while i < bytes.len() {
+    if escaped {
+      escaped = false;
+      i += 1;
+      continue;
+    }
+
+    match bytes[i] {
+      b'\\' => {
+        escaped = true;
+      }
+      b'[' if !in_class => {
+        in_class = true;
+      }
+      b']' if in_class => {
+        in_class = false;
+      }
+      b'(' if !in_class => {
+        depth += 1;
+      }
+      b')' if !in_class => {
+        depth -= 1;
+      }
+      b'|' if !in_class && depth == 0 => {
+        out.push(s[start..i].to_string());
+        start = i + 1;
+      }
+      _ => {}
+    }
+    i += 1;
+  }
+
+  out.push(s[start..].to_string());
+  out
+}
+
+fn is_lookaround_at(bytes: &[u8], i: usize) -> bool {
+  if i + 2 >= bytes.len()
+    || bytes[i] != b'('
+    || bytes[i + 1] != b'?'
+  {
+    return false;
+  }
+  bytes[i + 2] == b'='
+    || bytes[i + 2] == b'!'
+    || (i + 3 < bytes.len()
+      && bytes[i + 2] == b'<'
+      && (bytes[i + 3] == b'=' || bytes[i + 3] == b'!'))
+}
+
+fn is_negative_lookaround_at(
+  bytes: &[u8],
+  i: usize,
+) -> bool {
+  if i + 2 >= bytes.len()
+    || bytes[i] != b'('
+    || bytes[i + 1] != b'?'
+  {
+    return false;
+  }
+  bytes[i + 2] == b'!'
+    || (i + 3 < bytes.len()
+      && bytes[i + 2] == b'<'
+      && bytes[i + 3] == b'!')
 }
 
 fn find_matching_paren(
@@ -952,6 +1182,28 @@ fn try_fancy_fallback(
   Some((s, e))
 }
 
+fn verify_fallback_at(
+  fb: &FallbackPattern,
+  haystack: &str,
+  start: usize,
+  mode: &BoundaryMode,
+) -> Option<RawMatch> {
+  let (ms, me) =
+    safe_fancy_find(&fb.regex, haystack, start)?;
+  if ms != start {
+    return None;
+  }
+  let passes = !fb.boundaries.has_any()
+    || fb
+      .boundaries
+      .check_with_mode(haystack, ms, me, mode);
+  if passes {
+    Some((fb.original_index, ms, me))
+  } else {
+    None
+  }
+}
+
 // ─── Engine ───────────────────────────────────
 
 struct PatternInfo {
@@ -977,6 +1229,7 @@ struct FallbackPattern {
   original_index: u32,
   regex: fancy_regex::Regex,
   boundaries: EdgeBoundaries,
+  candidate: Option<MetaRegex>,
 }
 
 /// A verified match: (original_pattern_index,
@@ -1106,7 +1359,7 @@ impl RegexSet {
               ascii_internal_boundaries(&stripped);
             let fancy_pat =
               ascii_boundary_for_fancy(&with_ascii_b);
-            fancy_regex::Regex::new(&fancy_pat).ok()
+            build_fancy_regex(&fancy_pat).ok()
           }
           Verifier::None => None,
         };
@@ -1137,18 +1390,30 @@ impl RegexSet {
         }
       } else {
         // Core doesn't compile in MetaRegex.
-        let fancy_pat = ascii_boundary_for_fancy(&stripped);
-        let re = fancy_regex::Regex::new(&fancy_pat)
-          .map_err(|e| {
-            Error::from_reason(format!(
-              "Failed to compile pattern {i}: {e}"
-            ))
-          })?;
-        fallbacks.push(FallbackPattern {
-          original_index: i as u32,
-          regex: re,
-          boundaries: eb,
-        });
+        let fallback_patterns = split_large_alternation(
+          &stripped,
+          FALLBACK_ALT_CHUNK_SIZE,
+        )
+        .unwrap_or_else(|| vec![stripped.clone()]);
+        for fallback_pattern in fallback_patterns {
+          let fancy_pat =
+            ascii_boundary_for_fancy(&fallback_pattern);
+          let re =
+            build_fancy_regex(&fancy_pat).map_err(|e| {
+              Error::from_reason(format!(
+                "Failed to compile pattern {i}: {e}"
+              ))
+            })?;
+          fallbacks.push(FallbackPattern {
+            original_index: i as u32,
+            regex: re,
+            boundaries: eb,
+            candidate: MetaRegex::new(
+              &strip_all_lookaround_str(&fallback_pattern),
+            )
+            .ok(),
+          });
+        }
       }
     }
 
@@ -1367,8 +1632,30 @@ impl RegexSet {
     for fb in &self.fallbacks {
       let mut pos = 0;
       while pos <= haystack.len() {
-        match safe_fancy_find(&fb.regex, haystack, pos) {
-          Some((ms, me)) => {
+        if let Some(ref candidate) = fb.candidate {
+          let input = Input::new(haystack).range(pos..);
+          let Some(m) = candidate.find(input) else {
+            break;
+          };
+          if let Some(found) = verify_fallback_at(
+            fb,
+            haystack,
+            m.start(),
+            &mode,
+          ) {
+            let end = found.2;
+            all.push(found);
+            pos = end.max(pos + 1);
+          } else {
+            pos = next_char_pos(haystack, m.start());
+          }
+          continue;
+        }
+
+        match safe_fancy_find_result(
+          &fb.regex, haystack, pos,
+        ) {
+          Ok(Some((ms, me))) => {
             let passes = !fb.boundaries.has_any()
               || fb
                 .boundaries
@@ -1380,7 +1667,8 @@ impl RegexSet {
               pos = ms + 1;
             }
           }
-          None => break,
+          Ok(None) => break,
+          Err(()) => pos = next_char_pos(haystack, pos),
         }
       }
     }
@@ -1547,8 +1835,29 @@ impl RegexSet {
     for fb in &self.fallbacks {
       let mut pos = 0;
       while pos <= haystack.len() {
-        match safe_fancy_find(&fb.regex, haystack, pos) {
-          Some((ms, me)) => {
+        if let Some(ref candidate) = fb.candidate {
+          let input = Input::new(haystack).range(pos..);
+          let Some(m) = candidate.find(input) else {
+            break;
+          };
+          if verify_fallback_at(
+            fb,
+            haystack,
+            m.start(),
+            &mode,
+          )
+          .is_some()
+          {
+            return true;
+          }
+          pos = next_char_pos(haystack, m.start());
+          continue;
+        }
+
+        match safe_fancy_find_result(
+          &fb.regex, haystack, pos,
+        ) {
+          Ok(Some((ms, me))) => {
             let passes = !fb.boundaries.has_any()
               || fb
                 .boundaries
@@ -1558,7 +1867,8 @@ impl RegexSet {
             }
             pos = ms + 1;
           }
-          None => break,
+          Ok(None) => break,
+          Err(()) => pos = next_char_pos(haystack, pos),
         }
       }
     }
@@ -1736,4 +2046,40 @@ pub fn uax29_boundaries(
   boundaries.sort_unstable();
   boundaries.dedup();
   Ok(boundaries)
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn split_large_alternation_skips_negative_lookaround_groups(
+  ) {
+    let alts = (0..140)
+      .map(|i| format!("BAD{i}"))
+      .collect::<Vec<_>>()
+      .join("|");
+    let pattern = format!(r"foo(?!(?:{alts}))\w+");
+
+    assert!(
+      split_large_alternation(&pattern, 128).is_none()
+    );
+  }
+
+  #[test]
+  fn split_large_alternation_keeps_negative_assertion_intact(
+  ) {
+    let alts = (0..140)
+      .map(|i| format!("GOOD{i}"))
+      .collect::<Vec<_>>()
+      .join("|");
+    let pattern = format!(r"(?:{alts})(?!BAD)");
+
+    let chunks = split_large_alternation(&pattern, 128)
+      .expect("outer alternation should split");
+    assert_eq!(chunks.len(), 2);
+    assert!(chunks
+      .iter()
+      .all(|chunk| chunk.ends_with("(?!BAD)")));
+  }
 }
