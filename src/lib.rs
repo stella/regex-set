@@ -8,6 +8,8 @@ use unicode_segmentation::UnicodeSegmentation;
 
 const FANCY_BACKTRACK_LIMIT: usize = 1_000_000;
 const FALLBACK_ALT_CHUNK_SIZE: usize = 128;
+const FALLBACK_MIN_CONTEXT: usize = 256;
+const FALLBACK_MAX_CONTEXT: usize = 8_192;
 
 fn build_fancy_regex(
   pattern: &str,
@@ -951,7 +953,11 @@ fn strip_lookaround_str(pattern: &str) -> String {
   result
 }
 
-fn strip_all_lookaround_str(pattern: &str) -> String {
+fn strip_fallback_candidate_str(pattern: &str) -> String {
+  strip_zero_width_assertions(pattern)
+}
+
+fn strip_zero_width_assertions(pattern: &str) -> String {
   let bytes = pattern.as_bytes();
   let mut result = String::with_capacity(pattern.len());
   let mut seg_start = 0;
@@ -968,6 +974,15 @@ fn strip_all_lookaround_str(pattern: &str) -> String {
 
     match bytes[i] {
       b'\\' => {
+        if !in_class
+          && i + 1 < bytes.len()
+          && (bytes[i + 1] == b'b' || bytes[i + 1] == b'B')
+        {
+          result.push_str(&pattern[seg_start..i]);
+          i += 2;
+          seg_start = i;
+          continue;
+        }
         escaped = true;
         i += 1;
       }
@@ -1159,6 +1174,7 @@ fn find_matching_paren(
   let mut depth = 0;
   let mut i = start;
   let mut escaped = false;
+  let mut in_class = false;
   while i < bytes.len() {
     if escaped {
       escaped = false;
@@ -1167,8 +1183,10 @@ fn find_matching_paren(
     }
     match bytes[i] {
       b'\\' => escaped = true,
-      b'(' => depth += 1,
-      b')' => {
+      b'[' if !in_class => in_class = true,
+      b']' if in_class => in_class = false,
+      b'(' if !in_class => depth += 1,
+      b')' if !in_class => {
         depth -= 1;
         if depth == 0 {
           return Some(i);
@@ -1388,13 +1406,26 @@ fn verify_fallback_at(
   fb: &FallbackPattern,
   haystack: &str,
   start: usize,
+  candidate_end: usize,
   mode: &BoundaryMode,
 ) -> Option<RawMatch> {
+  let ctx_start = floor_char_boundary(
+    haystack,
+    start.saturating_sub(fb.context),
+  );
+  let ctx_end = ceil_char_boundary(
+    haystack,
+    (candidate_end + fb.context).min(haystack.len()),
+  );
+  let window = &haystack[ctx_start..ctx_end];
+  let offset = start - ctx_start;
   let (ms, me) =
-    safe_fancy_find(&fb.regex, haystack, start)?;
-  if ms != start {
+    safe_fancy_find(&fb.regex, window, offset)?;
+  if ms != offset {
     return None;
   }
+  let ms = ctx_start + ms;
+  let me = ctx_start + me;
   let passes = !fb.boundaries.has_any()
     || fb
       .boundaries
@@ -1432,6 +1463,7 @@ struct FallbackPattern {
   regex: fancy_regex::Regex,
   boundaries: EdgeBoundaries,
   candidate: Option<MetaRegex>,
+  context: usize,
 }
 
 /// A verified match: (original_pattern_index,
@@ -1608,14 +1640,23 @@ impl RegexSet {
                 "Failed to compile pattern {i}: {e}"
               ))
             })?;
+          let candidate =
+            MetaRegex::new(&strip_fallback_candidate_str(
+              &fallback_pattern,
+            ))
+            .ok();
           fallbacks.push(FallbackPattern {
             original_index: i as u32,
             regex: re,
             boundaries: eb,
-            candidate: MetaRegex::new(
-              &strip_all_lookaround_str(&fallback_pattern),
-            )
-            .ok(),
+            candidate,
+            context: fallback_pattern
+              .len()
+              .saturating_mul(2)
+              .clamp(
+                FALLBACK_MIN_CONTEXT,
+                FALLBACK_MAX_CONTEXT,
+              ),
           });
         }
       }
@@ -1846,6 +1887,7 @@ impl RegexSet {
             fb,
             haystack,
             m.start(),
+            m.end(),
             &mode,
           ) {
             let end = found.2;
@@ -2050,6 +2092,7 @@ impl RegexSet {
             fb,
             haystack,
             m.start(),
+            m.end(),
             &mode,
           )
           .is_some()
@@ -2287,5 +2330,24 @@ mod tests {
     assert!(chunks
       .iter()
       .all(|chunk| chunk.ends_with("(?!BAD)")));
+  }
+
+  #[test]
+  fn find_matching_paren_ignores_class_parens() {
+    let pattern = r"foo(?=\s|[.,;!?)]|$)bar";
+    let start = pattern.find("(?=").unwrap();
+    let end = find_matching_paren(pattern, start).unwrap();
+
+    assert_eq!(&pattern[end..], ")bar");
+  }
+
+  #[test]
+  fn fallback_candidate_strips_full_lookahead() {
+    let pattern = r"foo(?=\s|[.,;!?)]|$)bar";
+
+    assert_eq!(
+      strip_fallback_candidate_str(pattern),
+      "foobar"
+    );
   }
 }
