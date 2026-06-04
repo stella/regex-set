@@ -55,7 +55,6 @@ jobs:
               - 'wasm/**'
               - 'npm/**'
               - '.github/workflows/ci.yml'
-              - '.github/workflows/release.yml'
             provenance:
               - '.github/workflows/**'
               - 'bun.lock'

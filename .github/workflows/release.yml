@@ -388,3 +388,6 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    secrets:
+      app_id: ${{ secrets.CLA_APP_ID }}
+      app_private_key: ${{ secrets.CLA_APP_PRIVATE_KEY }}
