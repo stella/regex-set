@@ -142,6 +142,28 @@ describe("RegexSet", () => {
     // Rust regex guarantees O(n), should be < 10ms
     expect(elapsed).toBeLessThan(100);
   });
+
+  test("chunks large leading scoped alternations internally", () => {
+    const terms = Array.from(
+      { length: 80 },
+      (_, index) => `(?i:currency${index})`,
+    ).join("|");
+    const rs = new RegexSet([`\\b(?:${terms})\\s+\\d+`]);
+    const nativeIndexMap = Reflect.get(rs, "_nativeIndexMap");
+
+    expect(rs.patternCount).toBe(1);
+    expect(nativeIndexMap.length).toBeGreaterThan(1);
+
+    const matches = rs.findIter("currency42 100");
+    expect(matches).toEqual([
+      {
+        pattern: 0,
+        start: 0,
+        end: 14,
+        text: "currency42 100",
+      },
+    ]);
+  });
 });
 
 // ─── wholeWords ───────────────────────────────
@@ -330,6 +352,16 @@ describe("ascii word boundary", () => {
     expect(rs.isMatch("601 234 567")).toBe(true);
     expect(rs.isMatch("601234567")).toBe(true);
     expect(rs.isMatch("6012345678")).toBe(false);
+  });
+
+  test("\\B + negative lookahead backtracks like JS", () => {
+    const rs = new RegexSet([String.raw`\B[a-z]+(?!\d)`], {
+      unicodeBoundaries: false,
+    });
+
+    expect(rs.findIter("0aa0")).toEqual([
+      { pattern: 0, start: 1, end: 2, text: "a" },
+    ]);
   });
 
   test("wholeWords perf: uses ASCII boundary", () => {

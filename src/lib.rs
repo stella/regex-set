@@ -58,6 +58,17 @@ fn next_char_pos(haystack: &str, pos: usize) -> usize {
   next
 }
 
+fn prev_char_pos(haystack: &str, pos: usize) -> usize {
+  if pos == 0 {
+    return 0;
+  }
+  let mut prev = pos - 1;
+  while prev > 0 && !haystack.is_char_boundary(prev) {
+    prev -= 1;
+  }
+  prev
+}
+
 /// Options for constructing a `RegexSet`.
 #[napi(object)]
 pub struct Options {
@@ -366,6 +377,101 @@ fn has_non_ascii(pattern: &str) -> bool {
   !pattern.is_ascii()
 }
 
+fn bracket_class_is_word_like(s: &str) -> bool {
+  let Some(inner) =
+    s.strip_prefix('[').and_then(|v| v.strip_suffix(']'))
+  else {
+    return false;
+  };
+  !inner.starts_with('^')
+    && inner.chars().all(|ch| {
+      ch.is_ascii_alphanumeric() || ch == '_' || ch == '-'
+    })
+}
+
+fn starts_with_word_like_token(s: &str) -> bool {
+  if s.starts_with("\\w") || s.starts_with("\\d") {
+    return true;
+  }
+  if s.starts_with("\\p{L}")
+    || s.starts_with("\\p{N}")
+    || s.starts_with("\\p{Alphabetic}")
+    || s.starts_with("\\p{Numeric}")
+    || s.starts_with("\\p{Letter}")
+    || s.starts_with("\\p{Number}")
+  {
+    return true;
+  }
+  if s
+    .chars()
+    .next()
+    .is_some_and(|ch| ch.is_alphanumeric() || ch == '_')
+  {
+    return true;
+  }
+  if !s.starts_with('[') {
+    return false;
+  }
+  let Some(end) = s.find(']') else {
+    return false;
+  };
+  bracket_class_is_word_like(&s[..=end])
+}
+
+fn strip_trailing_quantifier(s: &str) -> &str {
+  if s.ends_with('?')
+    || s.ends_with('+')
+    || s.ends_with('*')
+  {
+    return &s[..s.len() - 1];
+  }
+
+  let Some(close) = s.strip_suffix('}') else {
+    return s;
+  };
+  let Some(open) = close.rfind('{') else {
+    return s;
+  };
+  let quantifier = &close[open + 1..];
+  if !quantifier
+    .chars()
+    .all(|ch| ch.is_ascii_digit() || ch == ',')
+  {
+    return s;
+  }
+  &close[..open]
+}
+
+fn ends_with_word_like_token(s: &str) -> bool {
+  let s = strip_trailing_quantifier(s);
+  if s.ends_with("\\w") || s.ends_with("\\d") {
+    return true;
+  }
+  if s.ends_with("\\p{L}")
+    || s.ends_with("\\p{N}")
+    || s.ends_with("\\p{Alphabetic}")
+    || s.ends_with("\\p{Numeric}")
+    || s.ends_with("\\p{Letter}")
+    || s.ends_with("\\p{Number}")
+  {
+    return true;
+  }
+  if s
+    .chars()
+    .next_back()
+    .is_some_and(|ch| ch.is_alphanumeric() || ch == '_')
+  {
+    return true;
+  }
+  if !s.ends_with(']') {
+    return false;
+  }
+  let Some(open) = s.rfind('[') else {
+    return false;
+  };
+  bracket_class_is_word_like(&s[open..])
+}
+
 /// Strip leading/trailing `\b` or `\B` from a
 /// pattern string.
 fn strip_edge_boundaries(
@@ -410,6 +516,26 @@ fn strip_edge_boundaries(
       }
       end -= 2;
     }
+  }
+
+  const LEADING_NOT_WORD: &str = "(?<!\\w)";
+  if pattern[start..end].starts_with(LEADING_NOT_WORD)
+    && starts_with_word_like_token(
+      &pattern[start + LEADING_NOT_WORD.len()..end],
+    )
+  {
+    eb.leading_b = true;
+    start += LEADING_NOT_WORD.len();
+  }
+
+  const TRAILING_NOT_WORD: &str = "(?!\\w)";
+  if pattern[start..end].ends_with(TRAILING_NOT_WORD)
+    && ends_with_word_like_token(
+      &pattern[start..end - TRAILING_NOT_WORD.len()],
+    )
+  {
+    eb.trailing_b = true;
+    end -= TRAILING_NOT_WORD.len();
   }
 
   (pattern[start..end].to_string(), eb)
@@ -1111,6 +1237,28 @@ fn ascii_boundary_for_fancy(s: &str) -> String {
   s.replace("(?-u:\\b)", &b).replace("(?-u:\\B)", &big_b)
 }
 
+fn restore_edge_boundaries(
+  pattern: &str,
+  boundaries: &EdgeBoundaries,
+) -> String {
+  let mut restored =
+    String::with_capacity(pattern.len() + 4);
+  if boundaries.leading_b {
+    restored.push_str("\\b");
+  }
+  if boundaries.leading_big_b {
+    restored.push_str("\\B");
+  }
+  restored.push_str(pattern);
+  if boundaries.trailing_b {
+    restored.push_str("\\b");
+  }
+  if boundaries.trailing_big_b {
+    restored.push_str("\\B");
+  }
+  restored
+}
+
 // ─── Match checking ─────────────────────────
 
 enum Rejection {
@@ -1180,6 +1328,60 @@ fn try_fancy_fallback(
     pi.individual.find(inp).filter(|im| im.start() == s)?;
   }
   Some((s, e))
+}
+
+fn try_shorter_verified_match(
+  pi: &PatternInfo,
+  haystack: &str,
+  start: usize,
+  end: usize,
+  mode: &BoundaryMode,
+) -> Option<(usize, usize)> {
+  if !matches!(pi.verifier, Verifier::Inline(_)) {
+    return None;
+  }
+
+  let mut candidate_end = prev_char_pos(haystack, end);
+  while candidate_end > start {
+    let input = Input::new(haystack)
+      .range(start..candidate_end)
+      .anchored(Anchored::Yes);
+    if let Some(m) = pi.individual.find(input) {
+      let boundary_ok = !pi.boundaries.has_any()
+        || pi.boundaries.check_with_mode(
+          haystack,
+          start,
+          candidate_end,
+          mode,
+        );
+      if m.start() == start
+        && m.end() == candidate_end
+        && boundary_ok
+        && pi.verifier.check(haystack, start, candidate_end)
+      {
+        return Some((start, candidate_end));
+      }
+    }
+    candidate_end = prev_char_pos(haystack, candidate_end);
+  }
+
+  None
+}
+
+fn try_verifier_fallback(
+  pi: &PatternInfo,
+  haystack: &str,
+  start: usize,
+  end: usize,
+  mode: &BoundaryMode,
+) -> Option<(usize, usize)> {
+  try_fancy_fallback(pi, haystack, start, mode).or_else(
+    || {
+      try_shorter_verified_match(
+        pi, haystack, start, end, mode,
+      )
+    },
+  )
 }
 
 fn verify_fallback_at(
@@ -1355,8 +1557,10 @@ impl RegexSet {
             // Without this, ascii_boundary_for_fancy is a
             // no-op since stripped contains raw \b, not
             // the (?-u:\b) form it searches for.
+            let fallback_source =
+              restore_edge_boundaries(&stripped, &eb);
             let with_ascii_b =
-              ascii_internal_boundaries(&stripped);
+              ascii_internal_boundaries(&fallback_source);
             let fancy_pat =
               ascii_boundary_for_fancy(&with_ascii_b);
             build_fancy_regex(&fancy_pat).ok()
@@ -1563,10 +1767,11 @@ impl RegexSet {
               Err(ref rej) => {
                 let fancy_match =
                   if matches!(rej, Rejection::Verifier) {
-                    try_fancy_fallback(
+                    try_verifier_fallback(
                       pi,
                       haystack,
                       m.start(),
+                      m.end(),
                       &mode,
                     )
                   } else {
@@ -1801,10 +2006,11 @@ impl RegexSet {
               Ok(()) => return true,
               Err(ref rej) => {
                 if matches!(rej, Rejection::Verifier)
-                  && try_fancy_fallback(
+                  && try_verifier_fallback(
                     pi,
                     haystack,
                     m.start(),
+                    m.end(),
                     &mode,
                   )
                   .is_some()
