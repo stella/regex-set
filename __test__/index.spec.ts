@@ -354,6 +354,16 @@ describe("ascii word boundary", () => {
     expect(rs.isMatch("6012345678")).toBe(false);
   });
 
+  test("\\B + negative lookahead backtracks like JS", () => {
+    const rs = new RegexSet([String.raw`\B[a-z]+(?!\d)`], {
+      unicodeBoundaries: false,
+    });
+
+    expect(rs.findIter("0aa0")).toEqual([
+      { pattern: 0, start: 1, end: 2, text: "a" },
+    ]);
+  });
+
   test("wholeWords perf: uses ASCII boundary", () => {
     const rs = new RegexSet(["test"], {
       wholeWords: true,
