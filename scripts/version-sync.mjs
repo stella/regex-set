@@ -30,6 +30,10 @@ function writeJson(filePath, value) {
   );
 }
 
+function readVersion() {
+  return readText(repoPath("VERSION")).trim();
+}
+
 function replaceRequired(
   content,
   matcher,
@@ -60,21 +64,27 @@ function describeMismatches(
   );
 
   const root = readJson(packageJsonPath);
+  const versionFileVersion = readVersion();
+  if (versionFileVersion !== expectedVersion) {
+    mismatches.push(
+      `${repoPath("VERSION")}: version=${versionFileVersion}`,
+    );
+  }
   if (root.version !== expectedVersion) {
     mismatches.push(
       `${packageJsonPath}: version=${root.version}`,
     );
   }
 
-  for (const [name, version] of Object.entries(
+  for (const [name, optionalVersion] of Object.entries(
     root.optionalDependencies ?? {},
   )) {
     if (
       name.startsWith("@stll/regex-set-") &&
-      version !== expectedVersion
+      optionalVersion !== expectedVersion
     ) {
       mismatches.push(
-        `${packageJsonPath}: optionalDependencies.${name}=${version}`,
+        `${packageJsonPath}: optionalDependencies.${name}=${optionalVersion}`,
       );
     }
   }
@@ -202,6 +212,7 @@ function syncVersion(nextVersion) {
 
   const root = readJson(packageJsonPath);
   const previousVersion = root.version;
+  writeText(repoPath("VERSION"), `${nextVersion}\n`);
   root.version = nextVersion;
   for (const name of Object.keys(
     root.optionalDependencies ?? {},
@@ -323,23 +334,31 @@ function parseArgs() {
 
 function main() {
   const { command, args } = parseArgs();
+
+  if (command !== "sync" && command !== "check") {
+    console.error(
+      "Usage: node scripts/version-sync.mjs <sync|check> [--version <semver>] [--tag <git-tag>]",
+    );
+    process.exit(1);
+  }
+
   const rootVersion = readJson(
     repoPath("package.json"),
   ).version;
+  const version =
+    args.get("version") ??
+    args.get("tag")?.replace(/^v/, "") ??
+    readVersion();
 
   if (command === "sync") {
-    const nextVersion = args.get("version") ?? rootVersion;
-    syncVersion(nextVersion);
+    syncVersion(version);
     return;
   }
 
   if (command === "check") {
-    const expectedVersion = args.get("tag")
-      ? args.get("tag").replace(/^v/, "")
-      : rootVersion;
     const mismatches = describeMismatches(
       rootVersion,
-      expectedVersion,
+      version,
     );
     if (mismatches.length > 0) {
       console.error("Version drift detected:");
@@ -350,11 +369,6 @@ function main() {
     }
     return;
   }
-
-  console.error(
-    "Usage: node scripts/version-sync.mjs <sync|check> [--version <semver>] [--tag <git-tag>]",
-  );
-  process.exit(1);
 }
 
 main();
