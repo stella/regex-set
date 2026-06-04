@@ -1546,7 +1546,7 @@
       "version": "2.1.2"
     },
     {
-      "bom-ref": "pkg:cargo/semver@1.0.38",
+      "bom-ref": "pkg:cargo/semver@1.0.28",
       "evidence": {
         "identity": [
           {
@@ -1589,12 +1589,12 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/semver@1.0.38",
+      "purl": "pkg:cargo/semver@1.0.28",
       "type": "library",
-      "version": "1.0.38"
+      "version": "1.0.28"
     },
     {
-      "bom-ref": "pkg:cargo/serde@1.0.328",
+      "bom-ref": "pkg:cargo/serde@1.0.228",
       "evidence": {
         "identity": [
           {
@@ -1637,12 +1637,12 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/serde@1.0.328",
+      "purl": "pkg:cargo/serde@1.0.228",
       "type": "library",
-      "version": "1.0.328"
+      "version": "1.0.228"
     },
     {
-      "bom-ref": "pkg:cargo/serde_core@1.0.328",
+      "bom-ref": "pkg:cargo/serde_core@1.0.228",
       "evidence": {
         "identity": [
           {
@@ -1685,12 +1685,12 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/serde_core@1.0.328",
+      "purl": "pkg:cargo/serde_core@1.0.228",
       "type": "library",
-      "version": "1.0.328"
+      "version": "1.0.228"
     },
     {
-      "bom-ref": "pkg:cargo/serde_derive@1.0.328",
+      "bom-ref": "pkg:cargo/serde_derive@1.0.228",
       "evidence": {
         "identity": [
           {
@@ -1733,9 +1733,9 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/serde_derive@1.0.328",
+      "purl": "pkg:cargo/serde_derive@1.0.228",
       "type": "library",
-      "version": "1.0.328"
+      "version": "1.0.228"
     },
     {
       "bom-ref": "pkg:cargo/serde_json@1.0.150",
@@ -1907,7 +1907,7 @@
       "version": "2.0.117"
     },
     {
-      "bom-ref": "pkg:cargo/unicode-ident@1.0.34",
+      "bom-ref": "pkg:cargo/unicode-ident@1.0.24",
       "evidence": {
         "identity": [
           {
@@ -1943,9 +1943,9 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/unicode-ident@1.0.34",
+      "purl": "pkg:cargo/unicode-ident@1.0.24",
       "type": "library",
-      "version": "1.0.34"
+      "version": "1.0.24"
     },
     {
       "bom-ref": "pkg:cargo/unicode-segmentation@1.13.3",
@@ -2044,7 +2044,7 @@
       "version": "0.2.1"
     },
     {
-      "bom-ref": "pkg:cargo/zmij@1.0.31",
+      "bom-ref": "pkg:cargo/zmij@1.0.21",
       "evidence": {
         "identity": [
           {
@@ -2082,9 +2082,9 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/zmij@1.0.31",
+      "purl": "pkg:cargo/zmij@1.0.21",
       "type": "library",
-      "version": "1.0.31"
+      "version": "1.0.21"
     },
     {
       "authors": [
@@ -2351,7 +2351,7 @@
         "pkg:cargo/napi-sys@3.2.1",
         "pkg:cargo/nohash-hasher@0.2.0",
         "pkg:cargo/rustc-hash@2.1.2",
-        "pkg:cargo/serde@1.0.328",
+        "pkg:cargo/serde@1.0.228",
         "pkg:cargo/serde_json@1.0.150"
       ],
       "ref": "pkg:cargo/napi@3.9.0"
@@ -2376,7 +2376,7 @@
         "pkg:cargo/convert_case@0.11.0",
         "pkg:cargo/proc-macro2@1.0.106",
         "pkg:cargo/quote@1.0.45",
-        "pkg:cargo/semver@1.0.38",
+        "pkg:cargo/semver@1.0.28",
         "pkg:cargo/syn@2.0.117"
       ],
       "ref": "pkg:cargo/napi-derive-backend@5.0.4"
@@ -2397,7 +2397,7 @@
     },
     {
       "dependsOn": [
-        "pkg:cargo/unicode-ident@1.0.34"
+        "pkg:cargo/unicode-ident@1.0.24"
       ],
       "ref": "pkg:cargo/proc-macro2@1.0.106"
     },
@@ -2434,19 +2434,19 @@
     },
     {
       "dependsOn": [],
-      "ref": "pkg:cargo/semver@1.0.38"
+      "ref": "pkg:cargo/semver@1.0.28"
     },
     {
       "dependsOn": [
-        "pkg:cargo/serde_core@1.0.328"
+        "pkg:cargo/serde_core@1.0.228"
       ],
-      "ref": "pkg:cargo/serde@1.0.328"
+      "ref": "pkg:cargo/serde@1.0.228"
     },
     {
       "dependsOn": [
-        "pkg:cargo/serde_derive@1.0.328"
+        "pkg:cargo/serde_derive@1.0.228"
       ],
-      "ref": "pkg:cargo/serde_core@1.0.328"
+      "ref": "pkg:cargo/serde_core@1.0.228"
     },
     {
       "dependsOn": [
@@ -2454,15 +2454,15 @@
         "pkg:cargo/quote@1.0.45",
         "pkg:cargo/syn@2.0.117"
       ],
-      "ref": "pkg:cargo/serde_derive@1.0.328"
+      "ref": "pkg:cargo/serde_derive@1.0.228"
     },
     {
       "dependsOn": [
         "pkg:cargo/itoa@1.0.18",
         "pkg:cargo/memchr@2.8.1",
-        "pkg:cargo/serde@1.0.328",
-        "pkg:cargo/serde_core@1.0.328",
-        "pkg:cargo/zmij@1.0.31"
+        "pkg:cargo/serde@1.0.228",
+        "pkg:cargo/serde_core@1.0.228",
+        "pkg:cargo/zmij@1.0.21"
       ],
       "ref": "pkg:cargo/serde_json@1.0.150"
     },
@@ -2487,13 +2487,13 @@
       "dependsOn": [
         "pkg:cargo/proc-macro2@1.0.106",
         "pkg:cargo/quote@1.0.45",
-        "pkg:cargo/unicode-ident@1.0.34"
+        "pkg:cargo/unicode-ident@1.0.24"
       ],
       "ref": "pkg:cargo/syn@2.0.117"
     },
     {
       "dependsOn": [],
-      "ref": "pkg:cargo/unicode-ident@1.0.34"
+      "ref": "pkg:cargo/unicode-ident@1.0.24"
     },
     {
       "dependsOn": [],
@@ -2505,7 +2505,7 @@
     },
     {
       "dependsOn": [],
-      "ref": "pkg:cargo/zmij@1.0.31"
+      "ref": "pkg:cargo/zmij@1.0.21"
     },
     {
       "dependsOn": [],
