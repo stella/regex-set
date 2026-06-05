@@ -1,6 +1,6 @@
 {
   "name": "@stll/regex-set",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Single-pass multi-pattern regex for Node.js/Bun. Backtracking-immune, Unicode-aware Rust engine via NAPI-RS.",
   "keywords": [
     "multi-pattern",
@@ -52,6 +52,8 @@
     "test:runtime:node": "node scripts/runtime-smoke.mjs",
     "version:sync": "node scripts/version-sync.mjs sync",
     "version:check": "node scripts/version-sync.mjs check",
+    "release:prepare": "node scripts/prepare-release-package.mjs",
+    "release:check": "node scripts/check-release-tarballs.mjs",
     "format": "oxfmt . \"!provenance/**\" \"!.ai/**\" \"!.agents/**\" \"!.claude/**\" \"!AGENTS.md\" \"!CLAUDE.md\" \"!GEMINI.md\" && rustfmt src/lib.rs",
     "typecheck": "tsc --noEmit",
     "lint": "bun --bun oxlint -c oxlint.config.ts --report-unused-disable-directives-severity=error --deny-warnings --type-aware .",
@@ -83,13 +85,6 @@
     "tsdown": "^0.22.1",
     "typescript": "^6.0.3",
     "vite": "^8.0.14"
-  },
-  "optionalDependencies": {
-    "@stll/regex-set-darwin-arm64": "1.0.3",
-    "@stll/regex-set-darwin-x64": "1.0.3",
-    "@stll/regex-set-linux-arm64-gnu": "1.0.3",
-    "@stll/regex-set-linux-x64-gnu": "1.0.3",
-    "@stll/regex-set-wasm32-wasi": "1.0.3"
   },
   "napi": {
     "binaryName": "regex-set",

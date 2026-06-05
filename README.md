@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/assets/banner.png" alt="Stella" width="100%" />
+  <img src=".github/assets/banner.png" alt="stella" width="100%" />
 </p>
 
 # @stll/regex-set
@@ -28,9 +28,6 @@ available for browser builds.
 You do not need Vite to use `@stll/regex-set` in
 Node.js or Bun. Vite is only relevant for the
 browser/WASM companion package.
-
-GitHub releases include npm tarballs, an SBOM, and
-third-party notices.
 
 Prebuilts are available for:
 
