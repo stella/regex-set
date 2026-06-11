@@ -57,6 +57,7 @@ jobs:
         npm/linux-arm64-gnu/package.json
         npm/linux-x64-gnu/package.json
         npm/wasm32-wasi/package.json
+        npm/win32-x64-msvc/package.json
       dependency-name-prefixes: |
         @stll/regex-set-
       publish-to-npm: >-
@@ -329,6 +330,7 @@ jobs:
         npm/linux-arm64-gnu/package.json
         npm/linux-x64-gnu/package.json
         npm/wasm32-wasi/package.json
+        npm/win32-x64-msvc/package.json
       publish-to-npm: >-
         ${{ github.event_name == 'push'
             || (inputs.publish_to_npm && github.ref == 'refs/heads/main') }}
