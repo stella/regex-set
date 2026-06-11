@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.5
+
+### Features
+
+- Windows support: publish the
+  `@stll/regex-set-win32-x64-msvc` native binding
+  (x86_64). The loader already resolved it; the
+  package now exists on the registry.
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
