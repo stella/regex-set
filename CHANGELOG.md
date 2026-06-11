@@ -1,18 +1,26 @@
 # Changelog
 
-## 1.0.5
-
-### Features
-
-- Windows support: publish the
-  `@stll/regex-set-win32-x64-msvc` native binding
-  (x86_64). The loader already resolved it; the
-  package now exists on the registry.
-
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.0.5] - 2026-06-11
+
+### Changed
+
+- Build and publish win32-x64-msvc native binding (#101)
+- Bump regex-set to 1.0.5 (#102)
+
+## [1.0.4] - 2026-06-05
+
+### Changed
+
+- Refresh CHANGELOG.md (#93)
+- Use app token for changelog PRs (#94)
+- Standardize npm release workflow
+- Pin release workflow to npm visibility retry (#97)
+- Bump regex-set to 1.0.4
 
 ## [1.0.3] - 2026-06-04
 
@@ -89,6 +97,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Init
 
+[1.0.5]: https://github.com/stella/regex-set/compare/v1.0.4..v1.0.5
+[1.0.4]: https://github.com/stella/regex-set/compare/v1.0.3..v1.0.4
 [1.0.3]: https://github.com/stella/regex-set/compare/v1.0.2..v1.0.3
 [1.0.2]: https://github.com/stella/regex-set/compare/v1.0.1..v1.0.2
 [1.0.1]: https://github.com/stella/regex-set/compare/v1.0.0..v1.0.1
