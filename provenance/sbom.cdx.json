@@ -1402,7 +1402,7 @@
       "version": "0.4.14"
     },
     {
-      "bom-ref": "pkg:cargo/regex-syntax@0.8.10",
+      "bom-ref": "pkg:cargo/regex-syntax@0.8.11",
       "evidence": {
         "identity": [
           {
@@ -1423,7 +1423,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
+          "content": "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
         }
       ],
       "licenses": [
@@ -1445,9 +1445,9 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/regex-syntax@0.8.10",
+      "purl": "pkg:cargo/regex-syntax@0.8.11",
       "type": "library",
-      "version": "0.8.10"
+      "version": "0.8.11"
     },
     {
       "bom-ref": "pkg:cargo/regex@1.12.3",
@@ -2258,7 +2258,7 @@
       "dependsOn": [
         "pkg:cargo/bit-set@0.8.0",
         "pkg:cargo/regex-automata@0.4.14",
-        "pkg:cargo/regex-syntax@0.8.10"
+        "pkg:cargo/regex-syntax@0.8.11"
       ],
       "ref": "pkg:cargo/fancy-regex@0.18.0"
     },
@@ -2412,7 +2412,7 @@
         "pkg:cargo/aho-corasick@1.1.4",
         "pkg:cargo/memchr@2.8.1",
         "pkg:cargo/regex-automata@0.4.14",
-        "pkg:cargo/regex-syntax@0.8.10"
+        "pkg:cargo/regex-syntax@0.8.11"
       ],
       "ref": "pkg:cargo/regex@1.12.3"
     },
@@ -2420,13 +2420,13 @@
       "dependsOn": [
         "pkg:cargo/aho-corasick@1.1.4",
         "pkg:cargo/memchr@2.8.1",
-        "pkg:cargo/regex-syntax@0.8.10"
+        "pkg:cargo/regex-syntax@0.8.11"
       ],
       "ref": "pkg:cargo/regex-automata@0.4.14"
     },
     {
       "dependsOn": [],
-      "ref": "pkg:cargo/regex-syntax@0.8.10"
+      "ref": "pkg:cargo/regex-syntax@0.8.11"
     },
     {
       "dependsOn": [],
@@ -2477,7 +2477,7 @@
         "pkg:cargo/napi-derive@3.5.6",
         "pkg:cargo/napi@3.9.0",
         "pkg:cargo/regex-automata@0.4.14",
-        "pkg:cargo/regex-syntax@0.8.10",
+        "pkg:cargo/regex-syntax@0.8.11",
         "pkg:cargo/regex@1.12.3",
         "pkg:cargo/unicode-segmentation@1.13.3"
       ],
