@@ -1989,6 +1989,33 @@ impl RegexSet {
     Ok(packed)
   }
 
+  /// Byte-offset counterpart of [`find_iter_packed_inner`].
+  ///
+  /// Emits raw UTF-8 byte offsets instead of UTF-16 code-unit
+  /// offsets, so no UTF-16 translation is needed.
+  fn find_iter_packed_bytes_inner(&self, haystack: &str) -> Result<Vec<u32>> {
+    let (mut all, needs_sort) = self.collect_matches(haystack);
+
+    if all.is_empty() {
+      return Ok(Vec::new());
+    }
+
+    let selected = if needs_sort {
+      Self::select_non_overlapping(&mut all)
+    } else {
+      all
+    };
+
+    // Pack with raw UTF-8 byte offsets.
+    let mut packed = Vec::with_capacity(selected.len() * 3);
+    for (pat, start, end) in selected {
+      packed.push(pat);
+      packed.push(usize_to_u32("Match start offset", start)?);
+      packed.push(usize_to_u32("Match end offset", end)?);
+    }
+    Ok(packed)
+  }
+
   #[must_use]
   pub fn is_match(&self, haystack: &str) -> bool {
     self.is_match_inner(haystack)
@@ -2008,6 +2035,25 @@ impl RegexSet {
     let text = std::str::from_utf8(haystack)
       .map_err(|e| Error::from_reason(format!("Invalid UTF-8: {e}")))?;
     self.find_iter_packed_inner(text)
+  }
+
+  /// Byte-offset counterpart of [`RegexSet::find_iter_packed`].
+  ///
+  /// Same packed layout `[pattern, start, end, ...]`, but offsets
+  /// are raw UTF-8 byte offsets rather than UTF-16 code units.
+  /// Intended for native Rust consumers that slice `&str` directly.
+  pub fn find_iter_packed_bytes(&self, haystack: &str) -> Result<Vec<u32>> {
+    self.find_iter_packed_bytes_inner(haystack)
+  }
+
+  /// Byte-offset counterpart of [`RegexSet::find_iter_packed_buf`].
+  pub fn find_iter_packed_bytes_buf(
+    &self,
+    haystack: &[u8],
+  ) -> Result<Vec<u32>> {
+    let text = std::str::from_utf8(haystack)
+      .map_err(|e| Error::from_reason(format!("Invalid UTF-8: {e}")))?;
+    self.find_iter_packed_bytes_inner(text)
   }
 
   #[must_use]
@@ -2152,5 +2198,26 @@ mod tests {
     let pattern = r"foo(?=\s|[.,;!?)]|$)bar";
 
     assert_eq!(strip_fallback_candidate_str(pattern), "foobar");
+  }
+
+  #[test]
+  fn packed_byte_offsets_diverge_from_utf16() {
+    // `ä` is 2 UTF-8 bytes but 1 UTF-16 code unit, so byte and
+    // UTF-16 offsets for the trailing `b` diverge.
+    let set = RegexSet::new(vec!["b".to_owned()], Options::default())
+      .expect("pattern should compile");
+    let haystack = "äb";
+
+    // Existing UTF-16 method: `b` is at UTF-16 offsets 1..2.
+    let utf16 = set
+      .find_iter_packed(haystack)
+      .expect("utf16 find should succeed");
+    assert_eq!(utf16, vec![0, 1, 2], "expected UTF-16 offsets");
+
+    // New byte-offset variant: `b` is at byte offsets 2..3.
+    let bytes = set
+      .find_iter_packed_bytes(haystack)
+      .expect("byte find should succeed");
+    assert_eq!(bytes, vec![0, 2, 3], "expected raw UTF-8 byte offsets");
   }
 }
