@@ -2,7 +2,7 @@
 name = "stella-regex-set"
 version = "1.0.5"
 edition = "2024"
-description = "Multi-pattern regex search for Stella packages"
+description = "Multi-pattern regex search"
 license = "MIT"
 publish = false
 repository = "https://github.com/stella/regex-set"
