@@ -2201,23 +2201,25 @@ mod tests {
   }
 
   #[test]
-  fn packed_byte_offsets_diverge_from_utf16() {
+  fn packed_byte_offsets_diverge_from_utf16() -> Result<()> {
     // `ä` is 2 UTF-8 bytes but 1 UTF-16 code unit, so byte and
     // UTF-16 offsets for the trailing `b` diverge.
-    let set = RegexSet::new(vec!["b".to_owned()], Options::default())
-      .expect("pattern should compile");
+    let set = RegexSet::new(vec!["b".to_owned()], Options::default())?;
     let haystack = "äb";
 
     // Existing UTF-16 method: `b` is at UTF-16 offsets 1..2.
-    let utf16 = set
-      .find_iter_packed(haystack)
-      .expect("utf16 find should succeed");
-    assert_eq!(utf16, vec![0, 1, 2], "expected UTF-16 offsets");
+    assert_eq!(
+      set.find_iter_packed(haystack)?,
+      vec![0, 1, 2],
+      "expected UTF-16 offsets"
+    );
 
     // New byte-offset variant: `b` is at byte offsets 2..3.
-    let bytes = set
-      .find_iter_packed_bytes(haystack)
-      .expect("byte find should succeed");
-    assert_eq!(bytes, vec![0, 2, 3], "expected raw UTF-8 byte offsets");
+    assert_eq!(
+      set.find_iter_packed_bytes(haystack)?,
+      vec![0, 2, 3],
+      "expected raw UTF-8 byte offsets"
+    );
+    Ok(())
   }
 }
