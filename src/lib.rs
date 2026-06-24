@@ -1,8 +1,30 @@
+// Low-level parser loops maintain byte-offset invariants internally; exported
+// offsets and pattern indexes are checked before crossing the JS boundary.
+#![allow(
+  clippy::arithmetic_side_effects,
+  clippy::bool_to_int_with_if,
+  clippy::collapsible_if,
+  clippy::doc_markdown,
+  clippy::indexing_slicing,
+  clippy::integer_division,
+  clippy::items_after_statements,
+  clippy::manual_map,
+  clippy::match_same_arms,
+  clippy::missing_const_for_fn,
+  clippy::option_if_let_else,
+  clippy::redundant_closure,
+  clippy::string_slice,
+  clippy::struct_excessive_bools,
+  clippy::too_many_lines,
+  clippy::trivially_copy_pass_by_ref,
+  clippy::use_self
+)]
+
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use regex_automata::meta::Regex as MetaRegex;
 use regex_automata::Anchored;
 use regex_automata::Input;
+use regex_automata::meta::Regex as MetaRegex;
 use std::panic;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -10,6 +32,20 @@ const FANCY_BACKTRACK_LIMIT: usize = 1_000_000;
 const FALLBACK_ALT_CHUNK_SIZE: usize = 128;
 const FALLBACK_MIN_CONTEXT: usize = 256;
 const FALLBACK_MAX_CONTEXT: usize = 8_192;
+
+fn u32_overflow_error(label: &str, value: usize) -> Error {
+  Error::from_reason(format!("{label} exceeds u32 range: {value}"))
+}
+
+fn usize_to_u32(label: &str, value: usize) -> Result<u32> {
+  u32::try_from(value).map_err(|_| u32_overflow_error(label, value))
+}
+
+fn pattern_index_to_usize(pattern: u32) -> Result<usize> {
+  usize::try_from(pattern).map_err(|_| {
+    Error::from_reason(format!("Pattern index is not addressable: {pattern}"))
+  })
+}
 
 fn build_fancy_regex(
   pattern: &str,
@@ -52,9 +88,7 @@ fn next_char_pos(haystack: &str, pos: usize) -> usize {
     return pos + 1;
   }
   let mut next = pos + 1;
-  while next < haystack.len()
-    && !haystack.is_char_boundary(next)
-  {
+  while next < haystack.len() && !haystack.is_char_boundary(next) {
     next += 1;
   }
   next
@@ -103,26 +137,26 @@ pub struct Match {
 
 // ─── UTF-16 offset translation ────────────────
 
-fn byte_span_utf16_len(bytes: &[u8]) -> u32 {
+fn byte_span_utf16_len(bytes: &[u8]) -> Result<u32> {
   let mut count = 0u32;
   let mut i = 0;
   while i < bytes.len() {
     let b = bytes[i];
+    let units = if b < 0xF0 { 1 } else { 2 };
+    count = count
+      .checked_add(units)
+      .ok_or_else(|| Error::from_reason("UTF-16 offset exceeds u32 range"))?;
     if b < 0x80 {
-      count += 1;
       i += 1;
     } else if b < 0xE0 {
-      count += 1;
       i += 2;
     } else if b < 0xF0 {
-      count += 1;
       i += 3;
     } else {
-      count += 2;
       i += 4;
     }
   }
-  count
+  Ok(count)
 }
 
 // ─── Word boundary verification ─────────────
@@ -136,11 +170,7 @@ fn is_word_char_ascii(ch: char) -> bool {
 }
 
 /// Check word boundary at a byte position.
-fn check_word_boundary(
-  haystack: &str,
-  byte_pos: usize,
-  unicode: bool,
-) -> bool {
+fn check_word_boundary(haystack: &str, byte_pos: usize, unicode: bool) -> bool {
   let is_wc = if unicode {
     is_word_char_unicode
   } else {
@@ -150,15 +180,18 @@ fn check_word_boundary(
   let before = if byte_pos == 0 {
     false
   } else {
-    let ch =
-      haystack[..byte_pos].chars().next_back().unwrap();
-    is_wc(ch)
+    haystack
+      .get(..byte_pos)
+      .and_then(|prefix| prefix.chars().next_back())
+      .is_some_and(is_wc)
   };
   let after = if byte_pos >= haystack.len() {
     false
   } else {
-    let ch = haystack[byte_pos..].chars().next().unwrap();
-    is_wc(ch)
+    haystack
+      .get(byte_pos..)
+      .and_then(|suffix| suffix.chars().next())
+      .is_some_and(is_wc)
   };
   before != after
 }
@@ -264,9 +297,7 @@ impl BoundaryBitSet {
 /// Compute UAX#29 word boundaries as a bit set.
 /// No sort needed: unicode_word_indices returns
 /// positions in order. O(1) lookup per position.
-fn compute_uax29_boundaries(
-  haystack: &str,
-) -> BoundaryBitSet {
+fn compute_uax29_boundaries(haystack: &str) -> BoundaryBitSet {
   use unicode_segmentation::UnicodeSegmentation;
   let mut bs = BoundaryBitSet::new(haystack.len() + 1);
   bs.set(0);
@@ -288,12 +319,8 @@ enum BoundaryMode {
 impl BoundaryMode {
   fn is_boundary(&self, pos: usize) -> bool {
     match self {
-      BoundaryMode::Segmenter { bitset } => {
-        bitset.contains(pos)
-      }
-      BoundaryMode::Inline { .. } => {
-        unreachable!()
-      }
+      BoundaryMode::Segmenter { bitset } => bitset.contains(pos),
+      BoundaryMode::Inline { .. } => false,
     }
   }
 }
@@ -308,9 +335,7 @@ fn has_internal_boundary(pattern: &str) -> bool {
   let mut i = 0;
   while i < bytes.len() {
     if bytes[i] == b'\\' && i + 1 < bytes.len() {
-      if !in_class
-        && (bytes[i + 1] == b'b' || bytes[i + 1] == b'B')
-      {
+      if !in_class && (bytes[i + 1] == b'b' || bytes[i + 1] == b'B') {
         return true;
       }
       // Skip escaped char
@@ -336,8 +361,7 @@ fn has_internal_boundary(pattern: &str) -> bool {
 /// Uses string slices (not byte→char casts) to
 /// preserve multi-byte UTF-8 characters correctly.
 fn ascii_internal_boundaries(pattern: &str) -> String {
-  let mut result =
-    String::with_capacity(pattern.len() + 32);
+  let mut result = String::with_capacity(pattern.len() + 32);
   let bytes = pattern.as_bytes();
   let mut seg_start = 0;
   let mut in_class = false;
@@ -348,7 +372,7 @@ fn ascii_internal_boundaries(pattern: &str) -> String {
       if !in_class && (next == b'b' || next == b'B') {
         result.push_str(&pattern[seg_start..i]);
         result.push_str("(?-u:\\");
-        result.push(next as char); // b/B are ASCII
+        result.push(char::from(next)); // b/B are ASCII
         result.push(')');
         i += 2;
         seg_start = i;
@@ -380,15 +404,14 @@ fn has_non_ascii(pattern: &str) -> bool {
 }
 
 fn bracket_class_is_word_like(s: &str) -> bool {
-  let Some(inner) =
-    s.strip_prefix('[').and_then(|v| v.strip_suffix(']'))
+  let Some(inner) = s.strip_prefix('[').and_then(|v| v.strip_suffix(']'))
   else {
     return false;
   };
   !inner.starts_with('^')
-    && inner.chars().all(|ch| {
-      ch.is_ascii_alphanumeric() || ch == '_' || ch == '-'
-    })
+    && inner
+      .chars()
+      .all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-')
 }
 
 fn starts_with_word_like_token(s: &str) -> bool {
@@ -421,10 +444,7 @@ fn starts_with_word_like_token(s: &str) -> bool {
 }
 
 fn strip_trailing_quantifier(s: &str) -> &str {
-  if s.ends_with('?')
-    || s.ends_with('+')
-    || s.ends_with('*')
-  {
+  if s.ends_with('?') || s.ends_with('+') || s.ends_with('*') {
     return &s[..s.len() - 1];
   }
 
@@ -476,9 +496,7 @@ fn ends_with_word_like_token(s: &str) -> bool {
 
 /// Strip leading/trailing `\b` or `\B` from a
 /// pattern string.
-fn strip_edge_boundaries(
-  pattern: &str,
-) -> (String, EdgeBoundaries) {
+fn strip_edge_boundaries(pattern: &str) -> (String, EdgeBoundaries) {
   let bytes = pattern.as_bytes();
   let mut start = 0;
   let mut end = bytes.len();
@@ -487,8 +505,7 @@ fn strip_edge_boundaries(
   // Leading \b or \B
   if end - start >= 2
     && bytes[start] == b'\\'
-    && (bytes[start + 1] == b'b'
-      || bytes[start + 1] == b'B')
+    && (bytes[start + 1] == b'b' || bytes[start + 1] == b'B')
   {
     if bytes[start + 1] == b'b' {
       eb.leading_b = true;
@@ -532,9 +549,7 @@ fn strip_edge_boundaries(
 
   const TRAILING_NOT_WORD: &str = "(?!\\w)";
   if pattern[start..end].ends_with(TRAILING_NOT_WORD)
-    && ends_with_word_like_token(
-      &pattern[start..end - TRAILING_NOT_WORD.len()],
-    )
+    && ends_with_word_like_token(&pattern[start..end - TRAILING_NOT_WORD.len()])
   {
     eb.trailing_b = true;
     end -= TRAILING_NOT_WORD.len();
@@ -571,9 +586,7 @@ impl EdgeBoundaries {
         BoundaryMode::Inline { unicode } => {
           check_word_boundary(haystack, pos, *unicode)
         }
-        BoundaryMode::Segmenter { .. } => {
-          mode.is_boundary(pos)
-        }
+        BoundaryMode::Segmenter { .. } => mode.is_boundary(pos),
       }
     };
 
@@ -639,9 +652,7 @@ impl CharClass {
       CharClass::AsciiUppercase => ch.is_ascii_uppercase(),
       CharClass::Lowercase => ch.is_lowercase(),
       CharClass::Uppercase => ch.is_uppercase(),
-      CharClass::CharSet(set) => {
-        set.binary_search(&ch).is_ok()
-      }
+      CharClass::CharSet(set) => set.binary_search(&ch).is_ok(),
       CharClass::Regex(re) => {
         let mut buf = [0u8; 4];
         re.is_match(ch.encode_utf8(&mut buf))
@@ -649,27 +660,17 @@ impl CharClass {
     }
   }
 
-  fn from_str(
-    s: &str,
-  ) -> std::result::Result<Self, String> {
+  fn from_str(s: &str) -> std::result::Result<Self, String> {
     match s {
       "\\d" | "[0-9]" => Ok(CharClass::Digit),
       "\\w" | "[a-zA-Z0-9_]" => Ok(CharClass::WordChar),
       "\\s" | "[\\t\\n\\r ]" => Ok(CharClass::Whitespace),
-      "\\p{L}" | "\\p{Alphabetic}" | "\\p{Letter}" => {
-        Ok(CharClass::Alpha)
-      }
-      "\\p{N}" | "\\p{Numeric}" | "\\p{Number}" => {
-        Ok(CharClass::Numeric)
-      }
+      "\\p{L}" | "\\p{Alphabetic}" | "\\p{Letter}" => Ok(CharClass::Alpha),
+      "\\p{N}" | "\\p{Numeric}" | "\\p{Number}" => Ok(CharClass::Numeric),
       "[a-z]" => Ok(CharClass::AsciiLowercase),
       "[A-Z]" => Ok(CharClass::AsciiUppercase),
-      "\\p{Ll}" | "\\p{Lowercase}" => {
-        Ok(CharClass::Lowercase)
-      }
-      "\\p{Lu}" | "\\p{Uppercase}" => {
-        Ok(CharClass::Uppercase)
-      }
+      "\\p{Ll}" | "\\p{Lowercase}" => Ok(CharClass::Lowercase),
+      "\\p{Lu}" | "\\p{Uppercase}" => Ok(CharClass::Uppercase),
       _ => {
         // Try expanding a simple bracket expression
         // into a sorted char set for O(log n) lookup
@@ -677,8 +678,7 @@ impl CharClass {
         if let Some(chars) = expand_bracket_expr(s) {
           return Ok(CharClass::CharSet(chars));
         }
-        let re = regex::Regex::new(s)
-          .map_err(|e| format!("{e}"))?;
+        let re = regex::Regex::new(s).map_err(|e| format!("{e}"))?;
         Ok(CharClass::Regex(re))
       }
     }
@@ -691,10 +691,7 @@ impl CharClass {
 /// Only handles ASCII ranges and literal chars.
 fn expand_bracket_expr(s: &str) -> Option<Vec<char>> {
   let bytes = s.as_bytes();
-  if bytes.len() < 3
-    || bytes[0] != b'['
-    || bytes[bytes.len() - 1] != b']'
-  {
+  if bytes.len() < 3 || bytes[0] != b'[' || bytes[bytes.len() - 1] != b']' {
     return None;
   }
   let inner = &s[1..s.len() - 1];
@@ -724,16 +721,16 @@ fn expand_bracket_expr(s: &str) -> Option<Vec<char>> {
       if lo > hi {
         return None;
       }
-      let count = (hi - lo) as usize + 1;
+      let count = usize::from(hi - lo) + 1;
       if chars.len() + count > 256 {
         return None;
       }
       for c in lo..=hi {
-        chars.push(c as char);
+        chars.push(char::from(c));
       }
       i += 3;
     } else {
-      chars.push(ibytes[i] as char);
+      chars.push(char::from(ibytes[i]));
       i += 1;
     }
   }
@@ -755,30 +752,26 @@ impl CharCheck {
     if pos >= haystack.len() {
       return self.negated;
     }
-    let ch = haystack[pos..].chars().next().unwrap();
+    let Some(ch) = haystack.get(pos..).and_then(|value| value.chars().next())
+    else {
+      return self.negated;
+    };
     let matches = self.class.matches_char(ch);
-    if self.negated {
-      !matches
-    } else {
-      matches
-    }
+    if self.negated { !matches } else { matches }
   }
 
-  fn test_before(
-    &self,
-    haystack: &str,
-    pos: usize,
-  ) -> bool {
+  fn test_before(&self, haystack: &str, pos: usize) -> bool {
     if pos == 0 {
       return self.negated;
     }
-    let ch = haystack[..pos].chars().next_back().unwrap();
+    let Some(ch) = haystack
+      .get(..pos)
+      .and_then(|value| value.chars().next_back())
+    else {
+      return self.negated;
+    };
     let matches = self.class.matches_char(ch);
-    if self.negated {
-      !matches
-    } else {
-      matches
-    }
+    if self.negated { !matches } else { matches }
   }
 }
 
@@ -791,9 +784,7 @@ fn has_lookaround(pattern: &str) -> bool {
     || pattern.contains("(?<!")
 }
 
-fn extract_leading_lookbehind(
-  pattern: &str,
-) -> Option<(String, bool, String)> {
+fn extract_leading_lookbehind(pattern: &str) -> Option<(String, bool, String)> {
   let (prefix, negated) = if pattern.starts_with("(?<!") {
     ("(?<!", true)
   } else if pattern.starts_with("(?<=") {
@@ -807,9 +798,7 @@ fn extract_leading_lookbehind(
   Some((content, negated, rest))
 }
 
-fn extract_trailing_lookahead(
-  pattern: &str,
-) -> Option<(String, String, bool)> {
+fn extract_trailing_lookahead(pattern: &str) -> Option<(String, String, bool)> {
   let start = find_last_lookahead_start(pattern)?;
   let end = pattern.len() - 1;
   let prefix = &pattern[start..start + 3];
@@ -818,8 +807,7 @@ fn extract_trailing_lookahead(
   }
   let prefix_len = 3;
   let negated = &pattern[start + 2..start + 3] == "!";
-  let content =
-    pattern[start + prefix_len..end].to_string();
+  let content = pattern[start + prefix_len..end].to_string();
   let rest = pattern[..start].to_string();
   Some((rest, content, negated))
 }
@@ -845,9 +833,7 @@ fn build_verifier(
   let mut pre: Option<CharCheck> = None;
   let mut post: Option<CharCheck> = None;
 
-  if let Some((content, negated, rest)) =
-    extract_leading_lookbehind(&core)
-  {
+  if let Some((content, negated, rest)) = extract_leading_lookbehind(&core) {
     if is_simple_char_class(&content) {
       let class = CharClass::from_str(&content)?;
       pre = Some(CharCheck { class, negated });
@@ -855,9 +841,7 @@ fn build_verifier(
     }
   }
 
-  if let Some((rest, content, negated)) =
-    extract_trailing_lookahead(&core)
-  {
+  if let Some((rest, content, negated)) = extract_trailing_lookahead(&core) {
     if is_simple_char_class(&content) {
       let class = CharClass::from_str(&content)?;
       post = Some(CharCheck { class, negated });
@@ -865,13 +849,8 @@ fn build_verifier(
     }
   }
 
-  if !has_lookaround(&core)
-    && (pre.is_some() || post.is_some())
-  {
-    return Ok((
-      core,
-      Verifier::Inline(InlineCheck { pre, post }),
-    ));
+  if !has_lookaround(&core) && (pre.is_some() || post.is_some()) {
+    return Ok((core, Verifier::Inline(InlineCheck { pre, post })));
   }
 
   // Complex lookaround → fancy-regex fallback.
@@ -885,12 +864,7 @@ fn build_verifier(
 }
 
 impl Verifier {
-  fn check(
-    &self,
-    haystack: &str,
-    start: usize,
-    end: usize,
-  ) -> bool {
+  fn check(&self, haystack: &str, start: usize, end: usize) -> bool {
     match self {
       Verifier::None => true,
       Verifier::Inline(ic) => {
@@ -909,15 +883,14 @@ impl Verifier {
       Verifier::Complex(re) => {
         let ctx_start = start.saturating_sub(20);
         let ctx_end = (end + 20).min(haystack.len());
-        let ctx_start =
-          floor_char_boundary(haystack, ctx_start);
+        let ctx_start = floor_char_boundary(haystack, ctx_start);
         let ctx_end = ceil_char_boundary(haystack, ctx_end);
         let window = &haystack[ctx_start..ctx_end];
         let offset = start - ctx_start;
         // Must match exactly at offset.
         safe_fancy_find(re, window, offset)
-          .filter(|&(s, _)| s == offset)
-          .is_some()
+          .as_ref()
+          .is_some_and(|&(s, _)| s == offset)
       }
     }
   }
@@ -927,9 +900,7 @@ impl Verifier {
 
 fn strip_lookaround_str(pattern: &str) -> String {
   let mut result = pattern.to_string();
-  while result.starts_with("(?<=")
-    || result.starts_with("(?<!")
-  {
+  while result.starts_with("(?<=") || result.starts_with("(?<!") {
     if let Some(end) = find_matching_paren(&result, 0) {
       result = result[end + 1..].to_string();
     } else {
@@ -939,9 +910,7 @@ fn strip_lookaround_str(pattern: &str) -> String {
   loop {
     let trimmed = result.trim_end();
     if trimmed.ends_with(')') {
-      if let Some(start) =
-        find_last_lookahead_start(trimmed)
-      {
+      if let Some(start) = find_last_lookahead_start(trimmed) {
         result = trimmed[..start].to_string();
       } else {
         break;
@@ -1041,10 +1010,7 @@ fn split_large_alternation(
         in_class = false;
         i += 1;
       }
-      b'('
-        if !in_class
-          && is_negative_lookaround_at(bytes, i) =>
-      {
+      b'(' if !in_class && is_negative_lookaround_at(bytes, i) => {
         if let Some(end) = find_matching_paren(pattern, i) {
           i = end + 1;
         } else {
@@ -1058,15 +1024,11 @@ fn split_large_alternation(
           && bytes[i + 2] == b':' =>
       {
         if let Some(end) = find_matching_paren(pattern, i) {
-          let alts = split_top_level_alternatives(
-            &pattern[i + 3..end],
-          );
+          let alts = split_top_level_alternatives(&pattern[i + 3..end]);
           if alts.len() > chunk_size
-            && best.as_ref().is_none_or(
-              |(_, _, best_alts)| {
-                alts.len() > best_alts.len()
-              },
-            )
+            && best
+              .as_ref()
+              .is_none_or(|(_, _, best_alts)| alts.len() > best_alts.len())
           {
             best = Some((i + 3, end, alts));
           }
@@ -1137,10 +1099,7 @@ fn split_top_level_alternatives(s: &str) -> Vec<String> {
 }
 
 fn is_lookaround_at(bytes: &[u8], i: usize) -> bool {
-  if i + 2 >= bytes.len()
-    || bytes[i] != b'('
-    || bytes[i + 1] != b'?'
-  {
+  if i + 2 >= bytes.len() || bytes[i] != b'(' || bytes[i + 1] != b'?' {
     return false;
   }
   bytes[i + 2] == b'='
@@ -1150,26 +1109,15 @@ fn is_lookaround_at(bytes: &[u8], i: usize) -> bool {
       && (bytes[i + 3] == b'=' || bytes[i + 3] == b'!'))
 }
 
-fn is_negative_lookaround_at(
-  bytes: &[u8],
-  i: usize,
-) -> bool {
-  if i + 2 >= bytes.len()
-    || bytes[i] != b'('
-    || bytes[i + 1] != b'?'
-  {
+fn is_negative_lookaround_at(bytes: &[u8], i: usize) -> bool {
+  if i + 2 >= bytes.len() || bytes[i] != b'(' || bytes[i + 1] != b'?' {
     return false;
   }
   bytes[i + 2] == b'!'
-    || (i + 3 < bytes.len()
-      && bytes[i + 2] == b'<'
-      && bytes[i + 3] == b'!')
+    || (i + 3 < bytes.len() && bytes[i + 2] == b'<' && bytes[i + 3] == b'!')
 }
 
-fn find_matching_paren(
-  s: &str,
-  start: usize,
-) -> Option<usize> {
+fn find_matching_paren(s: &str, start: usize) -> Option<usize> {
   let bytes = s.as_bytes();
   let mut depth = 0;
   let mut i = start;
@@ -1214,8 +1162,7 @@ fn find_last_lookahead_start(s: &str) -> Option<usize> {
         if depth == 0 {
           if i + 2 < bytes.len()
             && bytes[i + 1] == b'?'
-            && (bytes[i + 2] == b'='
-              || bytes[i + 2] == b'!')
+            && (bytes[i + 2] == b'=' || bytes[i + 2] == b'!')
           {
             return Some(i);
           }
@@ -1249,9 +1196,8 @@ fn ceil_char_boundary(s: &str, mut i: usize) -> usize {
 const W: &str = "[a-zA-Z0-9_]";
 
 fn ascii_boundary_for_fancy(s: &str) -> String {
-  let b = format!("(?:(?<={W})(?!{W})|(?<!{W})(?={W}))",);
-  let big_b =
-    format!("(?:(?<={W})(?={W})|(?<!{W})(?!{W}))",);
+  let b = format!("(?:(?<={W})(?!{W})|(?<!{W})(?={W}))");
+  let big_b = format!("(?:(?<={W})(?={W})|(?<!{W})(?!{W}))");
   s.replace("(?-u:\\b)", &b).replace("(?-u:\\B)", &big_b)
 }
 
@@ -1259,8 +1205,7 @@ fn restore_edge_boundaries(
   pattern: &str,
   boundaries: &EdgeBoundaries,
 ) -> String {
-  let mut restored =
-    String::with_capacity(pattern.len() + 4);
+  let mut restored = String::with_capacity(pattern.len() + 4);
   if boundaries.leading_b {
     restored.push_str("\\b");
   }
@@ -1292,9 +1237,7 @@ fn check_match(
   mode: &BoundaryMode,
 ) -> std::result::Result<(), Rejection> {
   if pi.boundaries.has_any()
-    && !pi
-      .boundaries
-      .check_with_mode(haystack, start, end, mode)
+    && !pi.boundaries.check_with_mode(haystack, start, end, mode)
   {
     return Err(Rejection::Boundary);
   }
@@ -1307,9 +1250,7 @@ fn check_match(
   if pi.has_internal_b {
     let input = Input::new(haystack).range(start..);
     match pi.individual.find(input) {
-      Some(m) if m.start() == start && m.end() == end => {
-        Ok(())
-      }
+      Some(m) if m.start() == start && m.end() == end => Ok(()),
       _ => Err(Rejection::Verifier),
     }
   } else {
@@ -1366,12 +1307,9 @@ fn try_shorter_verified_match(
       .anchored(Anchored::Yes);
     if let Some(m) = pi.individual.find(input) {
       let boundary_ok = !pi.boundaries.has_any()
-        || pi.boundaries.check_with_mode(
-          haystack,
-          start,
-          candidate_end,
-          mode,
-        );
+        || pi
+          .boundaries
+          .check_with_mode(haystack, start, candidate_end, mode);
       if m.start() == start
         && m.end() == candidate_end
         && boundary_ok
@@ -1393,13 +1331,8 @@ fn try_verifier_fallback(
   end: usize,
   mode: &BoundaryMode,
 ) -> Option<(usize, usize)> {
-  try_fancy_fallback(pi, haystack, start, mode).or_else(
-    || {
-      try_shorter_verified_match(
-        pi, haystack, start, end, mode,
-      )
-    },
-  )
+  try_fancy_fallback(pi, haystack, start, mode)
+    .or_else(|| try_shorter_verified_match(pi, haystack, start, end, mode))
 }
 
 fn verify_fallback_at(
@@ -1409,32 +1342,23 @@ fn verify_fallback_at(
   candidate_end: usize,
   mode: &BoundaryMode,
 ) -> Option<RawMatch> {
-  let ctx_start = floor_char_boundary(
-    haystack,
-    start.saturating_sub(fb.context),
-  );
+  let ctx_start =
+    floor_char_boundary(haystack, start.saturating_sub(fb.context));
   let ctx_end = ceil_char_boundary(
     haystack,
     (candidate_end + fb.context).min(haystack.len()),
   );
   let window = &haystack[ctx_start..ctx_end];
   let offset = start - ctx_start;
-  let (ms, me) =
-    safe_fancy_find(&fb.regex, window, offset)?;
+  let (ms, me) = safe_fancy_find(&fb.regex, window, offset)?;
   if ms != offset {
     return None;
   }
   let ms = ctx_start + ms;
   let me = ctx_start + me;
   let passes = !fb.boundaries.has_any()
-    || fb
-      .boundaries
-      .check_with_mode(haystack, ms, me, mode);
-  if passes {
-    Some((fb.original_index, ms, me))
-  } else {
-    None
-  }
+    || fb.boundaries.check_with_mode(haystack, ms, me, mode);
+  passes.then_some((fb.original_index, ms, me))
 }
 
 // ─── Engine ───────────────────────────────────
@@ -1483,6 +1407,7 @@ pub struct RegexSet {
   /// Fancy-regex fallback patterns.
   fallbacks: Vec<FallbackPattern>,
   pattern_count: u32,
+  pattern_count_usize: usize,
   has_boundaryless_pattern: bool,
   has_heterogeneous_boundaries: bool,
   unicode_wb: bool,
@@ -1491,10 +1416,8 @@ pub struct RegexSet {
 #[napi]
 impl RegexSet {
   #[napi(constructor)]
-  pub fn new(
-    patterns: Vec<String>,
-    options: Option<Options>,
-  ) -> Result<Self> {
+  #[allow(clippy::needless_pass_by_value)]
+  pub fn new(patterns: Vec<String>, options: Option<Options>) -> Result<Self> {
     let whole_words = options
       .as_ref()
       .and_then(|o| o.whole_words)
@@ -1504,10 +1427,10 @@ impl RegexSet {
       .and_then(|o| o.unicode_boundaries)
       .unwrap_or(true);
 
-    let pattern_count = patterns.len() as u32;
+    let pattern_count_usize = patterns.len();
+    let pattern_count = usize_to_u32("Pattern count", pattern_count_usize)?;
 
-    let wrapped: Vec<String> = if whole_words && !unicode_wb
-    {
+    let wrapped: Vec<String> = if whole_words && !unicode_wb {
       patterns
         .iter()
         .map(|p| format!("(?-u:\\b)(?:{p})(?-u:\\b)"))
@@ -1532,12 +1455,9 @@ impl RegexSet {
         eb.trailing_big_b = false;
       }
 
-      let (core, verifier) = build_verifier(&stripped)
-        .map_err(|e| {
-          Error::from_reason(format!(
-            "Failed to compile pattern {i}: {e}"
-          ))
-        })?;
+      let (core, verifier) = build_verifier(&stripped).map_err(|e| {
+        Error::from_reason(format!("Failed to compile pattern {i}: {e}"))
+      })?;
 
       // Detect internal \b/\B that would cause DFA
       // state explosion in the multi-pattern DFA.
@@ -1550,8 +1470,7 @@ impl RegexSet {
       // non-ASCII word characters, so it would miss
       // matches at Unicode word boundaries (false
       // negatives that verification can't recover).
-      let internal_b = has_internal_boundary(&core)
-        && !has_non_ascii(&core);
+      let internal_b = has_internal_boundary(&core) && !has_non_ascii(&core);
       let dfa_core = if internal_b {
         ascii_internal_boundaries(&core)
       } else {
@@ -1564,11 +1483,10 @@ impl RegexSet {
         // boundaries goes to fast path, because
         // find_iter can't retry rejected positions
         // for other patterns.
-        let needs_slow =
-          !matches!(&verifier, Verifier::None)
-            || eb.leading_big_b
-            || eb.trailing_big_b
-            || internal_b;
+        let needs_slow = !matches!(&verifier, Verifier::None)
+          || eb.leading_big_b
+          || eb.trailing_big_b
+          || internal_b;
 
         // Build fancy-regex fallback for patterns
         // with verifiers. When the DFA finds a greedy
@@ -1589,12 +1507,9 @@ impl RegexSet {
             // Without this, ascii_boundary_for_fancy is a
             // no-op since stripped contains raw \b, not
             // the (?-u:\b) form it searches for.
-            let fallback_source =
-              restore_edge_boundaries(&stripped, &eb);
-            let with_ascii_b =
-              ascii_internal_boundaries(&fallback_source);
-            let fancy_pat =
-              ascii_boundary_for_fancy(&with_ascii_b);
+            let fallback_source = restore_edge_boundaries(&stripped, &eb);
+            let with_ascii_b = ascii_internal_boundaries(&fallback_source);
+            let fancy_pat = ascii_boundary_for_fancy(&with_ascii_b);
             build_fancy_regex(&fancy_pat).ok()
           }
           Verifier::None => None,
@@ -1603,7 +1518,7 @@ impl RegexSet {
         if needs_slow {
           slow_cores.push(dfa_core);
           slow_info.push(PatternInfo {
-            original_index: i as u32,
+            original_index: usize_to_u32("Pattern index", i)?,
             verifier,
             boundaries: eb,
             individual,
@@ -1613,7 +1528,7 @@ impl RegexSet {
         } else {
           fast_cores.push(dfa_core);
           fast_info.push(PatternInfo {
-            original_index: i as u32,
+            original_index: usize_to_u32("Pattern index", i)?,
             verifier,
             boundaries: eb,
             individual,
@@ -1626,51 +1541,38 @@ impl RegexSet {
         }
       } else {
         // Core doesn't compile in MetaRegex.
-        let fallback_patterns = split_large_alternation(
-          &stripped,
-          FALLBACK_ALT_CHUNK_SIZE,
-        )
-        .unwrap_or_else(|| vec![stripped.clone()]);
+        let fallback_patterns =
+          split_large_alternation(&stripped, FALLBACK_ALT_CHUNK_SIZE)
+            .unwrap_or_else(|| vec![stripped.clone()]);
         for fallback_pattern in fallback_patterns {
-          let fancy_pat =
-            ascii_boundary_for_fancy(&fallback_pattern);
-          let re =
-            build_fancy_regex(&fancy_pat).map_err(|e| {
-              Error::from_reason(format!(
-                "Failed to compile pattern {i}: {e}"
-              ))
-            })?;
+          let fancy_pat = ascii_boundary_for_fancy(&fallback_pattern);
+          let re = build_fancy_regex(&fancy_pat).map_err(|e| {
+            Error::from_reason(format!("Failed to compile pattern {i}: {e}"))
+          })?;
           let candidate =
-            MetaRegex::new(&strip_fallback_candidate_str(
-              &fallback_pattern,
-            ))
-            .ok();
+            MetaRegex::new(&strip_fallback_candidate_str(&fallback_pattern))
+              .ok();
           fallbacks.push(FallbackPattern {
-            original_index: i as u32,
+            original_index: usize_to_u32("Pattern index", i)?,
             regex: re,
             boundaries: eb,
             candidate,
             context: fallback_pattern
               .len()
               .saturating_mul(2)
-              .clamp(
-                FALLBACK_MIN_CONTEXT,
-                FALLBACK_MAX_CONTEXT,
-              ),
+              .clamp(FALLBACK_MIN_CONTEXT, FALLBACK_MAX_CONTEXT),
           });
         }
       }
     }
 
-    let build_multi =
-      |cores: &[String]| -> Option<MetaRegex> {
-        if cores.is_empty() {
-          return None;
-        }
-        let refs: Vec<&str> =
-          cores.iter().map(|s| s.as_str()).collect();
-        MetaRegex::new_many(&refs).ok()
-      };
+    let build_multi = |cores: &[String]| -> Option<MetaRegex> {
+      if cores.is_empty() {
+        return None;
+      }
+      let refs: Vec<&str> = cores.iter().map(String::as_str).collect();
+      MetaRegex::new_many(&refs).ok()
+    };
 
     let fast_multi = build_multi(&fast_cores);
     let slow_multi = build_multi(&slow_cores);
@@ -1679,18 +1581,15 @@ impl RegexSet {
       fast_info.iter().chain(slow_info.iter()).collect();
     let has_boundaryless_pattern =
       all_info.iter().any(|pi| !pi.boundaries.has_any());
-    let has_heterogeneous_boundaries = if all_info.len() < 2
-    {
+    let has_heterogeneous_boundaries = if all_info.len() < 2 {
       false
     } else {
       let first = &all_info[0].boundaries;
       all_info.iter().any(|pi| {
         pi.boundaries.leading_b != first.leading_b
           || pi.boundaries.trailing_b != first.trailing_b
-          || pi.boundaries.leading_big_b
-            != first.leading_big_b
-          || pi.boundaries.trailing_big_b
-            != first.trailing_big_b
+          || pi.boundaries.leading_big_b != first.leading_big_b
+          || pi.boundaries.trailing_big_b != first.trailing_big_b
       })
     };
 
@@ -1701,6 +1600,7 @@ impl RegexSet {
       slow_info,
       fallbacks,
       pattern_count,
+      pattern_count_usize,
       has_boundaryless_pattern,
       has_heterogeneous_boundaries,
       unicode_wb,
@@ -1708,6 +1608,7 @@ impl RegexSet {
   }
 
   #[napi(getter)]
+  #[allow(clippy::must_use_candidate)]
   pub fn pattern_count(&self) -> u32 {
     self.pattern_count
   }
@@ -1725,10 +1626,7 @@ impl RegexSet {
       .iter()
       .chain(self.slow_info.iter())
       .any(|pi| pi.boundaries.has_any())
-      || self
-        .fallbacks
-        .iter()
-        .any(|fb| fb.boundaries.has_any());
+      || self.fallbacks.iter().any(|fb| fb.boundaries.has_any());
 
     if !any_boundaries {
       return BoundaryMode::Inline { unicode: false };
@@ -1752,10 +1650,7 @@ impl RegexSet {
   /// (matches, needs_sort). When only the fast DFA
   /// produced matches, they're already in order —
   /// skip the sort.
-  fn collect_matches(
-    &self,
-    haystack: &str,
-  ) -> (Vec<RawMatch>, bool) {
+  fn collect_matches(&self, haystack: &str) -> (Vec<RawMatch>, bool) {
     let mut all: Vec<RawMatch> = Vec::new();
     let mut has_shadowed = false;
     let mode = self.boundary_mode(haystack);
@@ -1767,15 +1662,10 @@ impl RegexSet {
       for m in multi.find_iter(haystack) {
         let pi = &self.fast_info[m.pattern().as_usize()];
         let boundary_ok = !pi.boundaries.has_any()
-          || pi.boundaries.check_with_mode(
-            haystack,
-            m.start(),
-            m.end(),
-            &mode,
-          );
-        if boundary_ok
-          && pi.verifier.check(haystack, m.start(), m.end())
-        {
+          || pi
+            .boundaries
+            .check_with_mode(haystack, m.start(), m.end(), &mode);
+        if boundary_ok && pi.verifier.check(haystack, m.start(), m.end()) {
           all.push((pi.original_index, m.start(), m.end()));
         }
       }
@@ -1790,34 +1680,17 @@ impl RegexSet {
           Some(m) => {
             let dfa_idx = m.pattern().as_usize();
             let pi = &self.slow_info[dfa_idx];
-            match check_match(
-              haystack,
-              m.start(),
-              m.end(),
-              pi,
-              &mode,
-            ) {
+            match check_match(haystack, m.start(), m.end(), pi, &mode) {
               Ok(()) => {
-                all.push((
-                  pi.original_index,
-                  m.start(),
-                  m.end(),
-                ));
+                all.push((pi.original_index, m.start(), m.end()));
                 pos = m.end().max(pos + 1);
               }
               Err(ref rej) => {
-                let fancy_match =
-                  if matches!(rej, Rejection::Verifier) {
-                    try_verifier_fallback(
-                      pi,
-                      haystack,
-                      m.start(),
-                      m.end(),
-                      &mode,
-                    )
-                  } else {
-                    None
-                  };
+                let fancy_match = if matches!(rej, Rejection::Verifier) {
+                  try_verifier_fallback(pi, haystack, m.start(), m.end(), &mode)
+                } else {
+                  None
+                };
 
                 if let Some((fs, fe)) = fancy_match {
                   all.push((pi.original_index, fs, fe));
@@ -1827,35 +1700,27 @@ impl RegexSet {
                   // Guard is always true here (rej is
                   // Verifier), kept for symmetry with
                   // the else-if branch below.
-                  let alt_end =
-                    if self.needs_shadowed_check(rej) {
-                      if let Some(alt) = self
-                        .find_shadowed_slow(
-                          haystack,
-                          m.start(),
-                          dfa_idx,
-                          &mode,
-                        )
-                      {
-                        let end = alt.2;
-                        all.push(alt);
-                        has_shadowed = true;
-                        end
-                      } else {
-                        0
-                      }
-                    } else {
-                      0
-                    };
-                  pos = fe.max(alt_end).max(pos + 1);
-                } else if self.needs_shadowed_check(rej) {
-                  if let Some(alt) = self
-                    .find_shadowed_slow(
+                  let alt_end = if self.needs_shadowed_check(rej) {
+                    if let Some(alt) = self.find_shadowed_slow(
                       haystack,
                       m.start(),
                       dfa_idx,
                       &mode,
-                    )
+                    ) {
+                      let end = alt.2;
+                      all.push(alt);
+                      has_shadowed = true;
+                      end
+                    } else {
+                      0
+                    }
+                  } else {
+                    0
+                  };
+                  pos = fe.max(alt_end).max(pos + 1);
+                } else if self.needs_shadowed_check(rej) {
+                  if let Some(alt) =
+                    self.find_shadowed_slow(haystack, m.start(), dfa_idx, &mode)
                   {
                     all.push(alt);
                     has_shadowed = true;
@@ -1883,13 +1748,9 @@ impl RegexSet {
           let Some(m) = candidate.find(input) else {
             break;
           };
-          if let Some(found) = verify_fallback_at(
-            fb,
-            haystack,
-            m.start(),
-            m.end(),
-            &mode,
-          ) {
+          if let Some(found) =
+            verify_fallback_at(fb, haystack, m.start(), m.end(), &mode)
+          {
             let end = found.2;
             all.push(found);
             pos = end.max(pos + 1);
@@ -1899,14 +1760,10 @@ impl RegexSet {
           continue;
         }
 
-        match safe_fancy_find_result(
-          &fb.regex, haystack, pos,
-        ) {
+        match safe_fancy_find_result(&fb.regex, haystack, pos) {
           Ok(Some((ms, me))) => {
             let passes = !fb.boundaries.has_any()
-              || fb
-                .boundaries
-                .check_with_mode(haystack, ms, me, &mode);
+              || fb.boundaries.check_with_mode(haystack, ms, me, &mode);
             if passes {
               all.push((fb.original_index, ms, me));
               pos = me.max(pos + 1);
@@ -1929,21 +1786,15 @@ impl RegexSet {
     // literal patterns (each scanned independently).
     let sources = u8::from(self.fast_multi.is_some())
       + u8::from(self.slow_multi.is_some())
-      + u8::try_from(self.fallbacks.len().min(2))
-        .unwrap_or(2);
-    let needs_sort =
-      (sources > 1 || has_shadowed) && all.len() > 1;
+      + u8::try_from(self.fallbacks.len().min(2)).unwrap_or(2);
+    let needs_sort = (sources > 1 || has_shadowed) && all.len() > 1;
     (all, needs_sort)
   }
 
   /// Sort matches and select non-overlapping.
-  fn select_non_overlapping(
-    all: &mut [RawMatch],
-  ) -> Vec<RawMatch> {
+  fn select_non_overlapping(all: &mut [RawMatch]) -> Vec<RawMatch> {
     all.sort_by(|a, b| {
-      a.1
-        .cmp(&b.1)
-        .then_with(|| (b.2 - b.1).cmp(&(a.2 - a.1)))
+      a.1.cmp(&b.1).then_with(|| (b.2 - b.1).cmp(&(a.2 - a.1)))
     });
     let mut selected: Vec<RawMatch> = Vec::new();
     let mut last_end: usize = 0;
@@ -1967,47 +1818,30 @@ impl RegexSet {
       if idx == skip {
         continue;
       }
-      let input = Input::new(haystack)
-        .range(at..)
-        .anchored(Anchored::Yes);
+      let input = Input::new(haystack).range(at..).anchored(Anchored::Yes);
       if let Some(m) = pi.individual.find(input) {
         if m.start() == at
-          && check_match(
-            haystack,
-            m.start(),
-            m.end(),
-            pi,
-            mode,
-          )
-          .is_ok()
+          && check_match(haystack, m.start(), m.end(), pi, mode).is_ok()
         {
-          return Some((
-            pi.original_index,
-            m.start(),
-            m.end(),
-          ));
+          return Some((pi.original_index, m.start(), m.end()));
         }
       }
     }
     None
   }
 
-  fn needs_shadowed_check(
-    &self,
-    rejection: &Rejection,
-  ) -> bool {
+  fn needs_shadowed_check(&self, rejection: &Rejection) -> bool {
     match rejection {
       Rejection::Verifier => true,
       Rejection::Boundary => {
-        self.has_boundaryless_pattern
-          || self.has_heterogeneous_boundaries
+        self.has_boundaryless_pattern || self.has_heterogeneous_boundaries
       }
     }
   }
 
   // ── Internal methods ──────────────────────
 
-  fn _is_match(&self, haystack: &str) -> bool {
+  fn is_match_inner(&self, haystack: &str) -> bool {
     let mode = self.boundary_mode(haystack);
 
     // Fast DFA
@@ -2015,15 +1849,10 @@ impl RegexSet {
       for m in multi.find_iter(haystack) {
         let pi = &self.fast_info[m.pattern().as_usize()];
         let boundary_ok = !pi.boundaries.has_any()
-          || pi.boundaries.check_with_mode(
-            haystack,
-            m.start(),
-            m.end(),
-            &mode,
-          );
-        if boundary_ok
-          && pi.verifier.check(haystack, m.start(), m.end())
-        {
+          || pi
+            .boundaries
+            .check_with_mode(haystack, m.start(), m.end(), &mode);
+        if boundary_ok && pi.verifier.check(haystack, m.start(), m.end()) {
           return true;
         }
       }
@@ -2038,13 +1867,7 @@ impl RegexSet {
           Some(m) => {
             let dfa_idx = m.pattern().as_usize();
             let pi = &self.slow_info[dfa_idx];
-            match check_match(
-              haystack,
-              m.start(),
-              m.end(),
-              pi,
-              &mode,
-            ) {
+            match check_match(haystack, m.start(), m.end(), pi, &mode) {
               Ok(()) => return true,
               Err(ref rej) => {
                 if matches!(rej, Rejection::Verifier)
@@ -2061,12 +1884,7 @@ impl RegexSet {
                 }
                 if self.needs_shadowed_check(rej)
                   && self
-                    .find_shadowed_slow(
-                      haystack,
-                      m.start(),
-                      dfa_idx,
-                      &mode,
-                    )
+                    .find_shadowed_slow(haystack, m.start(), dfa_idx, &mode)
                     .is_some()
                 {
                   return true;
@@ -2088,14 +1906,8 @@ impl RegexSet {
           let Some(m) = candidate.find(input) else {
             break;
           };
-          if verify_fallback_at(
-            fb,
-            haystack,
-            m.start(),
-            m.end(),
-            &mode,
-          )
-          .is_some()
+          if verify_fallback_at(fb, haystack, m.start(), m.end(), &mode)
+            .is_some()
           {
             return true;
           }
@@ -2103,14 +1915,10 @@ impl RegexSet {
           continue;
         }
 
-        match safe_fancy_find_result(
-          &fb.regex, haystack, pos,
-        ) {
+        match safe_fancy_find_result(&fb.regex, haystack, pos) {
           Ok(Some((ms, me))) => {
             let passes = !fb.boundaries.has_any()
-              || fb
-                .boundaries
-                .check_with_mode(haystack, ms, me, &mode);
+              || fb.boundaries.check_with_mode(haystack, ms, me, &mode);
             if passes {
               return true;
             }
@@ -2124,15 +1932,11 @@ impl RegexSet {
     false
   }
 
-  fn _find_iter_packed(
-    &self,
-    haystack: &str,
-  ) -> Uint32Array {
-    let (mut all, needs_sort) =
-      self.collect_matches(haystack);
+  fn find_iter_packed_inner(&self, haystack: &str) -> Result<Uint32Array> {
+    let (mut all, needs_sort) = self.collect_matches(haystack);
 
     if all.is_empty() {
-      return Uint32Array::new(Vec::new());
+      return Ok(Uint32Array::new(Vec::new()));
     }
 
     let selected = if needs_sort {
@@ -2143,14 +1947,13 @@ impl RegexSet {
 
     // Pack with UTF-16 offsets.
     if haystack.is_ascii() {
-      let mut packed =
-        Vec::with_capacity(selected.len() * 3);
+      let mut packed = Vec::with_capacity(selected.len() * 3);
       for (pat, start, end) in selected {
         packed.push(pat);
-        packed.push(start as u32);
-        packed.push(end as u32);
+        packed.push(usize_to_u32("Match start offset", start)?);
+        packed.push(usize_to_u32("Match end offset", end)?);
       }
-      return Uint32Array::new(packed);
+      return Ok(Uint32Array::new(packed));
     }
 
     let bytes = haystack.as_bytes();
@@ -2159,13 +1962,19 @@ impl RegexSet {
     let mut last_utf16: u32 = 0;
 
     for (pat, start, end) in selected {
-      last_utf16 +=
-        byte_span_utf16_len(&bytes[last_byte..start]);
+      last_utf16 = last_utf16
+        .checked_add(byte_span_utf16_len(&bytes[last_byte..start])?)
+        .ok_or_else(|| {
+          Error::from_reason("UTF-16 start offset exceeds u32 range")
+        })?;
       let utf16_start = last_utf16;
       last_byte = start;
 
-      last_utf16 +=
-        byte_span_utf16_len(&bytes[last_byte..end]);
+      last_utf16 = last_utf16
+        .checked_add(byte_span_utf16_len(&bytes[last_byte..end])?)
+        .ok_or_else(|| {
+          Error::from_reason("UTF-16 end offset exceeds u32 range")
+        })?;
       let utf16_end = last_utf16;
       last_byte = end;
 
@@ -2173,57 +1982,54 @@ impl RegexSet {
       packed.push(utf16_start);
       packed.push(utf16_end);
     }
-    Uint32Array::new(packed)
+    Ok(Uint32Array::new(packed))
   }
 
   // ── NAPI entry points ─────────────────────
 
   #[napi]
+  #[allow(clippy::must_use_candidate, clippy::needless_pass_by_value)]
   pub fn is_match(&self, haystack: String) -> bool {
-    self._is_match(&haystack)
+    self.is_match_inner(&haystack)
   }
 
   #[napi(js_name = "_isMatchBuf")]
-  pub fn is_match_buf(
-    &self,
-    haystack: Buffer,
-  ) -> Result<bool> {
+  #[allow(clippy::needless_pass_by_value)]
+  pub fn is_match_buf(&self, haystack: Buffer) -> Result<bool> {
     let text = std::str::from_utf8(haystack.as_ref())
-      .map_err(|e| {
-        Error::from_reason(format!("Invalid UTF-8: {e}"))
-      })?;
-    Ok(self._is_match(text))
+      .map_err(|e| Error::from_reason(format!("Invalid UTF-8: {e}")))?;
+    Ok(self.is_match_inner(text))
   }
 
   #[napi(js_name = "_findIterPacked")]
-  pub fn find_iter_packed(
-    &self,
-    haystack: String,
-  ) -> Uint32Array {
-    self._find_iter_packed(&haystack)
+  #[allow(clippy::must_use_candidate, clippy::needless_pass_by_value)]
+  pub fn find_iter_packed(&self, haystack: String) -> Result<Uint32Array> {
+    self.find_iter_packed_inner(&haystack)
   }
 
   #[napi(js_name = "_findIterPackedBuf")]
-  pub fn find_iter_packed_buf(
-    &self,
-    haystack: Buffer,
-  ) -> Result<Uint32Array> {
+  #[allow(clippy::needless_pass_by_value)]
+  pub fn find_iter_packed_buf(&self, haystack: Buffer) -> Result<Uint32Array> {
     let text = std::str::from_utf8(haystack.as_ref())
-      .map_err(|e| {
-        Error::from_reason(format!("Invalid UTF-8: {e}"))
-      })?;
-    Ok(self._find_iter_packed(text))
+      .map_err(|e| Error::from_reason(format!("Invalid UTF-8: {e}")))?;
+    self.find_iter_packed_inner(text)
   }
 
   #[napi]
+  #[allow(clippy::must_use_candidate, clippy::needless_pass_by_value)]
   pub fn which_match(&self, haystack: String) -> Vec<u32> {
     let (all, _) = self.collect_matches(&haystack);
-    let mut seen = vec![false; self.pattern_count as usize];
+    let mut seen = vec![false; self.pattern_count_usize];
     let mut result = Vec::new();
     for (pat, _, _) in all {
-      let idx = pat as usize;
-      if !seen[idx] {
-        seen[idx] = true;
+      let Ok(idx) = pattern_index_to_usize(pat) else {
+        continue;
+      };
+      let Some(is_seen) = seen.get_mut(idx) else {
+        continue;
+      };
+      if !*is_seen {
+        *is_seen = true;
         result.push(pat);
       }
     }
@@ -2231,12 +2037,13 @@ impl RegexSet {
   }
 
   #[napi]
+  #[allow(clippy::needless_pass_by_value)]
   pub fn replace_all(
     &self,
     haystack: String,
     replacements: Vec<String>,
   ) -> Result<String> {
-    if replacements.len() != self.pattern_count as usize {
+    if replacements.len() != self.pattern_count_usize {
       return Err(Error::from_reason(format!(
         "Expected {} replacements, got {}",
         self.pattern_count,
@@ -2244,8 +2051,7 @@ impl RegexSet {
       )));
     }
 
-    let (mut all, needs_sort) =
-      self.collect_matches(&haystack);
+    let (mut all, needs_sort) = self.collect_matches(&haystack);
     let selected = if needs_sort {
       Self::select_non_overlapping(&mut all)
     } else {
@@ -2257,7 +2063,12 @@ impl RegexSet {
 
     for (pat, start, end) in selected {
       result.push_str(&haystack[last..start]);
-      result.push_str(&replacements[pat as usize]);
+      let replacement = replacements
+        .get(pattern_index_to_usize(pat)?)
+        .ok_or_else(|| {
+          Error::from_reason(format!("Invalid pattern index: {pat}"))
+        })?;
+      result.push_str(replacement);
       last = end;
     }
     result.push_str(&haystack[last..]);
@@ -2271,24 +2082,25 @@ impl RegexSet {
 /// the unicode-segmentation crate. Returns the
 /// set as a sorted Vec of byte offsets.
 #[napi(js_name = "_uax29Boundaries")]
-pub fn uax29_boundaries(
-  haystack: Buffer,
-) -> Result<Vec<u32>> {
+#[allow(clippy::needless_pass_by_value)]
+pub fn uax29_boundaries(haystack: Buffer) -> Result<Vec<u32>> {
   let text = std::str::from_utf8(haystack.as_ref())
-    .map_err(|e| {
-      Error::from_reason(format!("Invalid UTF-8: {e}"))
-    })?;
+    .map_err(|e| Error::from_reason(format!("Invalid UTF-8: {e}")))?;
 
   let mut boundaries = Vec::new();
   for word in text.unicode_word_indices() {
-    boundaries.push(word.0 as u32);
-    boundaries.push((word.0 + word.1.len()) as u32);
+    boundaries.push(usize_to_u32("UAX29 boundary", word.0)?);
+    let end = word
+      .0
+      .checked_add(word.1.len())
+      .ok_or_else(|| Error::from_reason("UAX29 boundary overflow"))?;
+    boundaries.push(usize_to_u32("UAX29 boundary", end)?);
   }
   // Add 0 and len as boundaries
-  if boundaries.is_empty() || boundaries[0] != 0 {
+  if boundaries.first().is_none_or(|first| *first != 0) {
     boundaries.insert(0, 0);
   }
-  let len = text.len() as u32;
+  let len = usize_to_u32("UAX29 text length", text.len())?;
   if *boundaries.last().unwrap_or(&0) != len {
     boundaries.push(len);
   }
@@ -2302,41 +2114,46 @@ mod tests {
   use super::*;
 
   #[test]
-  fn split_large_alternation_skips_negative_lookaround_groups(
-  ) {
+  fn split_large_alternation_skips_negative_lookaround_groups() {
     let alts = (0..140)
       .map(|i| format!("BAD{i}"))
       .collect::<Vec<_>>()
       .join("|");
     let pattern = format!(r"foo(?!(?:{alts}))\w+");
 
-    assert!(
-      split_large_alternation(&pattern, 128).is_none()
-    );
+    assert!(split_large_alternation(&pattern, 128).is_none());
   }
 
   #[test]
-  fn split_large_alternation_keeps_negative_assertion_intact(
-  ) {
+  fn split_large_alternation_keeps_negative_assertion_intact() {
     let alts = (0..140)
       .map(|i| format!("GOOD{i}"))
       .collect::<Vec<_>>()
       .join("|");
     let pattern = format!(r"(?:{alts})(?!BAD)");
 
-    let chunks = split_large_alternation(&pattern, 128)
-      .expect("outer alternation should split");
+    let chunks = split_large_alternation(&pattern, 128);
+    assert!(chunks.is_some(), "outer alternation should split");
+    let Some(chunks) = chunks else {
+      return;
+    };
     assert_eq!(chunks.len(), 2);
-    assert!(chunks
-      .iter()
-      .all(|chunk| chunk.ends_with("(?!BAD)")));
+    assert!(chunks.iter().all(|chunk| chunk.ends_with("(?!BAD)")));
   }
 
   #[test]
   fn find_matching_paren_ignores_class_parens() {
     let pattern = r"foo(?=\s|[.,;!?)]|$)bar";
-    let start = pattern.find("(?=").unwrap();
-    let end = find_matching_paren(pattern, start).unwrap();
+    let start = pattern.find("(?=");
+    assert!(start.is_some(), "fixture must contain lookahead");
+    let Some(start) = start else {
+      return;
+    };
+    let end = find_matching_paren(pattern, start);
+    assert!(end.is_some(), "lookahead should have a matching paren");
+    let Some(end) = end else {
+      return;
+    };
 
     assert_eq!(&pattern[end..], ")bar");
   }
@@ -2345,9 +2162,6 @@ mod tests {
   fn fallback_candidate_strips_full_lookahead() {
     let pattern = r"foo(?=\s|[.,;!?)]|$)bar";
 
-    assert_eq!(
-      strip_fallback_candidate_str(pattern),
-      "foobar"
-    );
+    assert_eq!(strip_fallback_candidate_str(pattern), "foobar");
   }
 }
