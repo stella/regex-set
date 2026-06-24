@@ -1,0 +1,25 @@
+[package]
+name = "stella-regex-set-core"
+version = "1.0.5"
+edition = "2024"
+description = "Multi-pattern regex search core"
+license = "MIT"
+publish = false
+repository = "https://github.com/stella/regex-set"
+keywords = ["regex", "search", "text"]
+categories = ["text-processing"]
+
+[dependencies]
+fancy-regex = "0.18"
+regex = "1"
+regex-automata = { version = "0.4", features = [
+  "meta",
+  "nfa",
+  "dfa",
+  "hybrid",
+] }
+regex-syntax = "0.8"
+unicode-segmentation = "1"
+
+[lints]
+workspace = true
