@@ -356,10 +356,17 @@ checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 name = "stella-regex-set"
 version = "1.0.5"
 dependencies = [
- "fancy-regex",
  "napi",
  "napi-build",
  "napi-derive",
+ "stella-regex-set-core",
+]
+
+[[package]]
+name = "stella-regex-set-core"
+version = "1.0.5"
+dependencies = [
+ "fancy-regex",
  "regex",
  "regex-automata",
  "regex-syntax",
