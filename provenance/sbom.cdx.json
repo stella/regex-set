@@ -1829,6 +1829,36 @@
       "version": "0.4.12"
     },
     {
+      "bom-ref": "pkg:cargo/stella-regex-set-core@1.0.5",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "Cargo.lock",
+            "confidence": 0.6,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.6,
+                "technique": "manifest-analysis",
+                "value": "Cargo.lock"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "name": "stella-regex-set-core",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "Cargo.lock"
+        }
+      ],
+      "purl": "pkg:cargo/stella-regex-set-core@1.0.5",
+      "type": "library",
+      "version": "1.0.5"
+    },
+    {
       "bom-ref": "pkg:cargo/stella-regex-set@1.0.5",
       "evidence": {
         "identity": [
@@ -2472,16 +2502,22 @@
     },
     {
       "dependsOn": [
-        "pkg:cargo/fancy-regex@0.18.0",
         "pkg:cargo/napi-build@2.3.2",
         "pkg:cargo/napi-derive@3.5.6",
         "pkg:cargo/napi@3.9.0",
+        "pkg:cargo/stella-regex-set-core@1.0.5"
+      ],
+      "ref": "pkg:cargo/stella-regex-set@1.0.5"
+    },
+    {
+      "dependsOn": [
+        "pkg:cargo/fancy-regex@0.18.0",
         "pkg:cargo/regex-automata@0.4.14",
         "pkg:cargo/regex-syntax@0.8.10",
         "pkg:cargo/regex@1.12.3",
         "pkg:cargo/unicode-segmentation@1.13.3"
       ],
-      "ref": "pkg:cargo/stella-regex-set@1.0.5"
+      "ref": "pkg:cargo/stella-regex-set-core@1.0.5"
     },
     {
       "dependsOn": [
@@ -2541,6 +2577,28 @@
           "name": "stella-regex-set",
           "purl": "pkg:cargo/stella-regex-set@1.0.5",
           "type": "application",
+          "version": "1.0.5"
+        },
+        {
+          "bom-ref": "pkg:cargo/stella-regex-set-core@1.0.5",
+          "externalReferences": [
+            {
+              "type": "vcs",
+              "url": "https://github.com/stella/regex-set"
+            }
+          ],
+          "group": "",
+          "licenses": [
+            {
+              "license": {
+                "id": "MIT",
+                "url": "https://opensource.org/licenses/MIT"
+              }
+            }
+          ],
+          "name": "stella-regex-set-core",
+          "purl": "pkg:cargo/stella-regex-set-core@1.0.5",
+          "type": "library",
           "version": "1.0.5"
         }
       ],
