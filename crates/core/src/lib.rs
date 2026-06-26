@@ -59,6 +59,8 @@ const PREPARED_MAGIC: &[u8; 8] = b"st-rx01\0";
 const PREPARED_SCHEMA_VERSION: u8 = 1;
 const PREPARED_KIND_META: u8 = 0;
 const PREPARED_KIND_DENSE: u8 = 1;
+const PREPARED_DENSE_DFA_MAX_BYTES: usize = 1024 * 1024;
+const PREPARED_DENSE_DETERMINIZE_MAX_BYTES: usize = 8 * 1024 * 1024;
 const PREPARED_FINGERPRINT_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
 const PREPARED_FINGERPRINT_PRIME: u64 = 0x0000_0100_0000_01b3;
 
@@ -1563,7 +1565,7 @@ fn build_prepared_multi(
     .map(MultiRegex::Meta)
     .map_err(|e| Error::from_reason(format!("{e}")))?;
 
-  let artifact = match DfaRegex::new_many(&refs) {
+  let artifact = match build_serializable_dense_regex(&refs) {
     Ok(dense) => PreparedMultiArtifact {
       fingerprint,
       kind: PreparedMultiKind::Dense {
@@ -1578,6 +1580,17 @@ fn build_prepared_multi(
   };
   prepared.push_captured(artifact);
   Ok(Some(meta))
+}
+
+fn build_serializable_dense_regex(patterns: &[&str]) -> Result<DfaRegex> {
+  DfaRegex::builder()
+    .dense(
+      dense::Config::new()
+        .dfa_size_limit(Some(PREPARED_DENSE_DFA_MAX_BYTES))
+        .determinize_size_limit(Some(PREPARED_DENSE_DETERMINIZE_MAX_BYTES)),
+    )
+    .build_many(patterns)
+    .map_err(|e| Error::from_reason(format!("{e}")))
 }
 
 fn serialize_dense_dfa(dfa: &dense::DFA<Vec<u32>>) -> Vec<u8> {
@@ -2650,6 +2663,26 @@ mod tests {
       RegexSet::with_prepared(vec![String::from("bar")], options, &artifact);
 
     assert!(result.is_err(), "artifact must match prepared patterns");
+    Ok(())
+  }
+
+  #[test]
+  fn prepared_regex_set_skips_oversized_dense_artifacts() -> Result<()> {
+    let options = Options::default();
+    let patterns = vec![String::from(r"\w{20}")];
+    let artifact = RegexSet::prepare(patterns.clone(), options)?;
+
+    assert!(
+      artifact.len() < 1024,
+      "oversized dense DFAs should fall back to compact prepared markers"
+    );
+
+    let baseline = RegexSet::new(patterns.clone(), options)?;
+    let prepared = RegexSet::with_prepared(patterns, options, &artifact)?;
+    assert_eq!(
+      baseline.find_iter_packed("abcdefghijklmnopqrst")?,
+      prepared.find_iter_packed("abcdefghijklmnopqrst")?
+    );
     Ok(())
   }
 }
