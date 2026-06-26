@@ -132,5 +132,7 @@ const {
 );
 module.exports = __napiModule.exports;
 module.exports.RegexSet = __napiModule.exports.RegexSet;
+module.exports._prepareRegexSet =
+  __napiModule.exports._prepareRegexSet;
 module.exports._uax29Boundaries =
   __napiModule.exports._uax29Boundaries;

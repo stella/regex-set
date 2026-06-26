@@ -36,6 +36,47 @@ describe("RegexSet", () => {
     ]);
   });
 
+  test("prepared artifact matches normal construction", () => {
+    const patterns = [
+      { pattern: "\\bfoo\\b", name: "word" },
+      { pattern: "\\d{2}\\.\\d{2}\\.\\d{4}", name: "date" },
+      /bar/i,
+      "X\\d+(?!\\d)",
+    ];
+    const options = { unicodeBoundaries: true };
+    const haystack = "foo 15.03.1990 BAR X123 čfoo";
+    const prepared = RegexSet.prepare(patterns, options);
+    const normal = new RegexSet(patterns, options);
+    const loaded = new RegexSet(
+      patterns,
+      options,
+      prepared,
+    );
+
+    expect(prepared.byteLength).toBeGreaterThan(0);
+    expect(loaded.findIter(haystack)).toEqual(
+      normal.findIter(haystack),
+    );
+    expect(loaded.whichMatch(haystack)).toEqual(
+      normal.whichMatch(haystack),
+    );
+    expect(
+      loaded.replaceAll(haystack, [
+        "[WORD]",
+        "[DATE]",
+        "[BAR]",
+        "[CODE]",
+      ]),
+    ).toBe(
+      normal.replaceAll(haystack, [
+        "[WORD]",
+        "[DATE]",
+        "[BAR]",
+        "[CODE]",
+      ]),
+    );
+  });
+
   test("regex patterns: dates", () => {
     const rs = new RegexSet(["\\d{2}\\.\\d{2}\\.\\d{4}"]);
     const matches = rs.findIter(
@@ -149,7 +190,10 @@ describe("RegexSet", () => {
       (_, index) => `(?i:currency${index})`,
     ).join("|");
     const rs = new RegexSet([`\\b(?:${terms})\\s+\\d+`]);
-    const nativeIndexMap = Reflect.get(rs, "_nativeIndexMap");
+    const nativeIndexMap = Reflect.get(
+      rs,
+      "_nativeIndexMap",
+    );
 
     expect(rs.patternCount).toBe(1);
     expect(nativeIndexMap.length).toBeGreaterThan(1);

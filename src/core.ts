@@ -14,7 +14,12 @@ export type NativeBinding = {
   RegexSet: new (
     patterns: string[],
     options?: NativeOptions | null,
+    prepared?: Uint8Array | null,
   ) => NativeRegexSetInstance;
+  _prepareRegexSet: (
+    patterns: string[],
+    options?: NativeOptions | null,
+  ) => Uint8Array;
   _uax29Boundaries: (
     haystack: Buffer | Uint8Array,
   ) => number[];
@@ -504,7 +509,9 @@ function normalizeEntry(
 function expandLargeAlternation(pattern: string): string[] {
   const group = findLargestChunkableAlternation(pattern);
   if (!group) return [pattern];
-  if (group.branches.length < ALTERNATION_CHUNK_MIN_BRANCHES) {
+  if (
+    group.branches.length < ALTERNATION_CHUNK_MIN_BRANCHES
+  ) {
     return [pattern];
   }
 
@@ -566,7 +573,10 @@ function findLargestChunkableAlternation(
       branches.length >= ALTERNATION_CHUNK_MIN_BRANCHES &&
       pattern.slice(bodyStart, bodyEnd).includes("(?i:");
 
-    if (shouldChunk && (!best || branches.length > best.branches.length)) {
+    if (
+      shouldChunk &&
+      (!best || branches.length > best.branches.length)
+    ) {
       best = { bodyStart, bodyEnd, branches };
     }
   }
@@ -647,6 +657,139 @@ function splitTopLevelAlternatives(body: string): string[] {
   return branches;
 }
 
+type NativeInput = {
+  names: (string | undefined)[];
+  hasNames: boolean;
+  patternCount: number;
+  nativePatterns: string[];
+  nativeOpts: NativeOptions | undefined;
+  nativeIndexMap: number[];
+  jsFallbacks: JsFallback[];
+  boundaryOptions: BoundaryOptions;
+};
+
+function buildNativeInput(
+  patterns: PatternEntry[],
+  options?: Options,
+): NativeInput {
+  const entries = patterns.map(normalizeEntry);
+  const names = entries.map((e) => e.name);
+  const unicode = options?.unicodeBoundaries ?? true;
+  const wholeWords = options?.wholeWords ?? false;
+  const ci = options?.caseInsensitive ?? false;
+  let processed = entries.map((e) => e.pattern);
+
+  // Wrap with (?i-u:...) for case-insensitive
+  // matching. Edge \b/\B are extracted first so
+  // they stay outside the -u scope.
+  if (ci) {
+    processed = processed.map(caseInsensitivePattern);
+  }
+
+  if (!unicode) {
+    processed = processed.map(asciiBoundaries);
+  }
+
+  const nativeOpts: NativeOptions | undefined = options
+    ? {
+        ...(options.wholeWords !== undefined
+          ? { wholeWords: options.wholeWords }
+          : {}),
+        ...(options.unicodeBoundaries !== undefined
+          ? { unicodeBoundaries: options.unicodeBoundaries }
+          : {}),
+      }
+    : undefined;
+
+  const nativePatterns: string[] = [];
+  const nativeIndexMap: number[] = [];
+  const jsFallbacks: JsFallback[] = [];
+
+  for (let i = 0; i < processed.length; i++) {
+    const pattern = processed[i];
+    if (pattern === undefined) {
+      throw new Error(`Missing processed pattern ${i}`);
+    }
+    const expanded = expandLargeAlternation(pattern);
+    for (const expandedPattern of expanded) {
+      const jsFallback = jsFallbackRegExp(
+        expandedPattern,
+        unicode,
+      );
+      if (jsFallback) {
+        jsFallbacks.push({
+          pattern: i,
+          re: jsFallback,
+        });
+      } else {
+        nativeIndexMap.push(i);
+        nativePatterns.push(expandedPattern);
+      }
+    }
+  }
+
+  return {
+    names,
+    hasNames: entries.some((e) => e.name !== undefined),
+    patternCount: entries.length,
+    nativePatterns,
+    nativeOpts,
+    nativeIndexMap,
+    jsFallbacks,
+    boundaryOptions: {
+      wholeWords,
+      unicodeBoundaries: unicode,
+    },
+  };
+}
+
+function caseInsensitivePattern(p: string): string {
+  // Skip patterns already wrapped by regexpToRust or
+  // scopeInlineFlags.
+  if (
+    /^(?:\\[bB]|\(\?[ims]+(?:-[imsu]+)?\))*\(\?[ims]*i[ims]*(?:-[imsu]+)?[:(]/.test(
+      p,
+    )
+  )
+    return p;
+  let src = p;
+  let flagPrefix = "";
+  const bareFlagMatch = src.match(
+    /^\(\?[ims]+(?:-[imsu]+)?\)/,
+  );
+  if (bareFlagMatch) {
+    flagPrefix = bareFlagMatch[0];
+    src = src.slice(flagPrefix.length);
+  }
+  let leading = "";
+  let trailing = "";
+  if (src.startsWith("\\b")) {
+    leading = "\\b";
+    src = src.slice(2);
+  } else if (src.startsWith("\\B")) {
+    leading = "\\B";
+    src = src.slice(2);
+  }
+  if (src.length >= 2) {
+    const last = src.at(-1);
+    if (last === "b" || last === "B") {
+      let bs = 0;
+      let k = src.length - 2;
+      while (k >= 0 && src[k] === "\\") {
+        bs++;
+        k--;
+      }
+      if (bs > 0 && bs % 2 === 1) {
+        trailing = "\\" + last;
+        src = src.slice(0, -2);
+      }
+    }
+  }
+  const uFlag =
+    needsAsciiMode(src) && !hasNonAscii(src) ? "-u" : "";
+  return `${flagPrefix}${leading}(?i${uFlag}:${src})${trailing}`;
+}
+
 // -- RegexSet class --------------------------------------
 
 /**
@@ -683,135 +826,26 @@ export class RegexSet {
   private _nativeSingles: NativeSingle[];
   private _boundaryOptions: BoundaryOptions;
 
-  constructor(patterns: PatternEntry[], options?: Options) {
-    const entries = patterns.map(normalizeEntry);
-    this._names = entries.map((e) => e.name);
-    this._hasNames = entries.some(
-      (e) => e.name !== undefined,
-    );
-    this._patternCount = entries.length;
-
-    const unicode = options?.unicodeBoundaries ?? true;
-    const wholeWords = options?.wholeWords ?? false;
-    const ci = options?.caseInsensitive ?? false;
-    this._boundaryOptions = {
-      wholeWords,
-      unicodeBoundaries: unicode,
-    };
-
-    let processed = entries.map((e) => e.pattern);
-
-    // Wrap with (?i-u:...) for case-insensitive
-    // matching. Edge \b/\B are extracted first so
-    // they stay outside the -u scope (preserving
-    // Unicode word boundary semantics).
-    if (ci) {
-      processed = processed.map((p) => {
-        // Skip patterns already wrapped by
-        // regexpToRust or scopeInlineFlags.
-        if (
-          /^(?:\\[bB]|\(\?[ims]+(?:-[imsu]+)?\))*\(\?[ims]*i[ims]*(?:-[imsu]+)?[:(]/.test(
-            p,
-          )
-        )
-          return p;
-        // Strip leading bare-flag prefix (e.g. (?m),
-        // (?ms)) before extracting edge \b.
-        let src = p;
-        let flagPrefix = "";
-        const bareFlagMatch = src.match(
-          /^\(\?[ims]+(?:-[imsu]+)?\)/,
-        );
-        if (bareFlagMatch) {
-          flagPrefix = bareFlagMatch[0];
-          src = src.slice(flagPrefix.length);
-        }
-        // Extract edge \b/\B
-        let leading = "";
-        let trailing = "";
-        if (src.startsWith("\\b")) {
-          leading = "\\b";
-          src = src.slice(2);
-        } else if (src.startsWith("\\B")) {
-          leading = "\\B";
-          src = src.slice(2);
-        }
-        if (src.length >= 2) {
-          const last = src.at(-1);
-          if (last === "b" || last === "B") {
-            let bs = 0;
-            let k = src.length - 2;
-            while (k >= 0 && src[k] === "\\") {
-              bs++;
-              k--;
-            }
-            if (bs > 0 && bs % 2 === 1) {
-              trailing = "\\" + last;
-              src = src.slice(0, -2);
-            }
-          }
-        }
-        const uFlag =
-          needsAsciiMode(src) && !hasNonAscii(src)
-            ? "-u"
-            : "";
-        return `${flagPrefix}${leading}(?i${uFlag}:${src})${trailing}`;
-      });
-    }
-
-    if (!unicode) {
-      processed = processed.map(asciiBoundaries);
-    }
-
-    // Strip JS-only options before passing to native
-    const nativeOpts: NativeOptions | undefined = options
-      ? {
-          ...(options.wholeWords !== undefined
-            ? { wholeWords: options.wholeWords }
-            : {}),
-          ...(options.unicodeBoundaries !== undefined
-            ? {
-                unicodeBoundaries:
-                  options.unicodeBoundaries,
-              }
-            : {}),
-        }
-      : undefined;
-
-    const nativePatterns: string[] = [];
-    this._nativeIndexMap = [];
-    this._jsFallbacks = [];
+  constructor(
+    patterns: PatternEntry[],
+    options?: Options,
+    prepared?: Uint8Array,
+  ) {
+    const nativeInput = buildNativeInput(patterns, options);
+    this._names = nativeInput.names;
+    this._hasNames = nativeInput.hasNames;
+    this._patternCount = nativeInput.patternCount;
+    this._boundaryOptions = nativeInput.boundaryOptions;
+    this._nativeIndexMap = nativeInput.nativeIndexMap;
+    this._jsFallbacks = nativeInput.jsFallbacks;
     this._nativeSingles = [];
-
-    for (let i = 0; i < processed.length; i++) {
-      const pattern = processed[i];
-      if (pattern === undefined) {
-        throw new Error(`Missing processed pattern ${i}`);
-      }
-      const expanded = expandLargeAlternation(pattern);
-      for (const expandedPattern of expanded) {
-        const jsFallback = jsFallbackRegExp(
-          expandedPattern,
-          unicode,
-        );
-        if (jsFallback) {
-          this._jsFallbacks.push({
-            pattern: i,
-            re: jsFallback,
-          });
-        } else {
-          this._nativeIndexMap.push(i);
-          nativePatterns.push(expandedPattern);
-        }
-      }
-    }
-
     this._inner = new binding.RegexSet(
-      nativePatterns,
-      nativeOpts,
+      nativeInput.nativePatterns,
+      nativeInput.nativeOpts,
+      prepared,
     );
     if (this._jsFallbacks.length > 0) {
-      this._nativeSingles = nativePatterns.map(
+      this._nativeSingles = nativeInput.nativePatterns.map(
         (pattern, i) => {
           const original = this._nativeIndexMap[i];
           if (original === undefined) {
@@ -823,12 +857,23 @@ export class RegexSet {
             pattern: original,
             inner: new binding.RegexSet(
               [pattern],
-              nativeOpts,
+              nativeInput.nativeOpts,
             ),
           };
         },
       );
     }
+  }
+
+  static prepare(
+    patterns: PatternEntry[],
+    options?: Options,
+  ): Uint8Array {
+    const nativeInput = buildNativeInput(patterns, options);
+    return binding._prepareRegexSet(
+      nativeInput.nativePatterns,
+      nativeInput.nativeOpts,
+    );
   }
 
   /** Number of patterns. */
