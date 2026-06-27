@@ -1571,6 +1571,10 @@ fn build_prepared_multi(
     .map(MultiRegex::Meta)
     .map_err(|e| Error::from_reason(format!("{e}")))?;
 
+  if !matches!(prepared, PreparedMode::Capture { .. }) {
+    return Ok(Some(meta));
+  }
+
   let artifact = match build_serializable_dense_regex(&refs) {
     Ok(dense) => PreparedMultiArtifact {
       fingerprint,
