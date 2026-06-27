@@ -115,6 +115,10 @@ fn safe_fancy_find_result(
   .map_err(|_| ())
 }
 
+fn meta_regex_can_parse(pattern: &str) -> bool {
+  regex_syntax::Parser::new().parse(pattern).is_ok()
+}
+
 fn next_char_pos(haystack: &str, pos: usize) -> usize {
   if pos >= haystack.len() {
     return pos + 1;
@@ -1925,17 +1929,27 @@ impl RegexSet {
         core.clone()
       };
 
-      if let Ok(individual) = MetaRegex::new(&core) {
-        // Any verifier, \B, or internal \b → slow
-        // path. Only Verifier::None with no special
-        // boundaries goes to fast path, because
-        // find_iter can't retry rejected positions
-        // for other patterns.
-        let needs_slow = !matches!(&verifier, Verifier::None)
-          || eb.leading_big_b
-          || eb.trailing_big_b
-          || internal_b;
+      // Any verifier, \B, or internal \b → slow
+      // path. Only Verifier::None with no special
+      // boundaries goes to fast path, because find_iter
+      // can't retry rejected positions for other patterns.
+      let needs_slow = !matches!(&verifier, Verifier::None)
+        || eb.leading_big_b
+        || eb.trailing_big_b
+        || internal_b;
 
+      if !needs_slow && meta_regex_can_parse(&core) {
+        fast_cores.push(dfa_core);
+        fast_info.push(PatternInfo {
+          original_index: usize_to_u32("Pattern index", i)?,
+          verifier,
+          boundaries: eb,
+          individual: None,
+          has_internal_b: false,
+          // Fast path patterns never query individual or fallback state.
+          fancy_fallback: None,
+        });
+      } else if let Ok(individual) = MetaRegex::new(&core) {
         // Build fancy-regex fallback for patterns
         // with verifiers. When the DFA finds a greedy
         // match that the verifier rejects, fancy-regex
@@ -1963,28 +1977,15 @@ impl RegexSet {
           Verifier::None => None,
         };
 
-        if needs_slow {
-          slow_cores.push(dfa_core);
-          slow_info.push(PatternInfo {
-            original_index: usize_to_u32("Pattern index", i)?,
-            verifier,
-            boundaries: eb,
-            individual: Some(individual),
-            has_internal_b: internal_b,
-            fancy_fallback,
-          });
-        } else {
-          fast_cores.push(dfa_core);
-          fast_info.push(PatternInfo {
-            original_index: usize_to_u32("Pattern index", i)?,
-            verifier,
-            boundaries: eb,
-            individual: None,
-            has_internal_b: false,
-            // Fast path patterns never query individual or fallback state.
-            fancy_fallback: None,
-          });
-        }
+        slow_cores.push(dfa_core);
+        slow_info.push(PatternInfo {
+          original_index: usize_to_u32("Pattern index", i)?,
+          verifier,
+          boundaries: eb,
+          individual: Some(individual),
+          has_internal_b: internal_b,
+          fancy_fallback,
+        });
       } else {
         // Core doesn't compile in MetaRegex.
         let fallback_patterns =
