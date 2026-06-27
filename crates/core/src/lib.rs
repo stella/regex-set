@@ -20,8 +20,11 @@
   clippy::use_self
 )]
 
-use regex_automata::meta::Regex as MetaRegex;
-use regex_automata::{Anchored, Input};
+use regex_automata::{
+  Anchored, Input, Match as AutomataMatch,
+  dfa::{Automaton, dense, regex::Regex as DfaRegex},
+  meta::Regex as MetaRegex,
+};
 use std::{error, fmt, panic};
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -52,6 +55,15 @@ const FANCY_BACKTRACK_LIMIT: usize = 1_000_000;
 const FALLBACK_ALT_CHUNK_SIZE: usize = 128;
 const FALLBACK_MIN_CONTEXT: usize = 256;
 const FALLBACK_MAX_CONTEXT: usize = 8_192;
+const PREPARED_MAGIC: &[u8; 8] = b"st-rx01\0";
+const PREPARED_SCHEMA_VERSION: u8 = 1;
+const PREPARED_KIND_META: u8 = 0;
+const PREPARED_KIND_DENSE: u8 = 1;
+const PREPARED_ARTIFACT_MAX_COUNT: usize = 2;
+const PREPARED_DENSE_DFA_MAX_BYTES: usize = 1024 * 1024;
+const PREPARED_DENSE_DETERMINIZE_MAX_BYTES: usize = 8 * 1024 * 1024;
+const PREPARED_FINGERPRINT_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+const PREPARED_FINGERPRINT_PRIME: u64 = 0x0000_0100_0000_01b3;
 
 fn u32_overflow_error(label: &str, value: usize) -> Error {
   Error::from_reason(format!("{label} exceeds u32 range: {value}"))
@@ -1265,8 +1277,11 @@ fn check_match(
   // multi-DFA. Verify the match against the individual
   // pattern which has the original Unicode \b.
   if pi.has_internal_b {
+    let Some(individual) = &pi.individual else {
+      return Err(Rejection::Verifier);
+    };
     let input = Input::new(haystack).range(start..);
-    match pi.individual.find(input) {
+    match individual.find(input) {
       Some(m) if m.start() == start && m.end() == end => Ok(()),
       _ => Err(Rejection::Verifier),
     }
@@ -1300,8 +1315,9 @@ fn try_fancy_fallback(
   // no lookahead so it greedily overshoots past the
   // backtracked end. Start-only check suffices.
   if pi.has_internal_b {
+    let individual = pi.individual.as_ref()?;
     let inp = Input::new(haystack).range(s..);
-    pi.individual.find(inp).filter(|im| im.start() == s)?;
+    individual.find(inp).filter(|im| im.start() == s)?;
   }
   Some((s, e))
 }
@@ -1318,11 +1334,12 @@ fn try_shorter_verified_match(
   }
 
   let mut candidate_end = prev_char_pos(haystack, end);
+  let individual = pi.individual.as_ref()?;
   while candidate_end > start {
     let input = Input::new(haystack)
       .range(start..candidate_end)
       .anchored(Anchored::Yes);
-    if let Some(m) = pi.individual.find(input) {
+    if let Some(m) = individual.find(input) {
       let boundary_ok = !pi.boundaries.has_any()
         || pi
           .boundaries
@@ -1384,7 +1401,7 @@ struct PatternInfo {
   original_index: u32,
   verifier: Verifier,
   boundaries: EdgeBoundaries,
-  individual: MetaRegex,
+  individual: Option<MetaRegex>,
   /// Pattern had internal `\b`/`\B` replaced with
   /// `(?-u:\b)` in the multi-DFA. Matches must be
   /// verified against `individual` (which has the
@@ -1411,14 +1428,411 @@ struct FallbackPattern {
 /// byte_start, byte_end).
 type RawMatch = (u32, usize, usize);
 
+enum MultiRegex {
+  Meta(MetaRegex),
+  Dense(Box<DfaRegex>),
+}
+
+impl MultiRegex {
+  fn find(&self, input: Input<'_>) -> Option<AutomataMatch> {
+    match self {
+      Self::Meta(re) => re.find(input),
+      Self::Dense(re) => re.find(input),
+    }
+  }
+
+  fn for_each_match(
+    &self,
+    haystack: &str,
+    mut callback: impl FnMut(AutomataMatch),
+  ) {
+    match self {
+      Self::Meta(re) => {
+        for m in re.find_iter(haystack) {
+          callback(m);
+        }
+      }
+      Self::Dense(re) => {
+        for m in re.find_iter(haystack) {
+          callback(m);
+        }
+      }
+    }
+  }
+
+  fn any_match(
+    &self,
+    haystack: &str,
+    mut predicate: impl FnMut(AutomataMatch) -> bool,
+  ) -> bool {
+    match self {
+      Self::Meta(re) => {
+        for m in re.find_iter(haystack) {
+          if predicate(m) {
+            return true;
+          }
+        }
+      }
+      Self::Dense(re) => {
+        for m in re.find_iter(haystack) {
+          if predicate(m) {
+            return true;
+          }
+        }
+      }
+    }
+    false
+  }
+}
+
+#[derive(Debug)]
+struct PreparedMultiArtifact {
+  fingerprint: u64,
+  kind: PreparedMultiKind,
+}
+
+#[derive(Debug)]
+enum PreparedMultiKind {
+  Meta,
+  Dense { forward: Vec<u8>, reverse: Vec<u8> },
+}
+
+enum PreparedMode {
+  None,
+  Capture {
+    artifacts: Vec<PreparedMultiArtifact>,
+  },
+  Load {
+    artifacts: Vec<PreparedMultiArtifact>,
+    next: usize,
+  },
+}
+
+impl PreparedMode {
+  fn decode(bytes: &[u8]) -> Result<Self> {
+    let artifacts = decode_prepared_artifacts(bytes)?;
+    Ok(Self::Load { artifacts, next: 0 })
+  }
+
+  fn finish(self) -> Result<Vec<u8>> {
+    match self {
+      Self::None => Ok(Vec::new()),
+      Self::Capture { artifacts } => encode_prepared_artifacts(&artifacts),
+      Self::Load { artifacts, next } => {
+        if next == artifacts.len() {
+          return Ok(Vec::new());
+        }
+        Err(Error::from_reason("Unused prepared regex artifacts"))
+      }
+    }
+  }
+
+  fn next_loaded(
+    &mut self,
+    fingerprint: u64,
+    expected_pattern_count: usize,
+  ) -> Result<Option<MultiRegex>> {
+    let Self::Load { artifacts, next } = self else {
+      return Ok(None);
+    };
+    let artifact = artifacts
+      .get(*next)
+      .ok_or_else(|| Error::from_reason("Missing prepared regex artifact"))?;
+    if artifact.fingerprint != fingerprint {
+      return Err(Error::from_reason("Prepared regex artifact mismatch"));
+    }
+    *next += 1;
+    match &artifact.kind {
+      PreparedMultiKind::Meta => Ok(None),
+      PreparedMultiKind::Dense { forward, reverse } => {
+        dense_regex_from_bytes(forward, reverse, expected_pattern_count)
+          .map(Some)
+      }
+    }
+  }
+
+  fn push_captured(&mut self, artifact: PreparedMultiArtifact) {
+    if let Self::Capture { artifacts } = self {
+      artifacts.push(artifact);
+    }
+  }
+}
+
+fn build_prepared_multi(
+  cores: &[String],
+  prepared: &mut PreparedMode,
+) -> Result<Option<MultiRegex>> {
+  if cores.is_empty() {
+    return Ok(None);
+  }
+
+  let fingerprint = prepared_fingerprint(cores)?;
+  if let Some(loaded) = prepared.next_loaded(fingerprint, cores.len())? {
+    return Ok(Some(loaded));
+  }
+
+  let refs: Vec<&str> = cores.iter().map(String::as_str).collect();
+  let meta = MetaRegex::new_many(&refs)
+    .map(MultiRegex::Meta)
+    .map_err(|e| Error::from_reason(format!("{e}")))?;
+
+  if !matches!(prepared, PreparedMode::Capture { .. }) {
+    return Ok(Some(meta));
+  }
+
+  let artifact = match build_serializable_dense_regex(&refs) {
+    Ok(dense) => PreparedMultiArtifact {
+      fingerprint,
+      kind: PreparedMultiKind::Dense {
+        forward: serialize_dense_dfa(dense.forward()),
+        reverse: serialize_dense_dfa(dense.reverse()),
+      },
+    },
+    Err(_) => PreparedMultiArtifact {
+      fingerprint,
+      kind: PreparedMultiKind::Meta,
+    },
+  };
+  prepared.push_captured(artifact);
+  Ok(Some(meta))
+}
+
+fn build_serializable_dense_regex(patterns: &[&str]) -> Result<DfaRegex> {
+  DfaRegex::builder()
+    .dense(
+      dense::Config::new()
+        .dfa_size_limit(Some(PREPARED_DENSE_DFA_MAX_BYTES))
+        .determinize_size_limit(Some(PREPARED_DENSE_DETERMINIZE_MAX_BYTES)),
+    )
+    .build_many(patterns)
+    .map_err(|e| Error::from_reason(format!("{e}")))
+}
+
+fn serialize_dense_dfa(dfa: &dense::DFA<Vec<u32>>) -> Vec<u8> {
+  let (bytes, pad) = dfa.to_bytes_native_endian();
+  bytes[pad..].to_vec()
+}
+
+fn dense_regex_from_bytes(
+  forward: &[u8],
+  reverse: &[u8],
+  expected_pattern_count: usize,
+) -> Result<MultiRegex> {
+  let forward_storage = aligned_dense_bytes(forward);
+  let reverse_storage = aligned_dense_bytes(reverse);
+  let forward_dfa: dense::DFA<&[u32]> =
+    dense::DFA::from_bytes(aligned_dense_payload(&forward_storage))
+      .map_err(|e| Error::from_reason(format!("Invalid prepared regex: {e}")))?
+      .0;
+  let reverse_dfa: dense::DFA<&[u32]> =
+    dense::DFA::from_bytes(aligned_dense_payload(&reverse_storage))
+      .map_err(|e| Error::from_reason(format!("Invalid prepared regex: {e}")))?
+      .0;
+  if forward_dfa.pattern_len() != expected_pattern_count
+    || reverse_dfa.pattern_len() != expected_pattern_count
+  {
+    return Err(Error::from_reason("Prepared regex artifact mismatch"));
+  }
+  Ok(MultiRegex::Dense(Box::new(
+    DfaRegex::builder()
+      .build_from_dfas(forward_dfa.to_owned(), reverse_dfa.to_owned()),
+  )))
+}
+
+fn aligned_dense_bytes(bytes: &[u8]) -> Vec<u8> {
+  let mut storage: Vec<u8> = Vec::with_capacity(bytes.len() + 3);
+  let base = storage.as_ptr().addr();
+  let pad = (4 - (base % 4)) % 4;
+  storage.resize(pad, 0);
+  storage.extend_from_slice(bytes);
+  storage
+}
+
+fn aligned_dense_payload(storage: &[u8]) -> &[u8] {
+  let base = storage.as_ptr().addr();
+  let pad = (4 - (base % 4)) % 4;
+  &storage[pad..]
+}
+
+fn encode_prepared_artifacts(
+  artifacts: &[PreparedMultiArtifact],
+) -> Result<Vec<u8>> {
+  let mut out = Vec::new();
+  out.extend_from_slice(PREPARED_MAGIC);
+  out.push(PREPARED_SCHEMA_VERSION);
+  write_u32(
+    &mut out,
+    usize_to_u32("Prepared regex artifact count", artifacts.len())?,
+  );
+  for artifact in artifacts {
+    write_u64(&mut out, artifact.fingerprint);
+    match &artifact.kind {
+      PreparedMultiKind::Meta => {
+        out.push(PREPARED_KIND_META);
+        write_u32(&mut out, 0);
+        write_u32(&mut out, 0);
+      }
+      PreparedMultiKind::Dense { forward, reverse } => {
+        out.push(PREPARED_KIND_DENSE);
+        write_u32(
+          &mut out,
+          usize_to_u32("Prepared regex forward byte length", forward.len())?,
+        );
+        write_u32(
+          &mut out,
+          usize_to_u32("Prepared regex reverse byte length", reverse.len())?,
+        );
+        out.extend_from_slice(forward);
+        out.extend_from_slice(reverse);
+      }
+    }
+  }
+  Ok(out)
+}
+
+fn decode_prepared_artifacts(
+  bytes: &[u8],
+) -> Result<Vec<PreparedMultiArtifact>> {
+  let mut pos = 0;
+  let magic = read_exact(bytes, &mut pos, PREPARED_MAGIC.len())?;
+  if magic != PREPARED_MAGIC {
+    return Err(Error::from_reason("Invalid prepared regex artifact"));
+  }
+  let version = read_u8(bytes, &mut pos)?;
+  if version != PREPARED_SCHEMA_VERSION {
+    return Err(Error::from_reason("Unsupported prepared regex artifact"));
+  }
+  let count = read_u32(bytes, &mut pos)?;
+  let count = usize::try_from(count).map_err(|_| {
+    Error::from_reason("Prepared regex artifact count is not addressable")
+  })?;
+  if count > PREPARED_ARTIFACT_MAX_COUNT {
+    return Err(Error::from_reason(
+      "Prepared regex artifact count is too large",
+    ));
+  }
+  let mut artifacts = Vec::with_capacity(count);
+  for _ in 0..count {
+    let fingerprint = read_u64(bytes, &mut pos)?;
+    let kind = read_u8(bytes, &mut pos)?;
+    let forward_len =
+      usize::try_from(read_u32(bytes, &mut pos)?).map_err(|_| {
+        Error::from_reason("Prepared regex forward length is not addressable")
+      })?;
+    let reverse_len =
+      usize::try_from(read_u32(bytes, &mut pos)?).map_err(|_| {
+        Error::from_reason("Prepared regex reverse length is not addressable")
+      })?;
+    let kind = match kind {
+      PREPARED_KIND_META => {
+        if forward_len != 0 || reverse_len != 0 {
+          return Err(Error::from_reason(
+            "Invalid prepared regex meta artifact",
+          ));
+        }
+        PreparedMultiKind::Meta
+      }
+      PREPARED_KIND_DENSE => {
+        if forward_len > PREPARED_DENSE_DFA_MAX_BYTES
+          || reverse_len > PREPARED_DENSE_DFA_MAX_BYTES
+        {
+          return Err(Error::from_reason(
+            "Prepared regex artifact is too large",
+          ));
+        }
+        let forward = read_exact(bytes, &mut pos, forward_len)?.to_vec();
+        let reverse = read_exact(bytes, &mut pos, reverse_len)?.to_vec();
+        PreparedMultiKind::Dense { forward, reverse }
+      }
+      _ => {
+        return Err(Error::from_reason("Unknown prepared regex artifact kind"));
+      }
+    };
+    artifacts.push(PreparedMultiArtifact { fingerprint, kind });
+  }
+  if pos != bytes.len() {
+    return Err(Error::from_reason("Trailing prepared regex artifact bytes"));
+  }
+  Ok(artifacts)
+}
+
+fn read_exact<'a>(
+  bytes: &'a [u8],
+  pos: &mut usize,
+  len: usize,
+) -> Result<&'a [u8]> {
+  let end = pos
+    .checked_add(len)
+    .ok_or_else(|| Error::from_reason("Prepared regex artifact overflow"))?;
+  let value = bytes
+    .get(*pos..end)
+    .ok_or_else(|| Error::from_reason("Truncated prepared regex artifact"))?;
+  *pos = end;
+  Ok(value)
+}
+
+fn read_u8(bytes: &[u8], pos: &mut usize) -> Result<u8> {
+  let value = read_exact(bytes, pos, 1)?;
+  Ok(value[0])
+}
+
+fn read_u32(bytes: &[u8], pos: &mut usize) -> Result<u32> {
+  let value = read_exact(bytes, pos, 4)?;
+  Ok(u32::from_le_bytes([value[0], value[1], value[2], value[3]]))
+}
+
+fn read_u64(bytes: &[u8], pos: &mut usize) -> Result<u64> {
+  let value = read_exact(bytes, pos, 8)?;
+  Ok(u64::from_le_bytes([
+    value[0], value[1], value[2], value[3], value[4], value[5], value[6],
+    value[7],
+  ]))
+}
+
+fn write_u32(out: &mut Vec<u8>, value: u32) {
+  out.extend_from_slice(&value.to_le_bytes());
+}
+
+fn write_u64(out: &mut Vec<u8>, value: u64) {
+  out.extend_from_slice(&value.to_le_bytes());
+}
+
+fn prepared_fingerprint(patterns: &[String]) -> Result<u64> {
+  let mut hash = PREPARED_FINGERPRINT_OFFSET;
+  hash = fingerprint_byte(hash, PREPARED_SCHEMA_VERSION);
+  hash = fingerprint_usize(hash, patterns.len())?;
+  for pattern in patterns {
+    hash = fingerprint_usize(hash, pattern.len())?;
+    hash = fingerprint_bytes(hash, pattern.as_bytes());
+  }
+  Ok(hash)
+}
+
+fn fingerprint_usize(hash: u64, value: usize) -> Result<u64> {
+  let value = u64::try_from(value)
+    .map_err(|_| Error::from_reason("Prepared regex fingerprint overflow"))?;
+  Ok(fingerprint_bytes(hash, &value.to_le_bytes()))
+}
+
+fn fingerprint_bytes(mut hash: u64, bytes: &[u8]) -> u64 {
+  for byte in bytes {
+    hash = fingerprint_byte(hash, *byte);
+  }
+  hash
+}
+
+fn fingerprint_byte(hash: u64, byte: u8) -> u64 {
+  (hash ^ u64::from(byte)).wrapping_mul(PREPARED_FINGERPRINT_PRIME)
+}
+
 pub struct RegexSet {
   /// Fast DFA: patterns with Verifier::None
   /// and no \B boundaries.
-  fast_multi: Option<MetaRegex>,
+  fast_multi: Option<MultiRegex>,
   fast_info: Vec<PatternInfo>,
   /// Slow DFA: patterns with verifiers or \B.
   /// Uses manual loop with shadowed check.
-  slow_multi: Option<MetaRegex>,
+  slow_multi: Option<MultiRegex>,
   slow_info: Vec<PatternInfo>,
   /// Fancy-regex fallback patterns.
   fallbacks: Vec<FallbackPattern>,
@@ -1431,6 +1845,34 @@ pub struct RegexSet {
 
 impl RegexSet {
   pub fn new(patterns: Vec<String>, options: Options) -> Result<Self> {
+    let mut prepared = PreparedMode::None;
+    Self::build(patterns, options, &mut prepared)
+  }
+
+  pub fn prepare(patterns: Vec<String>, options: Options) -> Result<Vec<u8>> {
+    let mut prepared = PreparedMode::Capture {
+      artifacts: Vec::new(),
+    };
+    _ = Self::build(patterns, options, &mut prepared)?;
+    prepared.finish()
+  }
+
+  pub fn with_prepared(
+    patterns: Vec<String>,
+    options: Options,
+    bytes: &[u8],
+  ) -> Result<Self> {
+    let mut prepared = PreparedMode::decode(bytes)?;
+    let set = Self::build(patterns, options, &mut prepared)?;
+    _ = prepared.finish()?;
+    Ok(set)
+  }
+
+  fn build(
+    patterns: Vec<String>,
+    options: Options,
+    prepared: &mut PreparedMode,
+  ) -> Result<Self> {
     let whole_words = options.whole_words;
     let unicode_wb = options.unicode_boundaries;
     let pattern_count_usize = patterns.len();
@@ -1527,7 +1969,7 @@ impl RegexSet {
             original_index: usize_to_u32("Pattern index", i)?,
             verifier,
             boundaries: eb,
-            individual,
+            individual: Some(individual),
             has_internal_b: internal_b,
             fancy_fallback,
           });
@@ -1537,11 +1979,9 @@ impl RegexSet {
             original_index: usize_to_u32("Pattern index", i)?,
             verifier,
             boundaries: eb,
-            individual,
+            individual: None,
             has_internal_b: false,
-            // Fast path patterns always have Verifier::None,
-            // so fancy_fallback is always None. Skip storing
-            // the dead state.
+            // Fast path patterns never query individual or fallback state.
             fancy_fallback: None,
           });
         }
@@ -1572,16 +2012,8 @@ impl RegexSet {
       }
     }
 
-    let build_multi = |cores: &[String]| -> Option<MetaRegex> {
-      if cores.is_empty() {
-        return None;
-      }
-      let refs: Vec<&str> = cores.iter().map(String::as_str).collect();
-      MetaRegex::new_many(&refs).ok()
-    };
-
-    let fast_multi = build_multi(&fast_cores);
-    let slow_multi = build_multi(&slow_cores);
+    let fast_multi = build_prepared_multi(&fast_cores, prepared)?;
+    let slow_multi = build_prepared_multi(&slow_cores, prepared)?;
 
     let all_info: Vec<&PatternInfo> =
       fast_info.iter().chain(slow_info.iter()).collect();
@@ -1663,7 +2095,7 @@ impl RegexSet {
     // Checks boundaries + inline verifiers (None
     // or Inline char checks — never Complex).
     if let Some(ref multi) = self.fast_multi {
-      for m in multi.find_iter(haystack) {
+      multi.for_each_match(haystack, |m| {
         let pi = &self.fast_info[m.pattern().as_usize()];
         let boundary_ok = !pi.boundaries.has_any()
           || pi
@@ -1672,7 +2104,7 @@ impl RegexSet {
         if boundary_ok && pi.verifier.check(haystack, m.start(), m.end()) {
           all.push((pi.original_index, m.start(), m.end()));
         }
-      }
+      });
     }
 
     // Slow DFA: manual loop with shadowed check.
@@ -1822,8 +2254,11 @@ impl RegexSet {
       if idx == skip {
         continue;
       }
+      let Some(individual) = &pi.individual else {
+        continue;
+      };
       let input = Input::new(haystack).range(at..).anchored(Anchored::Yes);
-      if let Some(m) = pi.individual.find(input) {
+      if let Some(m) = individual.find(input) {
         if m.start() == at
           && check_match(haystack, m.start(), m.end(), pi, mode).is_ok()
         {
@@ -1850,15 +2285,16 @@ impl RegexSet {
 
     // Fast DFA
     if let Some(ref multi) = self.fast_multi {
-      for m in multi.find_iter(haystack) {
+      let found = multi.any_match(haystack, |m| {
         let pi = &self.fast_info[m.pattern().as_usize()];
         let boundary_ok = !pi.boundaries.has_any()
           || pi
             .boundaries
             .check_with_mode(haystack, m.start(), m.end(), &mode);
-        if boundary_ok && pi.verifier.check(haystack, m.start(), m.end()) {
-          return true;
-        }
+        boundary_ok && pi.verifier.check(haystack, m.start(), m.end())
+      });
+      if found {
+        return true;
       }
     }
 
@@ -2219,6 +2655,142 @@ mod tests {
       set.find_iter_packed_bytes(haystack)?,
       vec![0, 2, 3],
       "expected raw UTF-8 byte offsets"
+    );
+    Ok(())
+  }
+
+  #[test]
+  fn prepared_regex_set_matches_unprepared() -> Result<()> {
+    let patterns = vec![
+      String::from(r"\bfoo\b"),
+      String::from(r"\d{2}\.\d{2}\.\d{4}"),
+      String::from(r"(?i-u:bar)"),
+      String::from(r"X\d+(?!\d)"),
+    ];
+    let options = Options::default();
+    let haystack = "foo 15.03.1990 BAR X123 čfoo";
+    let replacements = vec![
+      String::from("[WORD]"),
+      String::from("[DATE]"),
+      String::from("[BAR]"),
+      String::from("[CODE]"),
+    ];
+
+    let artifact = RegexSet::prepare(patterns.clone(), options)?;
+    let baseline = RegexSet::new(patterns.clone(), options)?;
+    let prepared = RegexSet::with_prepared(patterns, options, &artifact)?;
+
+    assert_eq!(
+      baseline.find_iter_packed(haystack)?,
+      prepared.find_iter_packed(haystack)?
+    );
+    assert_eq!(baseline.is_match(haystack), prepared.is_match(haystack));
+    assert_eq!(
+      baseline.which_match(haystack),
+      prepared.which_match(haystack)
+    );
+    assert_eq!(
+      baseline.replace_all(haystack, &replacements)?,
+      prepared.replace_all(haystack, &replacements)?
+    );
+    Ok(())
+  }
+
+  #[test]
+  fn prepared_regex_set_rejects_mismatched_patterns() -> Result<()> {
+    let options = Options::default();
+    let artifact = RegexSet::prepare(vec![String::from("foo")], options)?;
+    let result =
+      RegexSet::with_prepared(vec![String::from("bar")], options, &artifact);
+
+    assert!(result.is_err(), "artifact must match prepared patterns");
+    Ok(())
+  }
+
+  #[test]
+  fn prepared_regex_set_rejects_mismatched_dense_pattern_count() -> Result<()> {
+    let options = Options::default();
+    let source = RegexSet::prepare(vec![String::from("foo")], options)?;
+    let [PreparedMultiArtifact { kind, .. }] =
+      decode_prepared_artifacts(&source)?
+        .try_into()
+        .map_err(|_| {
+          Error::from_reason("expected a single prepared regex artifact")
+        })?;
+    assert!(
+      matches!(&kind, PreparedMultiKind::Dense { .. }),
+      "simple patterns should produce dense artifacts"
+    );
+
+    let patterns = vec![String::from("foo"), String::from("bar")];
+    let artifact = encode_prepared_artifacts(&[PreparedMultiArtifact {
+      fingerprint: prepared_fingerprint(&patterns)?,
+      kind,
+    }])?;
+    let result = RegexSet::with_prepared(patterns, options, &artifact);
+
+    assert!(
+      result.is_err(),
+      "dense artifacts must declare the expected pattern count"
+    );
+    Ok(())
+  }
+
+  #[test]
+  fn prepared_regex_set_rejects_oversized_artifact_count() {
+    let mut artifact = Vec::new();
+    artifact.extend_from_slice(PREPARED_MAGIC);
+    artifact.push(PREPARED_SCHEMA_VERSION);
+    write_u32(&mut artifact, 3);
+
+    let result = RegexSet::with_prepared(
+      vec![String::from("foo")],
+      Options::default(),
+      &artifact,
+    );
+
+    assert!(result.is_err(), "artifact count must be bounded");
+  }
+
+  #[test]
+  fn prepared_regex_set_rejects_meta_payload_lengths() {
+    let mut artifact = Vec::new();
+    artifact.extend_from_slice(PREPARED_MAGIC);
+    artifact.push(PREPARED_SCHEMA_VERSION);
+    write_u32(&mut artifact, 1);
+    write_u64(&mut artifact, 0);
+    artifact.push(PREPARED_KIND_META);
+    write_u32(&mut artifact, 1);
+    write_u32(&mut artifact, 0);
+
+    let result = RegexSet::with_prepared(
+      vec![String::from("foo")],
+      Options::default(),
+      &artifact,
+    );
+
+    assert!(
+      result.is_err(),
+      "meta artifacts must not declare payload bytes"
+    );
+  }
+
+  #[test]
+  fn prepared_regex_set_skips_oversized_dense_artifacts() -> Result<()> {
+    let options = Options::default();
+    let patterns = vec![String::from(r"\w{20}")];
+    let artifact = RegexSet::prepare(patterns.clone(), options)?;
+
+    assert!(
+      artifact.len() < 1024,
+      "oversized dense DFAs should fall back to compact prepared markers"
+    );
+
+    let baseline = RegexSet::new(patterns.clone(), options)?;
+    let prepared = RegexSet::with_prepared(patterns, options, &artifact)?;
+    assert_eq!(
+      baseline.find_iter_packed("abcdefghijklmnopqrst")?,
+      prepared.find_iter_packed("abcdefghijklmnopqrst")?
     );
     Ok(())
   }

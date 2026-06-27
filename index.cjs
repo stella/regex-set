@@ -577,4 +577,5 @@ if (!nativeBinding) {
 
 module.exports = nativeBinding
 module.exports.RegexSet = nativeBinding.RegexSet
+module.exports._prepareRegexSet = nativeBinding._prepareRegexSet
 module.exports._uax29Boundaries = nativeBinding._uax29Boundaries

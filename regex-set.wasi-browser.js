@@ -62,5 +62,7 @@ const {
 });
 export default __napiModule.exports;
 export const RegexSet = __napiModule.exports.RegexSet;
+export const _prepareRegexSet =
+  __napiModule.exports._prepareRegexSet;
 export const _uax29Boundaries =
   __napiModule.exports._uax29Boundaries;

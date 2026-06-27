@@ -39,9 +39,18 @@ pub struct RegexSet {
 impl RegexSet {
   #[napi(constructor)]
   #[allow(clippy::needless_pass_by_value)]
-  pub fn new(patterns: Vec<String>, options: Option<Options>) -> Result<Self> {
-    let inner = core::RegexSet::new(patterns, resolve_options(options))
-      .map_err(|error| core_to_napi_error(&error))?;
+  pub fn new(
+    patterns: Vec<String>,
+    options: Option<Options>,
+    prepared: Option<Buffer>,
+  ) -> Result<Self> {
+    let options = resolve_options(options);
+    let inner = if let Some(prepared) = prepared {
+      core::RegexSet::with_prepared(patterns, options, prepared.as_ref())
+    } else {
+      core::RegexSet::new(patterns, options)
+    }
+    .map_err(|error| core_to_napi_error(&error))?;
     Ok(Self { inner })
   }
 
@@ -112,5 +121,16 @@ impl RegexSet {
 #[allow(clippy::needless_pass_by_value)]
 pub fn uax29_boundaries(haystack: Buffer) -> Result<Vec<u32>> {
   core::uax29_boundaries(haystack.as_ref())
+    .map_err(|error| core_to_napi_error(&error))
+}
+
+#[napi(js_name = "_prepareRegexSet")]
+#[allow(clippy::needless_pass_by_value)]
+pub fn prepare_regex_set(
+  patterns: Vec<String>,
+  options: Option<Options>,
+) -> Result<Buffer> {
+  core::RegexSet::prepare(patterns, resolve_options(options))
+    .map(Buffer::from)
     .map_err(|error| core_to_napi_error(&error))
 }
