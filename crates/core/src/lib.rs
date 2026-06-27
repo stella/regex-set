@@ -22,7 +22,7 @@
 
 use regex_automata::{
   Anchored, Input, Match as AutomataMatch,
-  dfa::{dense, regex::Regex as DfaRegex},
+  dfa::{Automaton, dense, regex::Regex as DfaRegex},
   meta::Regex as MetaRegex,
 };
 use std::{error, fmt, panic};
@@ -1527,7 +1527,11 @@ impl PreparedMode {
     }
   }
 
-  fn next_loaded(&mut self, fingerprint: u64) -> Result<Option<MultiRegex>> {
+  fn next_loaded(
+    &mut self,
+    fingerprint: u64,
+    expected_pattern_count: usize,
+  ) -> Result<Option<MultiRegex>> {
     let Self::Load { artifacts, next } = self else {
       return Ok(None);
     };
@@ -1541,7 +1545,8 @@ impl PreparedMode {
     match &artifact.kind {
       PreparedMultiKind::Meta => Ok(None),
       PreparedMultiKind::Dense { forward, reverse } => {
-        dense_regex_from_bytes(forward, reverse).map(Some)
+        dense_regex_from_bytes(forward, reverse, expected_pattern_count)
+          .map(Some)
       }
     }
   }
@@ -1562,7 +1567,7 @@ fn build_prepared_multi(
   }
 
   let fingerprint = prepared_fingerprint(cores)?;
-  if let Some(loaded) = prepared.next_loaded(fingerprint)? {
+  if let Some(loaded) = prepared.next_loaded(fingerprint, cores.len())? {
     return Ok(Some(loaded));
   }
 
@@ -1611,6 +1616,7 @@ fn serialize_dense_dfa(dfa: &dense::DFA<Vec<u32>>) -> Vec<u8> {
 fn dense_regex_from_bytes(
   forward: &[u8],
   reverse: &[u8],
+  expected_pattern_count: usize,
 ) -> Result<MultiRegex> {
   let forward_storage = aligned_dense_bytes(forward);
   let reverse_storage = aligned_dense_bytes(reverse);
@@ -1622,6 +1628,11 @@ fn dense_regex_from_bytes(
     dense::DFA::from_bytes(aligned_dense_payload(&reverse_storage))
       .map_err(|e| Error::from_reason(format!("Invalid prepared regex: {e}")))?
       .0;
+  if forward_dfa.pattern_len() != expected_pattern_count
+    || reverse_dfa.pattern_len() != expected_pattern_count
+  {
+    return Err(Error::from_reason("Prepared regex artifact mismatch"));
+  }
   Ok(MultiRegex::Dense(Box::new(
     DfaRegex::builder()
       .build_from_dfas(forward_dfa.to_owned(), reverse_dfa.to_owned()),
@@ -2693,6 +2704,35 @@ mod tests {
       RegexSet::with_prepared(vec![String::from("bar")], options, &artifact);
 
     assert!(result.is_err(), "artifact must match prepared patterns");
+    Ok(())
+  }
+
+  #[test]
+  fn prepared_regex_set_rejects_mismatched_dense_pattern_count() -> Result<()> {
+    let options = Options::default();
+    let source = RegexSet::prepare(vec![String::from("foo")], options)?;
+    let [PreparedMultiArtifact { kind, .. }] =
+      decode_prepared_artifacts(&source)?
+        .try_into()
+        .map_err(|_| {
+          Error::from_reason("expected a single prepared regex artifact")
+        })?;
+    assert!(
+      matches!(&kind, PreparedMultiKind::Dense { .. }),
+      "simple patterns should produce dense artifacts"
+    );
+
+    let patterns = vec![String::from("foo"), String::from("bar")];
+    let artifact = encode_prepared_artifacts(&[PreparedMultiArtifact {
+      fingerprint: prepared_fingerprint(&patterns)?,
+      kind,
+    }])?;
+    let result = RegexSet::with_prepared(patterns, options, &artifact);
+
+    assert!(
+      result.is_err(),
+      "dense artifacts must declare the expected pattern count"
+    );
     Ok(())
   }
 

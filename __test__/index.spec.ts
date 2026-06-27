@@ -77,6 +77,17 @@ describe("RegexSet", () => {
     );
   });
 
+  test("prepared artifact rejects malformed bytes", () => {
+    expect(
+      () =>
+        new RegexSet(
+          ["foo"],
+          undefined,
+          new Uint8Array([1, 2, 3]),
+        ),
+    ).toThrow();
+  });
+
   test("regex patterns: dates", () => {
     const rs = new RegexSet(["\\d{2}\\.\\d{2}\\.\\d{4}"]);
     const matches = rs.findIter(
