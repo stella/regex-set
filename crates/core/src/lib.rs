@@ -1276,8 +1276,11 @@ fn check_match(
   // multi-DFA. Verify the match against the individual
   // pattern which has the original Unicode \b.
   if pi.has_internal_b {
+    let Some(individual) = &pi.individual else {
+      return Err(Rejection::Verifier);
+    };
     let input = Input::new(haystack).range(start..);
-    match pi.individual.find(input) {
+    match individual.find(input) {
       Some(m) if m.start() == start && m.end() == end => Ok(()),
       _ => Err(Rejection::Verifier),
     }
@@ -1311,8 +1314,9 @@ fn try_fancy_fallback(
   // no lookahead so it greedily overshoots past the
   // backtracked end. Start-only check suffices.
   if pi.has_internal_b {
+    let individual = pi.individual.as_ref()?;
     let inp = Input::new(haystack).range(s..);
-    pi.individual.find(inp).filter(|im| im.start() == s)?;
+    individual.find(inp).filter(|im| im.start() == s)?;
   }
   Some((s, e))
 }
@@ -1329,11 +1333,12 @@ fn try_shorter_verified_match(
   }
 
   let mut candidate_end = prev_char_pos(haystack, end);
+  let individual = pi.individual.as_ref()?;
   while candidate_end > start {
     let input = Input::new(haystack)
       .range(start..candidate_end)
       .anchored(Anchored::Yes);
-    if let Some(m) = pi.individual.find(input) {
+    if let Some(m) = individual.find(input) {
       let boundary_ok = !pi.boundaries.has_any()
         || pi
           .boundaries
@@ -1395,7 +1400,7 @@ struct PatternInfo {
   original_index: u32,
   verifier: Verifier,
   boundaries: EdgeBoundaries,
-  individual: MetaRegex,
+  individual: Option<MetaRegex>,
   /// Pattern had internal `\b`/`\B` replaced with
   /// `(?-u:\b)` in the multi-DFA. Matches must be
   /// verified against `individual` (which has the
@@ -1929,7 +1934,7 @@ impl RegexSet {
             original_index: usize_to_u32("Pattern index", i)?,
             verifier,
             boundaries: eb,
-            individual,
+            individual: Some(individual),
             has_internal_b: internal_b,
             fancy_fallback,
           });
@@ -1939,11 +1944,9 @@ impl RegexSet {
             original_index: usize_to_u32("Pattern index", i)?,
             verifier,
             boundaries: eb,
-            individual,
+            individual: None,
             has_internal_b: false,
-            // Fast path patterns always have Verifier::None,
-            // so fancy_fallback is always None. Skip storing
-            // the dead state.
+            // Fast path patterns never query individual or fallback state.
             fancy_fallback: None,
           });
         }
@@ -2216,8 +2219,11 @@ impl RegexSet {
       if idx == skip {
         continue;
       }
+      let Some(individual) = &pi.individual else {
+        continue;
+      };
       let input = Input::new(haystack).range(at..).anchored(Anchored::Yes);
-      if let Some(m) = pi.individual.find(input) {
+      if let Some(m) = individual.find(input) {
         if m.start() == at
           && check_match(haystack, m.start(), m.end(), pi, mode).is_ok()
         {
