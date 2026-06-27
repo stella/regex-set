@@ -59,6 +59,7 @@ const PREPARED_MAGIC: &[u8; 8] = b"st-rx01\0";
 const PREPARED_SCHEMA_VERSION: u8 = 1;
 const PREPARED_KIND_META: u8 = 0;
 const PREPARED_KIND_DENSE: u8 = 1;
+const PREPARED_ARTIFACT_MAX_COUNT: usize = 2;
 const PREPARED_DENSE_DFA_MAX_BYTES: usize = 1024 * 1024;
 const PREPARED_DENSE_DETERMINIZE_MAX_BYTES: usize = 8 * 1024 * 1024;
 const PREPARED_FINGERPRINT_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
@@ -1690,6 +1691,11 @@ fn decode_prepared_artifacts(
   let count = usize::try_from(count).map_err(|_| {
     Error::from_reason("Prepared regex artifact count is not addressable")
   })?;
+  if count > PREPARED_ARTIFACT_MAX_COUNT {
+    return Err(Error::from_reason(
+      "Prepared regex artifact count is too large",
+    ));
+  }
   let mut artifacts = Vec::with_capacity(count);
   for _ in 0..count {
     let fingerprint = read_u64(bytes, &mut pos)?;
@@ -1703,8 +1709,22 @@ fn decode_prepared_artifacts(
         Error::from_reason("Prepared regex reverse length is not addressable")
       })?;
     let kind = match kind {
-      PREPARED_KIND_META => PreparedMultiKind::Meta,
+      PREPARED_KIND_META => {
+        if forward_len != 0 || reverse_len != 0 {
+          return Err(Error::from_reason(
+            "Invalid prepared regex meta artifact",
+          ));
+        }
+        PreparedMultiKind::Meta
+      }
       PREPARED_KIND_DENSE => {
+        if forward_len > PREPARED_DENSE_DFA_MAX_BYTES
+          || reverse_len > PREPARED_DENSE_DFA_MAX_BYTES
+        {
+          return Err(Error::from_reason(
+            "Prepared regex artifact is too large",
+          ));
+        }
         let forward = read_exact(bytes, &mut pos, forward_len)?.to_vec();
         let reverse = read_exact(bytes, &mut pos, reverse_len)?.to_vec();
         PreparedMultiKind::Dense { forward, reverse }
@@ -2670,6 +2690,45 @@ mod tests {
 
     assert!(result.is_err(), "artifact must match prepared patterns");
     Ok(())
+  }
+
+  #[test]
+  fn prepared_regex_set_rejects_oversized_artifact_count() {
+    let mut artifact = Vec::new();
+    artifact.extend_from_slice(PREPARED_MAGIC);
+    artifact.push(PREPARED_SCHEMA_VERSION);
+    write_u32(&mut artifact, 3);
+
+    let result = RegexSet::with_prepared(
+      vec![String::from("foo")],
+      Options::default(),
+      &artifact,
+    );
+
+    assert!(result.is_err(), "artifact count must be bounded");
+  }
+
+  #[test]
+  fn prepared_regex_set_rejects_meta_payload_lengths() {
+    let mut artifact = Vec::new();
+    artifact.extend_from_slice(PREPARED_MAGIC);
+    artifact.push(PREPARED_SCHEMA_VERSION);
+    write_u32(&mut artifact, 1);
+    write_u64(&mut artifact, 0);
+    artifact.push(PREPARED_KIND_META);
+    write_u32(&mut artifact, 1);
+    write_u32(&mut artifact, 0);
+
+    let result = RegexSet::with_prepared(
+      vec![String::from("foo")],
+      Options::default(),
+      &artifact,
+    );
+
+    assert!(
+      result.is_err(),
+      "meta artifacts must not declare payload bytes"
+    );
   }
 
   #[test]
