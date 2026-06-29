@@ -41,6 +41,15 @@ impl Error {
       reason: reason.into(),
     }
   }
+
+  fn is_prepared_artifact_alignment_error(&self) -> bool {
+    matches!(
+      self.reason.as_str(),
+      PREPARED_ERROR_MISSING_ARTIFACT
+        | PREPARED_ERROR_ARTIFACT_MISMATCH
+        | PREPARED_ERROR_UNUSED_ARTIFACTS
+    )
+  }
 }
 
 impl fmt::Display for Error {
@@ -64,6 +73,10 @@ const PREPARED_DENSE_DFA_MAX_BYTES: usize = 1024 * 1024;
 const PREPARED_DENSE_DETERMINIZE_MAX_BYTES: usize = 8 * 1024 * 1024;
 const PREPARED_FINGERPRINT_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
 const PREPARED_FINGERPRINT_PRIME: u64 = 0x0000_0100_0000_01b3;
+const PREPARED_ERROR_MISSING_ARTIFACT: &str = "Missing prepared regex artifact";
+const PREPARED_ERROR_ARTIFACT_MISMATCH: &str =
+  "Prepared regex artifact mismatch";
+const PREPARED_ERROR_UNUSED_ARTIFACTS: &str = "Unused prepared regex artifacts";
 
 fn u32_overflow_error(label: &str, value: usize) -> Error {
   Error::from_reason(format!("{label} exceeds u32 range: {value}"))
@@ -1501,6 +1514,12 @@ enum PreparedMultiKind {
   Dense { forward: Vec<u8>, reverse: Vec<u8> },
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FastProbeMode {
+  OptimisticLoad,
+  Verified,
+}
+
 enum PreparedMode {
   None,
   Capture {
@@ -1509,28 +1528,44 @@ enum PreparedMode {
   Load {
     artifacts: Vec<PreparedMultiArtifact>,
     next: usize,
+    fast_probe: FastProbeMode,
   },
 }
 
 impl PreparedMode {
-  const fn is_load(&self) -> bool {
-    matches!(self, Self::Load { .. })
+  const fn uses_optimistic_fast_probe(&self) -> bool {
+    matches!(
+      self,
+      Self::Load {
+        fast_probe: FastProbeMode::OptimisticLoad,
+        ..
+      }
+    )
   }
 
-  fn decode(bytes: &[u8]) -> Result<Self> {
+  fn decode_with_fast_probe(
+    bytes: &[u8],
+    fast_probe: FastProbeMode,
+  ) -> Result<Self> {
     let artifacts = decode_prepared_artifacts(bytes)?;
-    Ok(Self::Load { artifacts, next: 0 })
+    Ok(Self::Load {
+      artifacts,
+      next: 0,
+      fast_probe,
+    })
   }
 
   fn finish(self) -> Result<Vec<u8>> {
     match self {
       Self::None => Ok(Vec::new()),
       Self::Capture { artifacts } => encode_prepared_artifacts(&artifacts),
-      Self::Load { artifacts, next } => {
+      Self::Load {
+        artifacts, next, ..
+      } => {
         if next == artifacts.len() {
           return Ok(Vec::new());
         }
-        Err(Error::from_reason("Unused prepared regex artifacts"))
+        Err(Error::from_reason(PREPARED_ERROR_UNUSED_ARTIFACTS))
       }
     }
   }
@@ -1540,14 +1575,17 @@ impl PreparedMode {
     fingerprint: u64,
     expected_pattern_count: usize,
   ) -> Result<Option<MultiRegex>> {
-    let Self::Load { artifacts, next } = self else {
+    let Self::Load {
+      artifacts, next, ..
+    } = self
+    else {
       return Ok(None);
     };
     let artifact = artifacts
       .get(*next)
-      .ok_or_else(|| Error::from_reason("Missing prepared regex artifact"))?;
+      .ok_or_else(|| Error::from_reason(PREPARED_ERROR_MISSING_ARTIFACT))?;
     if artifact.fingerprint != fingerprint {
-      return Err(Error::from_reason("Prepared regex artifact mismatch"));
+      return Err(Error::from_reason(PREPARED_ERROR_ARTIFACT_MISMATCH));
     }
     *next += 1;
     match &artifact.kind {
@@ -1571,7 +1609,9 @@ fn can_skip_individual_fast_probe(
   needs_slow: bool,
   core: &str,
 ) -> bool {
-  !needs_slow && prepared.is_load() && meta_regex_can_parse(core)
+  !needs_slow
+    && prepared.uses_optimistic_fast_probe()
+    && meta_regex_can_parse(core)
 }
 
 fn build_prepared_multi(
@@ -1878,7 +1918,33 @@ impl RegexSet {
     options: Options,
     bytes: &[u8],
   ) -> Result<Self> {
-    let mut prepared = PreparedMode::decode(bytes)?;
+    // Avoid per-pattern probes unless artifact alignment proves the route drifted.
+    match Self::with_prepared_probe(
+      patterns.clone(),
+      options,
+      bytes,
+      FastProbeMode::OptimisticLoad,
+    ) {
+      Ok(set) => Ok(set),
+      Err(error) if error.is_prepared_artifact_alignment_error() => {
+        Self::with_prepared_probe(
+          patterns,
+          options,
+          bytes,
+          FastProbeMode::Verified,
+        )
+      }
+      Err(error) => Err(error),
+    }
+  }
+
+  fn with_prepared_probe(
+    patterns: Vec<String>,
+    options: Options,
+    bytes: &[u8],
+    fast_probe: FastProbeMode,
+  ) -> Result<Self> {
+    let mut prepared = PreparedMode::decode_with_fast_probe(bytes, fast_probe)?;
     let set = Self::build(patterns, options, &mut prepared)?;
     _ = prepared.finish()?;
     Ok(set)
@@ -2884,9 +2950,15 @@ mod tests {
     let capture = PreparedMode::Capture {
       artifacts: Vec::new(),
     };
-    let load = PreparedMode::Load {
+    let optimistic_load = PreparedMode::Load {
       artifacts: Vec::new(),
       next: 0,
+      fast_probe: FastProbeMode::OptimisticLoad,
+    };
+    let verified_load = PreparedMode::Load {
+      artifacts: Vec::new(),
+      next: 0,
+      fast_probe: FastProbeMode::Verified,
     };
 
     assert!(!can_skip_individual_fast_probe(
@@ -2895,8 +2967,21 @@ mod tests {
       pattern
     ));
     assert!(!can_skip_individual_fast_probe(&capture, false, pattern));
-    assert!(can_skip_individual_fast_probe(&load, false, pattern));
-    assert!(!can_skip_individual_fast_probe(&load, true, pattern));
+    assert!(can_skip_individual_fast_probe(
+      &optimistic_load,
+      false,
+      pattern
+    ));
+    assert!(!can_skip_individual_fast_probe(
+      &optimistic_load,
+      true,
+      pattern
+    ));
+    assert!(!can_skip_individual_fast_probe(
+      &verified_load,
+      false,
+      pattern
+    ));
   }
 
   #[test]
