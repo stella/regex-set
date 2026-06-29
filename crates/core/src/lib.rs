@@ -1513,6 +1513,10 @@ enum PreparedMode {
 }
 
 impl PreparedMode {
+  const fn is_load(&self) -> bool {
+    matches!(self, Self::Load { .. })
+  }
+
   fn decode(bytes: &[u8]) -> Result<Self> {
     let artifacts = decode_prepared_artifacts(bytes)?;
     Ok(Self::Load { artifacts, next: 0 })
@@ -1560,6 +1564,14 @@ impl PreparedMode {
       artifacts.push(artifact);
     }
   }
+}
+
+fn can_skip_individual_fast_probe(
+  prepared: &PreparedMode,
+  needs_slow: bool,
+  core: &str,
+) -> bool {
+  !needs_slow && prepared.is_load() && meta_regex_can_parse(core)
 }
 
 fn build_prepared_multi(
@@ -1938,7 +1950,7 @@ impl RegexSet {
         || eb.trailing_big_b
         || internal_b;
 
-      if !needs_slow && meta_regex_can_parse(&core) {
+      if can_skip_individual_fast_probe(prepared, needs_slow, &core) {
         fast_cores.push(dfa_core);
         fast_info.push(PatternInfo {
           original_index: usize_to_u32("Pattern index", i)?,
@@ -1950,6 +1962,20 @@ impl RegexSet {
           fancy_fallback: None,
         });
       } else if let Ok(individual) = MetaRegex::new(&core) {
+        if !needs_slow {
+          fast_cores.push(dfa_core);
+          fast_info.push(PatternInfo {
+            original_index: usize_to_u32("Pattern index", i)?,
+            verifier,
+            boundaries: eb,
+            individual: None,
+            has_internal_b: false,
+            // Fast path patterns never query individual or fallback state.
+            fancy_fallback: None,
+          });
+          continue;
+        }
+
         // Build fancy-regex fallback for patterns
         // with verifiers. When the DFA finds a greedy
         // match that the verifier rejects, fancy-regex
@@ -2774,6 +2800,27 @@ mod tests {
       result.is_err(),
       "meta artifacts must not declare payload bytes"
     );
+  }
+
+  #[test]
+  fn prepared_load_only_skips_individual_fast_probe() {
+    let pattern = "TOKEN\\d+";
+    let capture = PreparedMode::Capture {
+      artifacts: Vec::new(),
+    };
+    let load = PreparedMode::Load {
+      artifacts: Vec::new(),
+      next: 0,
+    };
+
+    assert!(!can_skip_individual_fast_probe(
+      &PreparedMode::None,
+      false,
+      pattern
+    ));
+    assert!(!can_skip_individual_fast_probe(&capture, false, pattern));
+    assert!(can_skip_individual_fast_probe(&load, false, pattern));
+    assert!(!can_skip_individual_fast_probe(&load, true, pattern));
   }
 
   #[test]
