@@ -2610,6 +2610,13 @@ pub fn uax29_boundaries(haystack: &[u8]) -> Result<Vec<u32>> {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use proptest::test_runner::{
+    Config as ProptestConfig, TestCaseError, TestRunner,
+  };
+
+  fn test_case_error(error: &Error) -> TestCaseError {
+    TestCaseError::fail(error.to_string())
+  }
 
   #[test]
   fn split_large_alternation_skips_negative_lookaround_groups() {
@@ -2661,6 +2668,75 @@ mod tests {
     let pattern = r"foo(?=\s|[.,;!?)]|$)bar";
 
     assert_eq!(strip_fallback_candidate_str(pattern), "foobar");
+  }
+
+  #[test]
+  fn prepared_regex_set_matches_unprepared_for_generated_literals() -> Result<()>
+  {
+    let strategy = (
+      proptest::string::string_regex("[abc]{1,8}")
+        .map_err(|error| Error::from_reason(error.to_string()))?,
+      proptest::string::string_regex("[xyz]{1,8}")
+        .map_err(|error| Error::from_reason(error.to_string()))?,
+      proptest::string::string_regex("[abcxyz0-9 -]{0,120}")
+        .map_err(|error| Error::from_reason(error.to_string()))?,
+    );
+    let mut runner = TestRunner::new(ProptestConfig::with_cases(64));
+    runner
+      .run(&strategy, |(first, second, haystack)| {
+        let patterns = vec![
+          regex::escape(&first),
+          regex::escape(&second),
+          String::from(r"\d{1,3}"),
+        ];
+        let options = Options::default();
+        let replacements = vec![
+          String::from("[A]"),
+          String::from("[B]"),
+          String::from("[N]"),
+        ];
+        let artifact = RegexSet::prepare(patterns.clone(), options)
+          .map_err(|error| test_case_error(&error))?;
+        let baseline = RegexSet::new(patterns.clone(), options)
+          .map_err(|error| test_case_error(&error))?;
+        let prepared = RegexSet::with_prepared(patterns, options, &artifact)
+          .map_err(|error| test_case_error(&error))?;
+
+        proptest::prop_assert_eq!(
+          baseline
+            .find_iter_packed(&haystack)
+            .map_err(|error| test_case_error(&error))?,
+          prepared
+            .find_iter_packed(&haystack)
+            .map_err(|error| test_case_error(&error))?
+        );
+        proptest::prop_assert_eq!(
+          baseline
+            .find_iter_packed_bytes(&haystack)
+            .map_err(|error| test_case_error(&error))?,
+          prepared
+            .find_iter_packed_bytes(&haystack)
+            .map_err(|error| test_case_error(&error))?
+        );
+        proptest::prop_assert_eq!(
+          baseline.which_match(&haystack),
+          prepared.which_match(&haystack)
+        );
+        proptest::prop_assert_eq!(
+          baseline.is_match(&haystack),
+          prepared.is_match(&haystack)
+        );
+        proptest::prop_assert_eq!(
+          baseline
+            .replace_all(&haystack, &replacements)
+            .map_err(|error| test_case_error(&error))?,
+          prepared
+            .replace_all(&haystack, &replacements)
+            .map_err(|error| test_case_error(&error))?
+        );
+        Ok(())
+      })
+      .map_err(|error| Error::from_reason(error.to_string()))
   }
 
   #[test]
