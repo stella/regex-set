@@ -21,5 +21,8 @@ regex-automata = { version = "0.4", features = [
 regex-syntax = "0.8"
 unicode-segmentation = "1"
 
+[dev-dependencies]
+proptest = "1"
+
 [lints]
 workspace = true
