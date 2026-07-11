@@ -3481,7 +3481,7 @@
           "name": "LongYinan (https://github.com/Brooooooklyn)"
         }
       ],
-      "bom-ref": "pkg:npm/@napi-rs/wasm-runtime@1.1.5",
+      "bom-ref": "pkg:npm/@napi-rs/wasm-runtime@1.1.6",
       "description": "Runtime and polyfill for wasm targets",
       "evidence": {
         "identity": [
@@ -3533,10 +3533,10 @@
           "value": "node_modules/@napi-rs/wasm-runtime/package.json"
         }
       ],
-      "purl": "pkg:npm/%40napi-rs/wasm-runtime@1.1.5",
+      "purl": "pkg:npm/%40napi-rs/wasm-runtime@1.1.6",
       "scope": "required",
       "type": "library",
-      "version": "1.1.5"
+      "version": "1.1.6"
     },
     {
       "authors": [
