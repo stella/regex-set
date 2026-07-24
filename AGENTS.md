@@ -193,3 +193,9 @@ oxlint (ultracite preset) + oxfmt. To suppress a rule:
 - Use the Bun version declared by `packageManager` in `package.json`.
 - Install repository and fixture dependencies with `bun install --frozen-lockfile`.
 - Do not use npm, yarn, or pnpm for repository dependency installation. Global npm tool installation is allowed.
+
+### Releases
+
+- Every pull request that changes published runtime code must add a Changesets entry; use `bun run changeset --empty` for an intentional no-release change.
+- Changesets owns `CHANGELOG.md` and the version PR. The version command synchronizes `VERSION`, every npm package, Cargo manifests and lock metadata, and the generated native loader guard.
+- Keep `.github/workflows/release.yml` as the trusted-publishing caller. Do not add another changelog generator or publish from the Changesets workflow.
