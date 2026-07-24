@@ -201,12 +201,11 @@ function asciiBoundaries(src: string): string {
       const next = src.charAt(i + 1);
       if (!inClass && (next === "b" || next === "B")) {
         result += `(?-u:\\${next})`;
-        i += 2;
       } else {
         // escaped char (including \\) -- emit as-is
         result += src.charAt(i) + src.charAt(i + 1);
-        i += 2;
       }
+      i += 2;
     } else {
       if (src.charAt(i) === "[") inClass = true;
       if (src.charAt(i) === "]") inClass = false;
