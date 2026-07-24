@@ -187,3 +187,9 @@ oxlint (ultracite preset) + oxfmt. To suppress a rule:
 - Preserve backtracking-immune behavior and Unicode word-boundary semantics.
 - Keep native, WASM, Bun, and Node runtime behavior aligned.
 - Add focused tests for match spans, captures, fallback behavior, and pattern-set ordering whenever those semantics change.
+
+### CI Package Manager
+
+- Use the Bun version declared by `packageManager` in `package.json`.
+- Install repository and fixture dependencies with `bun install --frozen-lockfile`.
+- Do not use npm, yarn, or pnpm for repository dependency installation. Global npm tool installation is allowed.

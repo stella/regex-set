@@ -1,6 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 
 import { RegexSet } from "../src/index.ts";
 
@@ -17,47 +16,38 @@ const fixtureNames = [
   ],
 ];
 
-const candidatePackageDirs = [
-  process.env.ANONYMIZE_PACKAGE_DIR,
-  resolve(
-    process.cwd(),
-    ".perf/anonymize/packages/anonymize",
-  ),
-  resolve(process.cwd(), "../anonymize/packages/anonymize"),
-  resolve(
-    process.cwd(),
-    "../anonymize-ts/packages/anonymize",
-  ),
-].filter((value) => value !== undefined);
-
-const packageDir = candidatePackageDirs.find((candidate) =>
-  existsSync(join(candidate, "src/detectors/regex.ts")),
+const PREPARED_CONFIG_PATH = join(
+  "crates",
+  "anonymize-core",
+  "tests",
+  "fixtures",
+  "assemble",
+  "baseline-all-on.expected.json",
 );
 
-if (!packageDir) {
+const candidateAnonymizeDirs = [
+  process.env.ANONYMIZE_REPOSITORY_DIR,
+  resolve(process.cwd(), ".perf/anonymize"),
+  resolve(process.cwd(), "../anonymize"),
+].filter((value) => value !== undefined);
+
+const anonymizeDir = candidateAnonymizeDirs.find(
+  (candidate) =>
+    existsSync(join(candidate, PREPARED_CONFIG_PATH)),
+);
+
+if (!anonymizeDir) {
   throw new Error(
-    "Set ANONYMIZE_PACKAGE_DIR to an anonymize packages/anonymize checkout",
+    "Set ANONYMIZE_REPOSITORY_DIR to an anonymize repository checkout",
   );
 }
 
-const importFromAnonymize = (relativePath) =>
-  import(
-    pathToFileURL(join(packageDir, relativePath)).href
-  );
-
-const { DEFAULT_ENTITY_LABELS } = await importFromAnonymize(
-  "src/constants.ts",
+const preparedConfig = JSON.parse(
+  readFileSync(
+    join(anonymizeDir, PREPARED_CONFIG_PATH),
+    "utf8",
+  ),
 );
-const {
-  REGEX_PATTERNS,
-  REGEX_META,
-  CURRENCY_PATTERN_META,
-  DATE_PATTERN_META,
-  SIGNING_CLAUSE_META,
-  getCurrencyPatterns,
-  getDatePatterns,
-  getSigningClausePatterns,
-} = await importFromAnonymize("src/detectors/regex.ts");
 
 const maxFindMs = Number(
   process.env.REGEX_SET_CONTRACT_MAX_FIND_MS ??
@@ -86,42 +76,34 @@ const countAlternations = (pattern) => {
   return count;
 };
 
-const allowedLabels = new Set(DEFAULT_ENTITY_LABELS);
-const allPatterns = [];
-const allMeta = [];
+const candidates = [];
+for (const [
+  index,
+  entry,
+] of preparedConfig.regex_patterns.entries()) {
+  if (entry.kind !== "regex") continue;
 
-for (const [index, pattern] of REGEX_PATTERNS.entries()) {
-  const meta = REGEX_META[index];
-  if (!meta || !allowedLabels.has(meta.label)) continue;
-  allPatterns.push(pattern);
-  allMeta.push(meta);
-}
+  const alternations = countAlternations(entry.pattern);
+  if (alternations < 64) continue;
 
-for (const pattern of await getCurrencyPatterns()) {
-  allPatterns.push(pattern);
-  allMeta.push(CURRENCY_PATTERN_META);
-}
-for (const pattern of await getDatePatterns()) {
-  allPatterns.push(pattern);
-  allMeta.push(DATE_PATTERN_META);
-}
-for (const pattern of await getSigningClausePatterns()) {
-  allPatterns.push(pattern);
-  allMeta.push(SIGNING_CLAUSE_META);
-}
-
-const candidates = allPatterns
-  .map((pattern, index) => ({
+  candidates.push({
     index,
-    pattern,
-    meta: allMeta[index],
-    alternations: countAlternations(pattern),
-  }))
-  .filter((candidate) => candidate.alternations >= 64);
+    pattern: entry.pattern,
+    meta: preparedConfig.regex_meta[index],
+    alternations,
+  });
+}
+
+if (candidates.length === 0) {
+  throw new Error(
+    "The anonymize assembly oracle contains no large regex candidates",
+  );
+}
 
 console.log(
   JSON.stringify({
     event: "candidates",
+    sourcePatterns: preparedConfig.regex_patterns.length,
     count: candidates.length,
     candidates: candidates.map((candidate) => ({
       index: candidate.index,
@@ -135,7 +117,9 @@ console.log(
 for (const [fixtureName, relativePath] of fixtureNames) {
   const text = readFileSync(
     join(
-      packageDir,
+      anonymizeDir,
+      "packages",
+      "anonymize",
       "src/__test__/fixtures/contracts",
       relativePath,
     ),
