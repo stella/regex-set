@@ -24,10 +24,10 @@ fn resolve_options(options: Option<Options>) -> core::Options {
     whole_words: None,
     unicode_boundaries: None,
   });
-  core::Options {
-    whole_words: opts.whole_words.unwrap_or(false),
-    unicode_boundaries: opts.unicode_boundaries.unwrap_or(true),
-  }
+  core::Options::builder()
+    .whole_words(opts.whole_words.unwrap_or(false))
+    .unicode_boundaries(opts.unicode_boundaries.unwrap_or(true))
+    .build()
 }
 
 #[napi]

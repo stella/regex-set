@@ -23,6 +23,7 @@ bun run lint        # oxlint
 bun run format      # oxfmt + rustfmt
 cargo clippy --all-targets --all-features -- -Dwarnings
 cargo fmt -- --check
+bun run rust:hawk   # Rust visibility lints
 ```
 
 ## Pull requests

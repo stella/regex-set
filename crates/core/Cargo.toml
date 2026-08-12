@@ -14,6 +14,7 @@ keywords = ["regex", "search", "text"]
 categories = ["text-processing"]
 
 [dependencies]
+bon = "3.9.3"
 fancy-regex = "0.19"
 regex = "1"
 regex-automata = { version = "0.4", features = [

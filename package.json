@@ -52,6 +52,7 @@
     "test:runtime:node": "node scripts/runtime-smoke.mjs",
     "version:sync": "node scripts/version-sync.mjs sync",
     "version:check": "node scripts/version-sync.mjs check",
+    "rust:hawk": "cargo +1.97.1 hawk check --target-dir target/hawk -D warnings -A hawk::dead_public -A hawk::unnecessary_public",
     "changeset": "changeset",
     "changeset:version": "changeset version && node scripts/version-sync.mjs sync",
     "release:prepare": "node scripts/prepare-release-package.mjs",
