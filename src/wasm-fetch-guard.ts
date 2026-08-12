@@ -1,5 +1,5 @@
 const FETCH_NEEDLE =
-  "await fetch(__wasmUrl).then((res) => res.arrayBuffer())";
+  "const __wasmFile = await __wasmResponse.arrayBuffer()";
 
 function buildMissingNeedleWarning(id: string): string {
   return (
@@ -10,18 +10,21 @@ function buildMissingNeedleWarning(id: string): string {
 }
 
 function buildReplacement(packageName: string): string {
-  return `await fetch(__wasmUrl).then(async (res) => {
-  const bytes = await res.arrayBuffer()
-  const view = new Uint8Array(bytes)
-  if (view.length < 4 || view[0] !== 0x00 || view[1] !== 0x61 || view[2] !== 0x73 || view[3] !== 0x6d) {
-    throw new Error(
-      ${JSON.stringify(
-        `${packageName} failed to load its .wasm binary. The response did not contain WebAssembly bytes, which commonly happens when a bundler (Vite, webpack dev server, etc.) rewrites import.meta.url during pre-bundling.\n\nIf you are using Vite, import the bundled plugin:\n  import stllWasm from "${packageName}/vite"\n  // ...\n  plugins: [stllWasm()]`,
-      )}
-    )
-  }
-  return bytes
-})`;
+  return `${FETCH_NEEDLE}
+const __wasmView = new Uint8Array(__wasmFile)
+if (
+  __wasmView.length < 4 ||
+  __wasmView[0] !== 0x00 ||
+  __wasmView[1] !== 0x61 ||
+  __wasmView[2] !== 0x73 ||
+  __wasmView[3] !== 0x6d
+) {
+  throw new Error(
+    ${JSON.stringify(
+      `${packageName} failed to load its .wasm binary. The response did not contain WebAssembly bytes, which commonly happens when a bundler (Vite, webpack dev server, etc.) rewrites import.meta.url during pre-bundling.\n\nIf you are using Vite, import the bundled plugin:\n  import stllWasm from "${packageName}/vite"\n  // ...\n  plugins: [stllWasm()]`,
+    )}
+  )
+}`;
 }
 
 export function injectWasmFetchGuard(

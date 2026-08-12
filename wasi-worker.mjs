@@ -10,6 +10,8 @@ const {
   instantiateNapiModuleSync,
   MessageHandler,
   getDefaultContext,
+  emnapiAsyncWorkPlugin,
+  emnapiTSFNPlugin,
 } = require("@napi-rs/wasm-runtime");
 
 if (parentPort) {
@@ -23,9 +25,7 @@ Object.assign(globalThis, {
   require,
   Worker,
   importScripts: function (f) {
-    (0, eval)(
-      fs.readFileSync(f, "utf8") + "//# sourceURL=" + f,
-    );
+    ;(0, eval)(fs.readFileSync(f, "utf8") + "//# sourceURL=" + f);
   },
   postMessage: function (msg) {
     if (parentPort) {
@@ -41,7 +41,7 @@ const __rootDir = parse(process.cwd()).root;
 const handler = new MessageHandler({
   onLoad({ wasmModule, wasmMemory }) {
     const wasi = new WASI({
-      version: "preview1",
+      version: 'preview1',
       env: process.env,
       preopens: {
         [__rootDir]: __rootDir,
@@ -52,12 +52,17 @@ const handler = new MessageHandler({
       childThread: true,
       wasi,
       context: emnapiContext,
+      // The wasm links a "basic" emnapi archive (no C async-work /
+      // threadsafe-function implementations), so every thread that
+      // instantiates it must provide the JavaScript implementations
+      // through the emnapi plugins.
+      plugins: [emnapiAsyncWorkPlugin, emnapiTSFNPlugin],
       overwriteImports(importObject) {
         importObject.env = {
           ...importObject.env,
           ...importObject.napi,
           ...importObject.emnapi,
-          memory: wasmMemory,
+          memory: wasmMemory
         };
       },
     });

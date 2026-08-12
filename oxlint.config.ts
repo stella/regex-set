@@ -5,7 +5,7 @@ export default library({
     "*.node",
     "npm/",
     "index.cjs",
-    "index.d.ts",
+    "index.d.cts",
     "*.wasi.cjs",
     "*.wasi-browser.js",
     "browser.js",
