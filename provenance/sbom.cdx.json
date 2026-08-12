@@ -2259,7 +2259,7 @@
       "version": "0.4.0"
     },
     {
-      "bom-ref": "pkg:cargo/regex-automata@0.4.14",
+      "bom-ref": "pkg:cargo/regex-automata@0.4.15",
       "evidence": {
         "identity": [
           {
@@ -2280,7 +2280,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "6e1dd4122fc1595e8162618945476892eefca7b88c52820e74af6262213cae8f"
+          "content": "1f388202e4b80542a0921078cc23b6333bcf1409c1e3f86404cae4766a6131db"
         }
       ],
       "licenses": [
@@ -2302,9 +2302,9 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/regex-automata@0.4.14",
+      "purl": "pkg:cargo/regex-automata@0.4.15",
       "type": "library",
-      "version": "0.4.14"
+      "version": "0.4.15"
     },
     {
       "bom-ref": "pkg:cargo/regex-syntax@0.8.11",
@@ -3657,7 +3657,7 @@
     {
       "dependsOn": [
         "pkg:cargo/bit-set@0.8.0",
-        "pkg:cargo/regex-automata@0.4.14",
+        "pkg:cargo/regex-automata@0.4.15",
         "pkg:cargo/regex-syntax@0.8.11"
       ],
       "ref": "pkg:cargo/fancy-regex@0.18.0"
@@ -3901,7 +3901,7 @@
       "dependsOn": [
         "pkg:cargo/aho-corasick@1.1.4",
         "pkg:cargo/memchr@2.8.2",
-        "pkg:cargo/regex-automata@0.4.14",
+        "pkg:cargo/regex-automata@0.4.15",
         "pkg:cargo/regex-syntax@0.8.11"
       ],
       "ref": "pkg:cargo/regex@1.12.4"
@@ -3912,7 +3912,7 @@
         "pkg:cargo/memchr@2.8.2",
         "pkg:cargo/regex-syntax@0.8.11"
       ],
-      "ref": "pkg:cargo/regex-automata@0.4.14"
+      "ref": "pkg:cargo/regex-automata@0.4.15"
     },
     {
       "dependsOn": [],
@@ -3992,7 +3992,7 @@
       "dependsOn": [
         "pkg:cargo/fancy-regex@0.18.0",
         "pkg:cargo/proptest@1.11.0",
-        "pkg:cargo/regex-automata@0.4.14",
+        "pkg:cargo/regex-automata@0.4.15",
         "pkg:cargo/regex-syntax@0.8.11",
         "pkg:cargo/regex@1.12.4",
         "pkg:cargo/unicode-segmentation@1.13.3"
