@@ -2679,6 +2679,21 @@ mod tests {
     Config as ProptestConfig, TestCaseError, TestRunner,
   };
 
+  #[test]
+  fn options_builder_preserves_defaults_and_overrides() {
+    assert_eq!(Options::builder().build(), Options::default());
+    assert_eq!(
+      Options::builder()
+        .whole_words(true)
+        .unicode_boundaries(false)
+        .build(),
+      Options {
+        whole_words: true,
+        unicode_boundaries: false,
+      }
+    );
+  }
+
   fn test_case_error(error: &Error) -> TestCaseError {
     TestCaseError::fail(error.to_string())
   }
