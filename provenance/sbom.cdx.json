@@ -1362,7 +1362,7 @@
       "version": "2.3.2"
     },
     {
-      "bom-ref": "pkg:cargo/napi-derive-backend@5.0.5",
+      "bom-ref": "pkg:cargo/napi-derive-backend@5.1.1",
       "evidence": {
         "identity": [
           {
@@ -1383,7 +1383,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "81b4b08f15eed7a2a20c3f4c6314013fc3ac890a3afa9892b594485299ebdb2d"
+          "content": "ddd961eb2aa8965e3f29722d754f3a86907eb1984e2fbcbe3fe87b9a02d6bfba"
         }
       ],
       "licenses": [
@@ -1400,12 +1400,12 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/napi-derive-backend@5.0.5",
+      "purl": "pkg:cargo/napi-derive-backend@5.1.1",
       "type": "library",
-      "version": "5.0.5"
+      "version": "5.1.1"
     },
     {
-      "bom-ref": "pkg:cargo/napi-derive@3.5.7",
+      "bom-ref": "pkg:cargo/napi-derive@3.5.9",
       "evidence": {
         "identity": [
           {
@@ -1426,7 +1426,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "61d66f70256ad5aef58659966064471d0ad90e2897bc36a5a5e0389c85aabc1e"
+          "content": "d4ba572deef53e2c386759a8c2014175a62679d74ff83adc205c8bc0e0285727"
         }
       ],
       "licenses": [
@@ -1443,9 +1443,9 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/napi-derive@3.5.7",
+      "purl": "pkg:cargo/napi-derive@3.5.9",
       "type": "library",
-      "version": "3.5.7"
+      "version": "3.5.9"
     },
     {
       "bom-ref": "pkg:cargo/napi-sys@3.2.2",
@@ -3788,12 +3788,12 @@
       "dependsOn": [
         "pkg:cargo/convert_case@0.11.0",
         "pkg:cargo/ctor@1.0.7",
-        "pkg:cargo/napi-derive-backend@5.0.5",
+        "pkg:cargo/napi-derive-backend@5.1.1",
         "pkg:cargo/proc-macro2@1.0.106",
         "pkg:cargo/quote@1.0.46",
         "pkg:cargo/syn@2.0.118"
       ],
-      "ref": "pkg:cargo/napi-derive@3.5.7"
+      "ref": "pkg:cargo/napi-derive@3.5.9"
     },
     {
       "dependsOn": [
@@ -3803,7 +3803,7 @@
         "pkg:cargo/semver@1.0.28",
         "pkg:cargo/syn@2.0.118"
       ],
-      "ref": "pkg:cargo/napi-derive-backend@5.0.5"
+      "ref": "pkg:cargo/napi-derive-backend@5.1.1"
     },
     {
       "dependsOn": [
@@ -3982,7 +3982,7 @@
     {
       "dependsOn": [
         "pkg:cargo/napi-build@2.3.2",
-        "pkg:cargo/napi-derive@3.5.7",
+        "pkg:cargo/napi-derive@3.5.9",
         "pkg:cargo/napi@3.9.4",
         "pkg:cargo/stella-regex-set-core@1.0.5"
       ],
