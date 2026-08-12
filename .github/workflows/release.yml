@@ -292,13 +292,13 @@ jobs:
           --output release-artifacts/attest-sbom.cdx.json
           .
       - name: Attest root package tarball with SBOM
-        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d
         with:
           subject-path: ${{ steps.pack.outputs.root_tarball }}
           sbom-path: release-artifacts/attest-sbom.cdx.json
       - name: Attest auxiliary package tarballs
         if: steps.pack.outputs.aux_tarballs != ''
-        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d
         with:
           subject-path: ${{ steps.pack.outputs.aux_tarballs }}
       - name: Stage provenance release assets
