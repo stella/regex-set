@@ -326,6 +326,7 @@ jobs:
           || (needs.verify.result == 'success'
               && needs.test.result == 'success'))
     runs-on: ubuntu-latest
+    environment: crates-io
     permissions:
       contents: read
       id-token: write
