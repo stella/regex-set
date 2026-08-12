@@ -2,10 +2,14 @@
 name = "stella-regex-set-core"
 version = "1.0.5"
 edition = "2024"
+rust-version = "1.87"
 description = "Multi-pattern regex search core"
 license = "MIT"
-publish = false
+publish = ["crates-io"]
 repository = "https://github.com/stella/regex-set"
+homepage = "https://github.com/stella/regex-set"
+documentation = "https://docs.rs/stella-regex-set-core"
+readme = "README.md"
 keywords = ["regex", "search", "text"]
 categories = ["text-processing"]
 
