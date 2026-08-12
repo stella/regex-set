@@ -4115,6 +4115,10 @@
             {
               "type": "vcs",
               "url": "https://github.com/stella/regex-set"
+            },
+            {
+              "type": "vcs",
+              "url": "https://github.com/stella/regex-set"
             }
           ],
           "group": "",
