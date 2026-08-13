@@ -21,7 +21,12 @@ export default defineConfig([
     clean: true,
     sourcemap: true,
     hash: false,
-    deps: { neverBundle: [/^@napi-rs\/wasm-runtime$/] },
+    deps: {
+      neverBundle: [
+        /^@emnapi\/runtime$/,
+        /^@napi-rs\/wasm-runtime$/,
+      ],
+    },
     copy: [
       {
         from: "regex-set.wasm32-wasi.wasm",

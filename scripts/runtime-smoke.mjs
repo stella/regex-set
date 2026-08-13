@@ -1,4 +1,14 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import {
+  copyFile,
+  mkdtemp,
+  readdir,
+  rm,
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { RegexSet } from "../dist/index.mjs";
 
@@ -41,5 +51,68 @@ assert.equal(
   replaced,
   "Born [DATE], phone [PHONE], ID [ID], [COMPANY]",
 );
+
+const repositoryRoot = fileURLToPath(
+  new URL("../", import.meta.url),
+);
+const isolatedRoot = await mkdtemp(
+  path.join(tmpdir(), "regex-set-loader-"),
+);
+
+function runLoaderProbe({ env, expectedError }) {
+  const loaderPath = path.join(isolatedRoot, "index.cjs");
+  const probe = spawnSync(
+    process.execPath,
+    [
+      "-e",
+      "try { const binding = require(process.argv[1]); if (typeof binding.RegexSet !== 'function') process.exit(2) } catch (error) { console.error(error instanceof Error ? error.message : String(error)); process.exit(1) }",
+      loaderPath,
+    ],
+    {
+      encoding: "utf8",
+      env: { ...process.env, ...env },
+    },
+  );
+  if (expectedError) {
+    assert.notEqual(probe.status, 0);
+    assert.match(probe.stderr, expectedError);
+    return;
+  }
+  assert.equal(probe.status, 0, probe.stderr);
+}
+
+try {
+  await copyFile(
+    path.join(repositoryRoot, "index.cjs"),
+    path.join(isolatedRoot, "index.cjs"),
+  );
+  for (const fileName of await readdir(repositoryRoot)) {
+    if (fileName.endsWith(".node")) {
+      await copyFile(
+        path.join(repositoryRoot, fileName),
+        path.join(isolatedRoot, fileName),
+      );
+    }
+  }
+
+  runLoaderProbe({ env: { NAPI_RS_FORCE_WASI: "false" } });
+  runLoaderProbe({ env: { NAPI_RS_FORCE_WASI: "true" } });
+  runLoaderProbe({
+    env: { NAPI_RS_FORCE_WASI: "error" },
+    expectedError:
+      /WASI binding not found and NAPI_RS_FORCE_WASI is set to error/,
+  });
+  runLoaderProbe({
+    env: { NAPI_RS_WASI_FLAVOR: "unsupported" },
+    expectedError: /Unsupported WASI flavor "unsupported"/,
+  });
+  runLoaderProbe({
+    env: { NAPI_RS_WASI_FLAVOR: "wasm32-wasi" },
+    expectedError:
+      /WASI binding for flavor "wasm32-wasi" not found/,
+  });
+} finally {
+  await rm(isolatedRoot, { force: true, recursive: true });
+}
 
 console.log("runtime smoke ok");

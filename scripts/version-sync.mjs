@@ -327,6 +327,23 @@ function mismatches(expectedVersion) {
         `${cargoTomlPath}: version=${cargoVersionMatch?.[1] ?? "<missing>"}`,
       );
     }
+    if (
+      cargoTomlPath === meta.cargoTomlPath &&
+      !/^publish = false$/m.test(cargoToml)
+    ) {
+      results.push(
+        `${cargoTomlPath}: root N-API crate must remain private`,
+      );
+    }
+    if (
+      cargoTomlPath ===
+        repoPath("crates", "core", "Cargo.toml") &&
+      !/^publish = \["crates-io"\]$/m.test(cargoToml)
+    ) {
+      results.push(
+        `${cargoTomlPath}: core crate must publish only to crates.io`,
+      );
+    }
     for (const cargoName of cargoNames) {
       const dependencyVersion = cargoToml.match(
         new RegExp(
@@ -342,6 +359,17 @@ function mismatches(expectedVersion) {
           `${cargoTomlPath}: dependencies.${cargoName}.version=${dependencyVersion[1]}`,
         );
       }
+    }
+  }
+
+  for (const requiredCoreFile of ["LICENSE", "README.md"]) {
+    const requiredPath = repoPath(
+      "crates",
+      "core",
+      requiredCoreFile,
+    );
+    if (!fileExists(requiredPath)) {
+      results.push(`${requiredPath}: required for publication`);
     }
   }
 

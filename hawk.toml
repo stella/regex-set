@@ -1,0 +1,13 @@
+# Hawk cannot observe npm, Node.js, Bun, or WebAssembly consumers of these
+# libraries. The rust:hawk script preserves public APIs and audits restricted
+# visibility.
+
+[[production]]
+package = "stella-regex-set"
+lib = "stella_regex_set"
+reason = "NAPI library; audit restricted visibility without changing its public API"
+
+[[production]]
+package = "stella-regex-set-core"
+lib = "stella_regex_set_core"
+reason = "downstream-facing library; audit restricted visibility without changing its public API"

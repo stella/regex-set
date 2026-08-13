@@ -155,18 +155,17 @@ fn prev_char_pos(haystack: &str, pos: usize) -> usize {
 }
 
 /// Options for constructing a `RegexSet`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(bon::Builder, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Options {
+  #[builder(default)]
   pub whole_words: bool,
+  #[builder(default = true)]
   pub unicode_boundaries: bool,
 }
 
 impl Default for Options {
   fn default() -> Self {
-    Self {
-      whole_words: false,
-      unicode_boundaries: true,
-    }
+    Self::builder().build()
   }
 }
 
@@ -2679,6 +2678,21 @@ mod tests {
   use proptest::test_runner::{
     Config as ProptestConfig, TestCaseError, TestRunner,
   };
+
+  #[test]
+  fn options_builder_preserves_defaults_and_overrides() {
+    assert_eq!(Options::builder().build(), Options::default());
+    assert_eq!(
+      Options::builder()
+        .whole_words(true)
+        .unicode_boundaries(false)
+        .build(),
+      Options {
+        whole_words: true,
+        unicode_boundaries: false,
+      }
+    );
+  }
 
   fn test_case_error(error: &Error) -> TestCaseError {
     TestCaseError::fail(error.to_string())
