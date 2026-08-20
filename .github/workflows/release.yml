@@ -3,7 +3,7 @@ name: Release
 env:
   NODE_VERSION: "22"
   # Pinned: bun's `latest` channel autoupdate has bitten release CI.
-  BUN_VERSION: "1.3.14"
+  BUN_VERSION: "1.4.0"
   CDXGEN_VERSION: "12.1.5"
   CARGO_INCREMENTAL: 0
 
