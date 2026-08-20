@@ -1,6 +1,6 @@
 [package]
 name = "stella-regex-set-core"
-version = "1.0.5"
+version = "1.0.6"
 edition = "2024"
 rust-version = "1.87"
 description = "Multi-pattern regex search core"

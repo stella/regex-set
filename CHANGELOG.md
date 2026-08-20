@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.6
+
+### Patch Changes
+
+- [#141](https://github.com/stella/regex-set/pull/141) [`0fce2fb`](https://github.com/stella/regex-set/commit/0fce2fb7596dc81bd9d21b8e28f3c6c860c84484) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Update dependencies and Rust quality tooling.
+
 ## 1.0.5
 
 ### Features

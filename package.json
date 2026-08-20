@@ -1,6 +1,6 @@
 {
   "name": "@stll/regex-set",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Single-pass multi-pattern regex for Node.js/Bun. Backtracking-immune, Unicode-aware Rust engine via NAPI-RS.",
   "keywords": [
     "multi-pattern",

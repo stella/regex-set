@@ -4,7 +4,7 @@ resolver = "3"
 
 [package]
 name = "stella-regex-set"
-version = "1.0.5"
+version = "1.0.6"
 edition = "2024"
 description = "Multi-pattern regex search"
 license = "MIT"
@@ -23,7 +23,7 @@ napi = { version = "3", default-features = false, features = [
   "serde-json",
 ] }
 napi-derive = "3"
-stella-regex-set-core = { version = "1.0.5", path = "crates/core" }
+stella-regex-set-core = { version = "1.0.6", path = "crates/core" }
 
 [build-dependencies]
 napi-build = "2"
