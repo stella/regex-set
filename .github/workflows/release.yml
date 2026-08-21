@@ -120,15 +120,20 @@ jobs:
         settings:
           - target: x86_64-apple-darwin
             os: macos-15
+            node_artifact: regex-set.darwin-x64.node
           - target: aarch64-apple-darwin
             os: macos-15
+            node_artifact: regex-set.darwin-arm64.node
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
+            node_artifact: regex-set.linux-x64-gnu.node
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
             use-cross: true
+            node_artifact: regex-set.linux-arm64-gnu.node
           - target: x86_64-pc-windows-msvc
             os: windows-latest
+            node_artifact: regex-set.win32-x64-msvc.node
           - target: wasm32-wasip1-threads
             os: ubuntu-latest
     steps:
@@ -160,12 +165,19 @@ jobs:
       - name: Build WASM
         if: matrix.settings.target == 'wasm32-wasip1-threads'
         run: bun run build:wasm
-      - name: Upload bindings
+      - name: Upload native binding
+        if: matrix.settings.target != 'wasm32-wasip1-threads'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bindings-${{ matrix.settings.target }}
+          path: ${{ matrix.settings.node_artifact }}
+          if-no-files-found: error
+      - name: Upload WASM bindings
+        if: matrix.settings.target == 'wasm32-wasip1-threads'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: bindings-${{ matrix.settings.target }}
           path: |
-            *.node
             *.wasm
             !*.debug.wasm
             *.cjs
