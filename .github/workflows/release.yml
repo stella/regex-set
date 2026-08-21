@@ -198,12 +198,7 @@ jobs:
           set -euo pipefail
           ls -R artifacts/
           for dir in artifacts/bindings-*; do
-            cp -- "$dir"/*.node . 2>/dev/null || true
-            cp -- "$dir"/*.wasm . 2>/dev/null || true
-            cp -- "$dir"/*.cjs . 2>/dev/null || true
-            cp -- "$dir"/*.d.cts . 2>/dev/null || true
-            cp -- "$dir"/*.js . 2>/dev/null || true
-            cp -- "$dir"/wasi-worker*.mjs . 2>/dev/null || true
+            cp -- "$dir"/* .
           done
           ls -la -- *.node 2>/dev/null || echo "No .node files"
           ls -la -- *.wasm 2>/dev/null || echo "No .wasm files"
@@ -239,12 +234,7 @@ jobs:
           set -euo pipefail
           ls -R artifacts/
           for dir in artifacts/bindings-*; do
-            cp -- "$dir"/*.node . 2>/dev/null || true
-            cp -- "$dir"/*.wasm . 2>/dev/null || true
-            cp -- "$dir"/*.cjs . 2>/dev/null || true
-            cp -- "$dir"/*.d.cts . 2>/dev/null || true
-            cp -- "$dir"/*.js . 2>/dev/null || true
-            cp -- "$dir"/wasi-worker*.mjs . 2>/dev/null || true
+            cp -- "$dir"/* .
           done
       - run: bun run build:js
       - run: node scripts/prepare-release-package.mjs
