@@ -1,4 +1,4 @@
-// napi-rs-artifact-metadata:{"version":2,"rootEntry":"index.js","exports":["RegexSet","_prepareRegexSet","_uax29Boundaries"],"managedRootEntries":["browser.js","index.js","regex-set.wasm","regex-set.debug.wasm"]}
+// napi-rs-artifact-metadata:{"version":2,"rootEntry":"index.cjs","exports":["RegexSet","_prepareRegexSet","_uax29Boundaries"],"managedRootEntries":["browser.js","index.cjs","regex-set.wasm","regex-set.debug.wasm"]}
 /* eslint-disable */
 /* prettier-ignore */
 

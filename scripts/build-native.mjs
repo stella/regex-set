@@ -1,12 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { constants } from "node:fs";
-import {
-  access,
-  readFile,
-  rename,
-  rm,
-  writeFile,
-} from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const cliPath = new URL(
@@ -19,6 +12,8 @@ const result = spawnSync(
   [
     fileURLToPath(cliPath),
     "build",
+    "--js",
+    "index.cjs",
     ...process.argv.slice(2),
   ],
   {
@@ -37,7 +32,10 @@ async function normalizeGeneratedFile(
   fileName,
   { disableTypecheck = false } = {},
 ) {
-  const fileUrl = new URL(`../${fileName}`, import.meta.url);
+  const fileUrl = new URL(
+    `../${fileName}`,
+    import.meta.url,
+  );
   try {
     let content = await readFile(fileUrl, "utf8");
     if (
@@ -57,21 +55,8 @@ async function normalizeGeneratedFile(
   }
 }
 
-await normalizeGeneratedFile(
-  "regex-set.wasi-browser.js",
-  { disableTypecheck: true },
-);
+await normalizeGeneratedFile("regex-set.wasi-browser.js", {
+  disableTypecheck: true,
+});
 await normalizeGeneratedFile("wasi-worker-browser.mjs");
 await normalizeGeneratedFile("wasi-worker.mjs");
-
-const source = new URL("../index.js", import.meta.url);
-const target = new URL("../index.cjs", import.meta.url);
-
-try {
-  await access(source, constants.F_OK);
-} catch {
-  process.exit(0);
-}
-
-await rm(target, { force: true });
-await rename(source, target);
