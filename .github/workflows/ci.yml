@@ -35,7 +35,7 @@ jobs:
       provenance-changed: ${{ steps.filter.outputs.provenance }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         id: filter
         with:
           filters: |
@@ -127,7 +127,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: stella/.github/.github/actions/changeset-policy@b8c0884053fb8d4fb6ba157692189e0f1aae1785 # v1.6.0
+      - uses: stella/.github/.github/actions/changeset-policy@5628b97fb3c560c0d961baa60c272c598eddcab5 # v1.7.0
         with:
           release-paths: |
             src/**
@@ -157,7 +157,7 @@ jobs:
   napi-ci:
     if: ${{ always() && !cancelled() && needs.check-changes.result == 'success' && (needs.trust-check.result == 'success' || needs.trust-check.result == 'skipped') }}
     needs: [check-changes, trust-check]
-    uses: stella/.github/.github/workflows/rust-napi-ci.yml@90c81b47c5fee6dc88e67d432cc6951e88a6724e
+    uses: stella/.github/.github/workflows/rust-napi-ci.yml@48aacae31829ce15216a6b766b03a92fd2e84da3
     with:
       node-version: "22"
       trusted: ${{ (github.event_name != 'pull_request' || needs.trust-check.outputs.trusted == 'true') && 'true' || 'false' }}
