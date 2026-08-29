@@ -88,6 +88,8 @@ jobs:
               - '.github/workflows/ci.yml'
       - name: Enforce Bun workflow installs
         run: node scripts/check-workflow-package-manager.mjs
+      - name: Enforce release privilege boundary
+        run: node scripts/check-release-privilege-boundary.mjs
 
   trust-check:
     if: github.event_name == 'pull_request'
