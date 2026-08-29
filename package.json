@@ -45,7 +45,7 @@
     "artifacts": "napi artifacts",
     "universal": "napi universal",
     "prepublishOnly": "napi prepublish -t npm && tsdown && node scripts/fix-napi-loader.mjs",
-    "test": "bun run check:release-artifacts && bun test __test__/index.spec.ts",
+    "test": "bun run check:release-artifacts && bun test __test__/index.spec.ts scripts/release-workflow.test.mjs",
     "test:props": "bun test __test__/properties.spec.ts",
     "perf:contracts": "bun scripts/contract-fixture-perf.mjs",
     "test:runtime:bun": "bun scripts/runtime-smoke.mjs",
