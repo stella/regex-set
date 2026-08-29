@@ -1,113 +1,235 @@
+import { YAML } from "bun";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
-const workflow = await readFile(
-  new URL(
-    "../.github/workflows/release.yml",
-    import.meta.url,
-  ),
-  "utf8",
-);
-const jobsIndex = workflow.indexOf("\njobs:\n");
-assert.notEqual(
-  jobsIndex,
-  -1,
-  "release workflow has no jobs",
-);
-const workflowPermissions = workflow.slice(0, jobsIndex);
-assert.match(
-  workflowPermissions,
-  /^permissions:\n  contents: read$/m,
-);
-assert.doesNotMatch(
-  workflowPermissions,
-  /id-token:\s*write|write-all/,
-);
-assert.doesNotMatch(
-  workflow,
-  /^\s*permissions:\s*write-all\s*$/m,
-);
+const JOB_ID = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 
-const jobBodies = new Map();
-let currentJob;
-for (const line of workflow
-  .slice(jobsIndex + 7)
-  .split("\n")) {
-  const jobStart = line.match(/^  ([a-z][a-z0-9-]+):$/);
-  if (jobStart) {
-    currentJob = jobStart[1];
-    jobBodies.set(currentJob, []);
-    continue;
-  }
-  if (currentJob) jobBodies.get(currentJob).push(line);
-}
+const isRecord = (value) =>
+  typeof value === "object" &&
+  value !== null &&
+  !Array.isArray(value);
 
-const body = (job) => {
-  const lines = jobBodies.get(job);
+const stepRunFingerprint = ({ name, run }) => ({
+  name,
+  sha256: createHash("sha256").update(run).digest("hex"),
+});
+
+export const parseJobBodies = (workflow) => {
+  const parsedWorkflow = YAML.parse(workflow);
   assert(
-    lines,
-    `release workflow is missing the ${job} job`,
+    isRecord(parsedWorkflow),
+    "release workflow is not a mapping",
   );
-  return lines.join("\n");
+  assert(
+    isRecord(parsedWorkflow.jobs),
+    "release workflow has no jobs",
+  );
+
+  const jobBodies = new Map(
+    Object.entries(parsedWorkflow.jobs),
+  );
+  assert(
+    jobBodies.size > 0,
+    "release workflow has no jobs",
+  );
+  for (const [job, definition] of jobBodies) {
+    assert.match(
+      job,
+      JOB_ID,
+      `release workflow has invalid job ID ${job}`,
+    );
+    assert(
+      isRecord(definition),
+      `${job} job is not a mapping`,
+    );
+  }
+
+  return { jobBodies, parsedWorkflow };
 };
 
-const oidcJobs = [...jobBodies]
-  .filter(([, lines]) =>
-    lines.some((line) => /id-token:\s*write/.test(line)),
-  )
-  .map(([job]) => job)
-  .sort((left, right) => left.localeCompare(right));
-assert.deepEqual(oidcJobs, ["attest", "core", "finalize"]);
+export const parseStepRuns = (job) => {
+  const steps = job.steps ?? [];
+  assert(
+    Array.isArray(steps),
+    "job steps are not a sequence",
+  );
+  const runs = [];
+  for (const step of steps) {
+    assert(
+      isRecord(step),
+      "workflow step is not a mapping",
+    );
+    if (step.run === undefined) continue;
+    assert.equal(
+      typeof step.run,
+      "string",
+      "step run is not a string",
+    );
+    assert(
+      step.name === undefined ||
+        typeof step.name === "string",
+      "step name is not a string",
+    );
+    runs.push({ name: step.name, run: step.run });
+  }
+  return runs;
+};
 
-const uses = (job) =>
-  [...body(job).matchAll(/^\s+(?:- )?uses: (\S+)/gm)].map(
-    ([, action]) => action,
-  );
-assert.deepEqual(uses("attest"), [
-  "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
-  "actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6",
-  "actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6",
-]);
-assert.deepEqual(uses("core"), [
-  "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
-  "dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8",
-  "rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18",
-]);
+export const checkReleasePrivilegeBoundary = (workflow) => {
+  const { jobBodies, parsedWorkflow } =
+    parseJobBodies(workflow);
+  assert.deepEqual(parsedWorkflow.permissions, {
+    contents: "read",
+  });
 
-for (const job of ["attest", "core"]) {
-  assert.doesNotMatch(body(job), /uses:\s+\.\//);
-  assert.doesNotMatch(
-    body(job),
-    /\b(?:bun|npm|pnpm|yarn)\s+(?:ci|exec|install|pack|run|x)\b|\bnpx\s+\S/,
-    `${job} may not execute package-manager, runtime, or local dependency code`,
+  const body = (job) => {
+    const definition = jobBodies.get(job);
+    assert(
+      definition,
+      `release workflow is missing the ${job} job`,
+    );
+    return definition;
+  };
+
+  const oidcJobs = [...jobBodies]
+    .filter(([, job]) => {
+      const permissions =
+        job.permissions ?? parsedWorkflow.permissions;
+      return (
+        permissions === "write-all" ||
+        (isRecord(permissions) &&
+          permissions["id-token"] === "write")
+      );
+    })
+    .map(([job]) => job)
+    .sort((left, right) => left.localeCompare(right));
+  assert.deepEqual(
+    oidcJobs,
+    ["attest", "core", "finalize"],
+    "release OIDC job allowlist changed",
   );
-  assert.doesNotMatch(
-    body(job),
-    /^\s+(?:run:\s+)?(?:node|deno|python3?)\s/gm,
-    `${job} may not execute a language runtime`,
+
+  const uses = (job) => {
+    const definition = body(job);
+    const references = [];
+    if (definition.uses !== undefined) {
+      assert.equal(typeof definition.uses, "string");
+      references.push(definition.uses);
+    }
+    const steps = definition.steps ?? [];
+    assert(
+      Array.isArray(steps),
+      `${job} steps are not a sequence`,
+    );
+    for (const step of steps) {
+      assert(
+        isRecord(step),
+        `${job} step is not a mapping`,
+      );
+      if (step.uses === undefined) continue;
+      assert.equal(typeof step.uses, "string");
+      references.push(step.uses);
+    }
+    return references;
+  };
+  assert.deepEqual(
+    uses("attest"),
+    [
+      "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+      "actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6",
+      "actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6",
+    ],
+    "attest action allowlist changed",
   );
+  assert.deepEqual(
+    uses("core"),
+    [
+      "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8",
+      "rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18",
+    ],
+    "core action allowlist changed",
+  );
+  assert.deepEqual(
+    uses("finalize"),
+    [
+      "stella/.github/.github/workflows/npm-version-finalize.yml@1ce0079bbdbf93a4c1917d2857496b89aedcec14",
+    ],
+    "finalize action allowlist changed",
+  );
+
+  // Hash parsed YAML scalars so every privileged shell change requires review.
+  const privilegedRunAllowlist = {
+    attest: [
+      {
+        name: "Resolve package tarballs",
+        sha256:
+          "a7159352fc80edabd0065cefb7936d9f297bc671fd02fa3cce2a3cf0974b9189",
+      },
+    ],
+    core: [
+      {
+        name: "Check exact crates.io version",
+        sha256:
+          "5fafc87d126f09a4457d132552c58820559499783e5f6e9a6b64f89a1c6515e4",
+      },
+      {
+        name: "Publish Rust core",
+        sha256:
+          "0982dfc7cc6fd9a316058022caefd77f910e49e7fa51789f49b3a7432e2dedd4",
+      },
+      {
+        name: "Verify exact crates.io release",
+        sha256:
+          "53dd7404c526efb3633177eb0351feca650d9ec8bcaf445bfa235c4b95721947",
+      },
+    ],
+    finalize: [],
+  };
+  for (const job of oidcJobs) {
+    const fingerprints = parseStepRuns(body(job)).map(
+      stepRunFingerprint,
+    );
+    assert.deepEqual(
+      fingerprints,
+      privilegedRunAllowlist[job],
+      `${job} privileged run-step allowlist changed`,
+    );
+  }
+
+  assert(
+    parseStepRuns(body("core-package")).some(({ run }) =>
+      run.includes("cargo publish --dry-run"),
+    ),
+    "core package dry run is missing",
+  );
+  assert(
+    parseStepRuns(body("core")).some(({ run }) =>
+      /cargo publish .*--no-verify/.test(run),
+    ),
+    "core publish command must skip the privileged verification build",
+  );
+  assert.deepEqual(body("finalize").secrets, {
+    RELEASE_APP_ID: "${{ secrets.CHANGELOG_APP_ID }}",
+    RELEASE_APP_PRIVATE_KEY:
+      "${{ secrets.CHANGELOG_APP_PRIVATE_KEY }}",
+  });
+};
+
+const isMain =
+  process.argv[1] !== undefined &&
+  pathToFileURL(resolve(process.argv[1])).href ===
+    import.meta.url;
+if (isMain) {
+  const workflow = await readFile(
+    new URL(
+      "../.github/workflows/release.yml",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  checkReleasePrivilegeBoundary(workflow);
 }
-const cargoCommands = body("core").match(
-  /^\s+run: cargo .*$/gm,
-);
-assert.deepEqual(cargoCommands, [
-  "        run: cargo publish --package stella-regex-set-core --locked --no-verify",
-]);
-
-assert.match(
-  body("core-package"),
-  /cargo publish --dry-run/,
-);
-assert.match(body("core"), /cargo publish .*--no-verify/);
-assert.match(
-  body("finalize"),
-  /npm-version-finalize\.yml@1ce0079bbdbf93a4c1917d2857496b89aedcec14/,
-);
-assert.doesNotMatch(body("finalize"), /secrets:\s*inherit/);
-const finalizerSecrets = body("finalize")
-  .split("\n")
-  .filter((line) => /^      [A-Z_]+:/.test(line));
-assert.deepEqual(finalizerSecrets, [
-  "      RELEASE_APP_ID: ${{ secrets.CHANGELOG_APP_ID }}",
-  "      RELEASE_APP_PRIVATE_KEY: ${{ secrets.CHANGELOG_APP_PRIVATE_KEY }}",
-]);

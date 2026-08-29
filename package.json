@@ -46,6 +46,7 @@
     "universal": "napi universal",
     "prepublishOnly": "napi prepublish -t npm && tsdown && node scripts/fix-napi-loader.mjs",
     "test": "bun run check:release-artifacts && bun test __test__/index.spec.ts",
+    "test:release-privilege": "bun test scripts/check-release-privilege-boundary.test.mjs",
     "test:props": "bun test __test__/properties.spec.ts",
     "perf:contracts": "bun scripts/contract-fixture-perf.mjs",
     "test:runtime:bun": "bun scripts/runtime-smoke.mjs",
