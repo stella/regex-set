@@ -94,7 +94,7 @@ jobs:
       - name: Enforce release privilege boundary
         run: |
           bun scripts/check-release-privilege-boundary.mjs
-          bun run test:release-privilege
+          bun test scripts/check-release-privilege-boundary.test.mjs
 
   trust-check:
     if: github.event_name == 'pull_request'
