@@ -219,6 +219,42 @@ jobs:
     }
   });
 
+  test("rejects inherited workflow execution controls", () => {
+    for (const mutation of [
+      workflow.replace(
+        "\npermissions:\n",
+        "\ndefaults:\n  run:\n    shell: bash -c 'echo malicious; {0}'\n\npermissions:\n",
+      ),
+      workflow.replace(
+        "env:\n  NODE_VERSION:",
+        "env:\n  PRELOAD_COMMAND: malicious\n  NODE_VERSION:",
+      ),
+    ]) {
+      expect(mutation).not.toBe(workflow);
+      expect(() =>
+        checkReleasePrivilegeBoundary(mutation),
+      ).toThrow("release workflow scope changed");
+    }
+  });
+
+  test("rejects secret access outside the exact finalizer mapping", () => {
+    for (const mutation of [
+      workflow.replace(
+        "  pack:\n    name: Pack",
+        "  pack:\n    env:\n      RELEASE_TOKEN: ${{ secrets.NPM_TOKEN }}\n    name: Pack",
+      ),
+      workflow.replace(
+        "  preflight:\n    name: Preflight",
+        "  preflight:\n    name: Preflight\n    secrets: inherit",
+      ),
+    ]) {
+      expect(mutation).not.toBe(workflow);
+      expect(() =>
+        checkReleasePrivilegeBoundary(mutation),
+      ).toThrow("release secret allowlist changed");
+    }
+  });
+
   test("accepts the reviewed workflow as a fixed point", () => {
     checkReleasePrivilegeBoundary(workflow);
     expect(

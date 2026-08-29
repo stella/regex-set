@@ -22,6 +22,39 @@ const fingerprint = (value) =>
     .update(JSON.stringify(value))
     .digest("hex");
 
+const secretReferences = (
+  value,
+  path = "",
+  insideSecrets = false,
+) => {
+  if (typeof value === "string") {
+    if (
+      insideSecrets ||
+      /\bsecrets(?:\.|\[|\s*(?:\}\}|\)))/.test(value)
+    ) {
+      return [`${path}=${value}`];
+    }
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((entry, index) =>
+      secretReferences(
+        entry,
+        `${path}[${index}]`,
+        insideSecrets,
+      ),
+    );
+  }
+  if (!isRecord(value)) return [];
+  return Object.entries(value).flatMap(([key, entry]) =>
+    secretReferences(
+      entry,
+      path === "" ? key : `${path}.${key}`,
+      insideSecrets || key === "secrets",
+    ),
+  );
+};
+
 const effectiveWriteGrants = ({
   jobBodies,
   workflowPermissions,
@@ -110,6 +143,24 @@ export const checkReleasePrivilegeBoundary = (workflow) => {
   assert.deepEqual(parsedWorkflow.permissions, {
     contents: "read",
   });
+  const workflowScope = Object.fromEntries(
+    Object.entries(parsedWorkflow).filter(
+      ([key]) => key !== "jobs",
+    ),
+  );
+  assert.equal(
+    fingerprint(workflowScope),
+    "ed48301ba410bbcd4a4f211ce6c7a4d90aebec8242391cc522830441ab28d5a9",
+    "release workflow scope changed",
+  );
+  assert.deepEqual(
+    secretReferences(parsedWorkflow),
+    [
+      "jobs.finalize.secrets.RELEASE_APP_ID=${{ secrets.CHANGELOG_APP_ID }}",
+      "jobs.finalize.secrets.RELEASE_APP_PRIVATE_KEY=${{ secrets.CHANGELOG_APP_PRIVATE_KEY }}",
+    ],
+    "release secret allowlist changed",
+  );
 
   const body = (job) => {
     const definition = jobBodies.get(job);
