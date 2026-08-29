@@ -248,6 +248,10 @@ jobs:
         "  pack:\n    env:\n      RELEASE_TOKEN: ${{ secrets [ 'NPM_TOKEN' ] }}\n    name: Pack",
       ),
       workflow.replace(
+        "  pack:\n    name: Pack",
+        "  pack:\n    env:\n      RELEASE_TOKEN: ${{ SECRETS.NPM_TOKEN }}\n    name: Pack",
+      ),
+      workflow.replace(
         "  preflight:\n    name: Preflight",
         "  preflight:\n    name: Preflight\n    secrets: inherit",
       ),

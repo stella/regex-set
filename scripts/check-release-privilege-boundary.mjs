@@ -28,7 +28,7 @@ const secretReferences = (
   insideSecrets = false,
 ) => {
   if (typeof value === "string") {
-    if (insideSecrets || /\bsecrets\b/.test(value)) {
+    if (insideSecrets || /\bsecrets\b/i.test(value)) {
       return [`${path}=${value}`];
     }
     return [];
