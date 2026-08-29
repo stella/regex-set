@@ -72,7 +72,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "22"
+          node-version: "22.21.1"
       - run: node scripts/version-sync.mjs check
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
@@ -141,7 +141,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "22"
+          node-version: "22.21.1"
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
           targets: ${{ matrix.settings.target }}
@@ -232,7 +232,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "22"
+          node-version: "22.21.1"
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: "1.4.0"
@@ -326,11 +326,15 @@ jobs:
         with:
           name: release-artifacts
           path: release-artifacts
-      - name: Attest npm package tarballs with SBOM
+      - name: Attest root npm package with SBOM
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
         with:
-          subject-path: release-artifacts/*.tgz
+          subject-path: release-artifacts/stll-regex-set-[0-9]*.tgz
           sbom-path: release-artifacts/attest-sbom.cdx.json
+      - name: Attest auxiliary npm packages
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-path: release-artifacts/stll-regex-set-[a-z]*.tgz
 
   core-verify:
     name: Verify Rust core package
@@ -349,7 +353,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "22"
+          node-version: "22.21.1"
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - run: node scripts/version-sync.mjs check
       - name: Verify publishable core package
@@ -367,7 +371,7 @@ jobs:
                 && needs.test.result == 'success'))
         && (github.event_name == 'push'
             || inputs.publish_to_npm))
-    uses: stella/.github/.github/workflows/crates-io-publish.yml@eabb8b7de6cc69e1bbd3468ee80ddaf99cbddc33
+    uses: stella/.github/.github/workflows/crates-io-publish.yml@06d3be1f42585ac33635102120f917bb74f9ecab
     with:
       crate-name: stella-regex-set-core
       manifest-path: crates/core/Cargo.toml
@@ -385,7 +389,7 @@ jobs:
         && needs.core.result == 'success'
         && (github.event_name == 'push'
             || inputs.publish_to_npm))
-    uses: stella/.github/.github/workflows/npm-version-finalize.yml@eabb8b7de6cc69e1bbd3468ee80ddaf99cbddc33
+    uses: stella/.github/.github/workflows/npm-version-finalize.yml@06d3be1f42585ac33635102120f917bb74f9ecab
     with:
       package-files: |
         package.json
