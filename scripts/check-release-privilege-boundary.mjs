@@ -37,7 +37,7 @@ const oidcJobs = [...jobBodies]
     lines.some((line) => /id-token:\s*write/.test(line)),
   )
   .map(([job]) => job)
-  .sort();
+  .sort((left, right) => left.localeCompare(right));
 assert.deepEqual(oidcJobs, ["attest", "core", "finalize"]);
 
 const executableDependencyCode = [
