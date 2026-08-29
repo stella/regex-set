@@ -113,15 +113,26 @@ jobs:
       expect(mutation).not.toBe(workflow);
       expect(() =>
         checkReleasePrivilegeBoundary(mutation),
-      ).toThrow("core privileged step allowlist changed");
+      ).toThrow(
+        /core privileged (run-)?step allowlist changed/,
+      );
     }
   });
 
   test("rejects execution controls on privileged run steps", () => {
     const publishStep = `      - name: Publish Rust core
         if: steps.crate-status.outputs.already-released != 'true'
-        run: cargo publish --package stella-regex-set-core --locked --no-verify
+        working-directory: \${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$CARGO_HOME"
+          cargo publish \\
+            --manifest-path "$GITHUB_WORKSPACE/crates/core/Cargo.toml" \\
+            --locked \\
+            --no-verify
         env:
+          # Keep repository-controlled Cargo configuration outside the credential path.
+          CARGO_HOME: \${{ runner.temp }}/release-cargo-home
           CARGO_REGISTRY_TOKEN: \${{ steps.crates-io-auth.outputs.token }}`;
     for (const mutationStep of [
       publishStep.replace(
@@ -142,6 +153,30 @@ jobs:
       expect(() =>
         checkReleasePrivilegeBoundary(mutation),
       ).toThrow("core privileged step allowlist changed");
+    }
+  });
+
+  test("rejects repository-scoped Cargo configuration", () => {
+    for (const [search, replacement] of [
+      [
+        "        working-directory: ${{ runner.temp }}",
+        "        working-directory: .",
+      ],
+      [
+        "          CARGO_HOME: ${{ runner.temp }}/release-cargo-home",
+        "          CARGO_HOME: ${{ github.workspace }}/.cargo",
+      ],
+    ]) {
+      const mutation = replaceLast(
+        workflow,
+        search,
+        replacement,
+      );
+      expect(() =>
+        checkReleasePrivilegeBoundary(mutation),
+      ).toThrow(
+        /core privileged (run-)?step allowlist changed|isolate Cargo configuration/,
+      );
     }
   });
 

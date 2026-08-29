@@ -219,7 +219,7 @@ export const checkReleasePrivilegeBoundary = (workflow) => {
       {
         name: "Publish Rust core",
         sha256:
-          "0982dfc7cc6fd9a316058022caefd77f910e49e7fa51789f49b3a7432e2dedd4",
+          "e4aca45f118e2c90ecb3abf74a4b9223de1fbfe8fc3c72df119926c6b34f268a",
       },
       {
         name: "Verify exact crates.io release",
@@ -248,9 +248,23 @@ export const checkReleasePrivilegeBoundary = (workflow) => {
   );
   assert(
     parseStepRuns(body("core")).some(({ run }) =>
-      /cargo publish .*--no-verify/.test(run),
+      /cargo publish[\s\S]*--no-verify/.test(run),
     ),
     "core publish command must skip the privileged verification build",
+  );
+  const publishStep = body("core").steps.find(
+    (step) => step.name === "Publish Rust core",
+  );
+  assert.deepEqual(
+    {
+      cargoHome: publishStep?.env?.CARGO_HOME,
+      workingDirectory: publishStep?.["working-directory"],
+    },
+    {
+      cargoHome: "${{ runner.temp }}/release-cargo-home",
+      workingDirectory: "${{ runner.temp }}",
+    },
+    "core publish must isolate Cargo configuration from the checkout",
   );
   assert.deepEqual(body("finalize").secrets, {
     RELEASE_APP_ID: "${{ secrets.CHANGELOG_APP_ID }}",
@@ -261,7 +275,7 @@ export const checkReleasePrivilegeBoundary = (workflow) => {
   const privilegedJobFingerprints = {
     attest:
       "b2c6c78e653abb881a434696a3519444dd68ac036391104ebe137d5be1ff611f",
-    core: "7455e5a8986e94d0739db65b53b6305ac9058f37a30678ead5e29d050b25b481",
+    core: "29cb45984048cde62c5c7d20cfd7b4a871d13b31c4ac6f6d1e0b80b199def1ce",
     finalize:
       "a0adf533b4e837d9fcf1c357e26ce38b31a31de20af3cab667c8bcdd5da6f2bd",
   };
