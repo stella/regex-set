@@ -17,6 +17,32 @@ const stepRunFingerprint = ({ name, run }) => ({
   sha256: createHash("sha256").update(run).digest("hex"),
 });
 
+const fingerprint = (value) =>
+  createHash("sha256")
+    .update(JSON.stringify(value))
+    .digest("hex");
+
+const effectiveWriteGrants = ({
+  jobBodies,
+  workflowPermissions,
+}) =>
+  [...jobBodies]
+    .flatMap(([jobName, job]) => {
+      const permissions =
+        job.permissions ?? workflowPermissions;
+      if (permissions === "write-all") {
+        return [`${jobName}:write-all`];
+      }
+      assert(
+        isRecord(permissions),
+        `${jobName} permissions are not a mapping`,
+      );
+      return Object.entries(permissions)
+        .filter(([, access]) => access === "write")
+        .map(([permission]) => `${jobName}:${permission}`);
+    })
+    .sort((left, right) => left.localeCompare(right));
+
 export const parseJobBodies = (workflow) => {
   const parsedWorkflow = YAML.parse(workflow);
   assert(
@@ -110,6 +136,20 @@ export const checkReleasePrivilegeBoundary = (workflow) => {
     oidcJobs,
     ["attest", "core", "finalize"],
     "release OIDC job allowlist changed",
+  );
+  assert.deepEqual(
+    effectiveWriteGrants({
+      jobBodies,
+      workflowPermissions: parsedWorkflow.permissions,
+    }),
+    [
+      "attest:attestations",
+      "attest:id-token",
+      "core:id-token",
+      "finalize:contents",
+      "finalize:id-token",
+    ],
+    "release write-permission allowlist changed",
   );
 
   const uses = (job) => {
@@ -217,6 +257,21 @@ export const checkReleasePrivilegeBoundary = (workflow) => {
     RELEASE_APP_PRIVATE_KEY:
       "${{ secrets.CHANGELOG_APP_PRIVATE_KEY }}",
   });
+
+  const privilegedJobFingerprints = {
+    attest:
+      "b2c6c78e653abb881a434696a3519444dd68ac036391104ebe137d5be1ff611f",
+    core: "7455e5a8986e94d0739db65b53b6305ac9058f37a30678ead5e29d050b25b481",
+    finalize:
+      "a0adf533b4e837d9fcf1c357e26ce38b31a31de20af3cab667c8bcdd5da6f2bd",
+  };
+  for (const job of oidcJobs) {
+    assert.equal(
+      fingerprint(body(job)),
+      privilegedJobFingerprints[job],
+      `${job} privileged step allowlist changed`,
+    );
+  }
 };
 
 const isMain =

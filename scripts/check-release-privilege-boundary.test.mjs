@@ -14,6 +14,15 @@ const workflow = readFileSync(
   "utf8",
 );
 
+const replaceLast = (value, search, replacement) => {
+  const index = value.lastIndexOf(search);
+  expect(
+    index,
+    `missing mutation target: ${search}`,
+  ).not.toBe(-1);
+  return `${value.slice(0, index)}${replacement}${value.slice(index + search.length)}`;
+};
+
 describe("release privilege boundary", () => {
   test("recognizes the complete GitHub job identifier grammar", () => {
     const fixture = `
@@ -84,6 +93,93 @@ jobs:
         checkReleasePrivilegeBoundary(mutation),
       ).toThrow(
         "core privileged run-step allowlist changed",
+      );
+    }
+  });
+
+  test("rejects inputs on privileged action steps", () => {
+    const checkout = `      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false`;
+    for (const input of [
+      "repository: attacker/repository",
+      "ref: attacker-controlled-ref",
+    ]) {
+      const mutation = replaceLast(
+        workflow,
+        checkout,
+        `${checkout}\n          ${input}`,
+      );
+      expect(mutation).not.toBe(workflow);
+      expect(() =>
+        checkReleasePrivilegeBoundary(mutation),
+      ).toThrow("core privileged step allowlist changed");
+    }
+  });
+
+  test("rejects execution controls on privileged run steps", () => {
+    const publishStep = `      - name: Publish Rust core
+        if: steps.crate-status.outputs.already-released != 'true'
+        run: cargo publish --package stella-regex-set-core --locked --no-verify
+        env:
+          CARGO_REGISTRY_TOKEN: \${{ steps.crates-io-auth.outputs.token }}`;
+    for (const mutationStep of [
+      publishStep.replace(
+        "        run:",
+        "        shell: bash -c 'echo malicious; {0}'\n        run:",
+      ),
+      `${publishStep}\n          MALICIOUS_ENV: enabled`,
+      publishStep.replace(
+        "if: steps.crate-status.outputs.already-released != 'true'",
+        "if: always()",
+      ),
+    ]) {
+      const mutation = workflow.replace(
+        publishStep,
+        mutationStep,
+      );
+      expect(mutation).not.toBe(workflow);
+      expect(() =>
+        checkReleasePrivilegeBoundary(mutation),
+      ).toThrow("core privileged step allowlist changed");
+    }
+  });
+
+  test("rejects every unexpected write permission owner", () => {
+    for (const [permission, access] of [
+      ["contents", "write"],
+      ["packages", "write"],
+      ["actions", "write"],
+    ]) {
+      const mutation = workflow
+        .replace(
+          `  pack:
+    name: Pack`,
+          `  pack:
+    name: Pack`,
+        )
+        .replace(
+          `  pack:
+    name: Pack
+    needs: [preflight, verify, test]
+    if: needs.preflight.outputs.already-released != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read`,
+          `  pack:
+    name: Pack
+    needs: [preflight, verify, test]
+    if: needs.preflight.outputs.already-released != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      ${permission}: ${access}`,
+        );
+      expect(mutation).not.toBe(workflow);
+      expect(() =>
+        checkReleasePrivilegeBoundary(mutation),
+      ).toThrow(
+        "release write-permission allowlist changed",
       );
     }
   });
