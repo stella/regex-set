@@ -44,9 +44,9 @@ Project: root
 - libloading 0.9.0 — ISC
 - linux-raw-sys 0.12.1 — Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT
 - memchr 2.8.3 — MIT OR Unlicense
-- napi 3.12.7 — MIT
-- napi-build 2.4.4 — MIT
-- napi-derive 3.6.8 — MIT
+- napi 3.13.0 — MIT
+- napi-build 2.5.0 — MIT
+- napi-derive 3.6.9 — MIT
 - napi-derive-backend 6.1.4 — MIT
 - napi-sys 3.3.2 — MIT
 - nohash-hasher 0.2.0 — Apache-2.0 OR MIT
