@@ -18,7 +18,7 @@
     "rust"
   ],
   "homepage": "https://github.com/stella/regex-set#readme",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "engines": {
     "node": ">= 18"
   },
