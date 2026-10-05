@@ -7,6 +7,7 @@
   "main": "regex-set.wasi.cjs",
   "types": "regex-set.wasi.d.cts",
   "files": [
+    "NOTICE",
     "regex-set.wasm32-wasi.wasm",
     "regex-set.wasi.cjs",
     "regex-set.wasi.d.cts",
@@ -24,7 +25,7 @@
     "rust"
   ],
   "homepage": "https://github.com/stella/regex-set#readme",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "engines": {
     "node": ">= 18"
   },

@@ -6,6 +6,7 @@
   ],
   "main": "regex-set.linux-x64-gnu.node",
   "files": [
+    "NOTICE",
     "regex-set.linux-x64-gnu.node"
   ],
   "description": "Single-pass multi-pattern regex for Node.js/Bun. Backtracking-immune, Unicode-aware Rust engine via NAPI-RS.",
@@ -18,7 +19,7 @@
     "rust"
   ],
   "homepage": "https://github.com/stella/regex-set#readme",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "engines": {
     "node": ">= 18"
   },
