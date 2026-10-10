@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.7
+
+### Patch Changes
+
+- [#191](https://github.com/stella/regex-set/pull/191) [`60bcfb3`](https://github.com/stella/regex-set/commit/60bcfb3bd335673b7b9830e5567412d69efd91dc) Thanks [@jan-kubica](https://github.com/jan-kubica)! - License the packages under Apache-2.0 and update the published license metadata.
+
 ## 1.0.6
 
 ### Patch Changes
