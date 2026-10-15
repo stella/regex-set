@@ -40,7 +40,7 @@ jobs:
       github.event_name != 'workflow_dispatch'
       || inputs.publish_to_npm != true
       || github.ref == 'refs/heads/main'
-    uses: stella/.github/.github/workflows/npm-version-preflight.yml@636b7841096c8f0cc5a1572077b78768ef8fea42
+    uses: stella/.github/.github/workflows/npm-version-preflight.yml@5764ab66e4df84cfd2e642c7d7e4678261e668f8
     with:
       package-files: |
         package.json
@@ -381,7 +381,7 @@ jobs:
         && needs.core-verify.result == 'success'
         && (github.event_name == 'push'
             || inputs.publish_to_npm))
-    uses: stella/.github/.github/workflows/crates-io-publish.yml@636b7841096c8f0cc5a1572077b78768ef8fea42
+    uses: stella/.github/.github/workflows/crates-io-publish.yml@5764ab66e4df84cfd2e642c7d7e4678261e668f8
     with:
       crate-name: stella-regex-set-core
       manifest-path: crates/core/Cargo.toml
@@ -400,7 +400,7 @@ jobs:
         && needs.core-verify.result == 'success'
         && (github.event_name == 'push'
             || inputs.publish_to_npm))
-    uses: stella/.github/.github/workflows/crates-io-publish.yml@636b7841096c8f0cc5a1572077b78768ef8fea42
+    uses: stella/.github/.github/workflows/crates-io-publish.yml@5764ab66e4df84cfd2e642c7d7e4678261e668f8
     with:
       crate-name: stella-regex-set-core
       manifest-path: crates/core/Cargo.toml
@@ -418,7 +418,7 @@ jobs:
         && needs.core.result == 'success'
         && (github.event_name == 'push'
             || inputs.publish_to_npm))
-    uses: stella/.github/.github/workflows/npm-version-finalize.yml@636b7841096c8f0cc5a1572077b78768ef8fea42
+    uses: stella/.github/.github/workflows/npm-version-finalize.yml@5764ab66e4df84cfd2e642c7d7e4678261e668f8
     with:
       package-files: |
         package.json
