@@ -192,7 +192,7 @@ jobs:
     needs: [check-changes, trust-check]
     uses: stella/.github/.github/workflows/rust-napi-ci.yml@8f19eb7220047e5b06f6e75f0b9f908bfd01f5f6
     with:
-      node-version: "22"
+      node-version: "26.10.0"
       trusted: ${{ (github.event_name != 'pull_request' || needs.trust-check.outputs.trusted == 'true') && 'true' || 'false' }}
       rust-changed: ${{ needs.check-changes.outputs.rust-changed }}
       build-changed: ${{ needs.check-changes.outputs.build-changed }}
@@ -276,7 +276,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         if: needs.check-changes.outputs.build-changed == 'true'
         with:
-          node-version: "22"
+          node-version-file: .node-version
       - run: bun install --frozen-lockfile
         if: needs.check-changes.outputs.build-changed == 'true'
       - run: bun run build

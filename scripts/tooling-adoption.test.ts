@@ -60,6 +60,23 @@ describe("shared tooling adoption", () => {
     expect(checks).toContain("bun run check:typecheck-parity");
   });
 
+  test("runtime selectors share policy pins with one bounded Hawk exception", () => {
+    const declaration = JSON.parse(read("stll-toolchain.json"));
+    expect(declaration.rustExceptions).toHaveLength(1);
+    expect(declaration.rustExceptions.at(0)).toMatchObject({
+      pin: "1.97.1",
+      tracking: "https://github.com/stella/tooling/issues/99",
+      expires: "2026-11-11",
+    });
+    expect(read(".node-version").trim()).toBe("26.10.0");
+    const ci = read(".github/workflows/ci.yml");
+    expect(ci).toContain('node-version: "26.10.0"');
+    const release = read(".github/workflows/release.yml");
+    expect(release.match(/node-version-file: .node-version/g)).toHaveLength(4);
+    expect(release.match(/toolchain: "1.99.0"/g)).toHaveLength(3);
+    expect(release).not.toMatch(/node-version: "22/);
+  });
+
   test("shared detector skips prose and detects runtime changes or missing history", () => {
     const directory = mkdtempSync(join(tmpdir(), "regex-toolchain-"));
     const git = (...args: string[]) =>
