@@ -54,7 +54,7 @@ jobs:
         id: toolchain
         run: |
           bunx --no-install stll-toolchain-changed --since "$BASE_REF" > "$RUNNER_TEMP/toolchain-changes.json"
-          node --input-type=module -e 'import fs from "node:fs"; const result = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); if (typeof result.changed !== "boolean") throw new Error("Missing toolchain changed result"); fs.appendFileSync(process.env.GITHUB_OUTPUT, `changed=${result.changed}\n`);' "$RUNNER_TEMP/toolchain-changes.json"
+          node --input-type=module -e 'import fs from "node:fs"; const result = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); if (typeof result.changed !== "boolean") throw new Error("Missing toolchain changed result"); fs.appendFileSync(process.env.GITHUB_OUTPUT, "changed=" + result.changed + "\n");' "$RUNNER_TEMP/toolchain-changes.json"
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         id: filter
         with:
