@@ -26,22 +26,36 @@ concurrency:
 jobs:
   check-changes:
     runs-on: ubuntu-latest
+    env:
+      BASE_REF: ${{ (github.event_name == 'pull_request' && github.event.pull_request.base.sha) || (github.event_name == 'push' && github.event.before) || 'unavailable-toolchain-base' }}
     permissions:
       contents: read
       pull-requests: read
     outputs:
-      rust-changed: ${{ steps.filter.outputs.rust }}
-      build-changed: ${{ steps.filter.outputs.build }}
-      provenance-changed: ${{ steps.filter.outputs.provenance }}
+      rust-changed: ${{ (steps.filter.outputs.rust == 'true' || steps.toolchain.outputs.changed == 'true') && 'true' || 'false' }}
+      build-changed: ${{ (steps.filter.outputs.build == 'true' || steps.toolchain.outputs.changed == 'true') && 'true' || 'false' }}
+      provenance-changed: ${{ (steps.filter.outputs.provenance == 'true' || steps.toolchain.outputs.changed == 'true') && 'true' || 'false' }}
+      toolchain-changed: ${{ steps.toolchain.outputs.changed }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Detect toolchain changes
+        id: toolchain
+        run: |
+          bunx --no-install stll-toolchain-changed --since "$BASE_REF" > "$RUNNER_TEMP/toolchain-changes.json"
+          node --input-type=module -e 'import fs from "node:fs"; const result = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); if (typeof result.changed !== "boolean") throw new Error("Missing toolchain changed result"); fs.appendFileSync(process.env.GITHUB_OUTPUT, `changed=${result.changed}\n`);' "$RUNNER_TEMP/toolchain-changes.json"
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         id: filter
         with:
           filters: |
             rust:
               - 'package.json'
-              - '.github/workflows/**'
               - 'VERSION'
               - 'src/**'
               - 'crates/**'
@@ -51,11 +65,9 @@ jobs:
               - 'clippy.toml'
               - 'deny.toml'
               - 'hawk.toml'
-              - 'rust-toolchain.toml'
               - 'rustfmt.toml'
-              - '.github/workflows/ci.yml'
             build:
-              - '.github/workflows/**'
+              - '__test__/**'
               - 'VERSION'
               - 'src/**'
               - 'crates/**'
@@ -69,9 +81,7 @@ jobs:
               - 'scripts/**'
               - 'wasm/**'
               - 'npm/**'
-              - '.github/workflows/ci.yml'
             provenance:
-              - '.github/workflows/**'
               - 'VERSION'
               - 'bun.lock'
               - 'Cargo.lock'
@@ -85,7 +95,6 @@ jobs:
               - '*.mjs'
               - '.provenance.yml'
               - 'provenance/**'
-              - '.github/workflows/ci.yml'
       - name: Enforce Bun workflow installs
         run: node scripts/check-workflow-package-manager.mjs
   trust-check:
@@ -155,8 +164,6 @@ jobs:
 
   checks:
     name: Typecheck and parity
-    env:
-      BASE_REF: ${{ (github.event_name == 'pull_request' && github.event.pull_request.base.sha) || (github.event_name == 'push' && github.event.before) || 'unavailable-toolchain-base' }}
     if: >-
       always()
       && !cancelled()
@@ -178,13 +185,8 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run check:toolchain
       - run: bun run typecheck
-      - name: Detect toolchain changes
-        id: toolchain
-        run: |
-          bunx --no-install stll-toolchain-changed --since "$BASE_REF" > "$RUNNER_TEMP/toolchain-changes.json"
-          node --input-type=module -e 'import fs from "node:fs"; const result = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); if (typeof result.changed !== "boolean") throw new Error("Missing toolchain changed result"); fs.appendFileSync(process.env.GITHUB_OUTPUT, `changed=${result.changed}\n`);' "$RUNNER_TEMP/toolchain-changes.json"
       - run: bun run check:typecheck-parity
-        if: steps.toolchain.outputs.changed == 'true'
+        if: needs.check-changes.outputs.toolchain-changed == 'true'
       - run: bun test scripts/tooling-adoption.test.ts
 
   napi-ci:
