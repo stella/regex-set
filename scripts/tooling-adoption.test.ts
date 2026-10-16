@@ -9,10 +9,12 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import config from "../oxlint.config";
 
@@ -36,7 +38,9 @@ describe("shared tooling adoption", () => {
     expect(tsconfig.extends).toBe(
       "@stll/typescript-config/node.json",
     );
-    expect(tsconfig.compilerOptions).toBeUndefined();
+    expect(tsconfig.compilerOptions).toEqual({
+      allowImportingTsExtensions: true,
+    });
   });
 
   test("generated cloud setup is reproducible without changing the hook", () => {
@@ -129,7 +133,7 @@ describe("shared tooling adoption", () => {
 
   test("shared detector skips prose and detects runtime changes or missing history", () => {
     const directory = mkdtempSync(
-      join(tmpdir(), "regex-toolchain-"),
+      join(tmpdir(), "regex toolchain-ž-"),
     );
     const git = (...args: string[]) =>
       execFileSync("git", args, {
@@ -141,10 +145,14 @@ describe("shared tooling adoption", () => {
         execFileSync(
           "node",
           [
-            new URL(
-              "node_modules/@stll/oxlint-config/dist/toolchain-changed-cli.mjs",
-              root,
-            ).pathname,
+            fileURLToPath(
+              pathToFileURL(
+                join(
+                  directory,
+                  "node_modules/@stll/oxlint-config/dist/toolchain-changed-cli.mjs",
+                ),
+              ),
+            ),
             "--since",
             since,
           ],
@@ -152,6 +160,11 @@ describe("shared tooling adoption", () => {
         ),
       );
     try {
+      symlinkSync(
+        fileURLToPath(new URL("node_modules", root)),
+        join(directory, "node_modules"),
+        "dir",
+      );
       git("init", "--quiet");
       git("config", "user.email", "test@example.com");
       git("config", "user.name", "Test");
