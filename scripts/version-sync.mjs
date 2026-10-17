@@ -30,7 +30,7 @@ function writeText(filePath, content) {
 }
 
 /** @param {string} filePath */
-function readJson(filePath) {
+function readPackageManifest(filePath) {
   return parseReleaseManifest(readText(filePath));
 }
 
@@ -223,7 +223,9 @@ function replaceSbomVersionForPurl(
 }
 
 function packageMeta() {
-  const root = readJson(repoPath("package.json"));
+  const root = readPackageManifest(
+    repoPath("package.json"),
+  );
   const cargoTomlPath = repoPath("Cargo.toml");
   const cargoToml = readText(cargoTomlPath);
   const cargoNameMatch = cargoToml.match(
@@ -317,7 +319,7 @@ function platformPackageManifests() {
       );
       return {
         manifestPath,
-        manifest: readJson(manifestPath),
+        manifest: readPackageManifest(manifestPath),
       };
     })
     .sort((left, right) =>
@@ -359,7 +361,7 @@ function mismatches(expectedVersion) {
     );
   }
 
-  const wasm = readJson(meta.wasmManifestPath);
+  const wasm = readPackageManifest(meta.wasmManifestPath);
   if (wasm.version !== expectedVersion) {
     results.push(
       `${meta.wasmManifestPath}: version=${wasm.version}`,
@@ -534,8 +536,10 @@ function mismatches(expectedVersion) {
     }
 
     const sbomVersionDrift = [];
+    /** @type {unknown} */
+    const sbom = JSON.parse(provenanceSbom);
     collectSbomVersionDrift(
-      JSON.parse(provenanceSbom),
+      sbom,
       expectedPurls,
       expectedVersion,
       sbomVersionDrift,
@@ -578,7 +582,9 @@ function syncVersion(nextVersion) {
   }
   writeJson(meta.packageJsonPath, meta.root);
 
-  const wasmManifest = readJson(meta.wasmManifestPath);
+  const wasmManifest = readPackageManifest(
+    meta.wasmManifestPath,
+  );
   wasmManifest.version = nextVersion;
   writeJson(meta.wasmManifestPath, wasmManifest);
 

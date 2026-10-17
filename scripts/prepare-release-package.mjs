@@ -17,7 +17,7 @@ function readText(filePath) {
   return fs.readFileSync(filePath, "utf8");
 }
 
-function readJson(filePath) {
+function readPackageManifest(filePath) {
   return parseReleaseManifest(readText(filePath));
 }
 
@@ -54,7 +54,7 @@ function platformPackages() {
       );
       return {
         packageJsonPath,
-        manifest: readJson(packageJsonPath),
+        manifest: readPackageManifest(packageJsonPath),
       };
     })
     .sort((left, right) =>
@@ -64,7 +64,7 @@ function platformPackages() {
 
 const version = readText(repoPath("VERSION")).trim();
 const packageJsonPath = repoPath("package.json");
-const root = readJson(packageJsonPath);
+const root = readPackageManifest(packageJsonPath);
 const [scope, baseName] = root.name.split("/");
 if (!scope || !baseName) {
   fail(`Expected scoped package name, got ${root.name}`);
