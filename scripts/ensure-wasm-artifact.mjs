@@ -16,6 +16,7 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 
 try {
   await access(wasmPath, constants.F_OK);
+  await access(singleThreadPath, constants.F_OK);
   await access(
     fileURLToPath(
       new URL(
