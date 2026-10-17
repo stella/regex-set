@@ -190,8 +190,13 @@ function collectSbomVersionDrift(
     expectedPurls.has(value["purl"]) &&
     value["version"] !== expectedVersion
   ) {
+    const version = value["version"] ?? "<missing>";
+    const displayedVersion =
+      typeof version === "string"
+        ? version
+        : (JSON.stringify(version) ?? "<invalid>");
     results.push(
-      `${value["purl"]}: version=${String(value["version"] ?? "<missing>")}`,
+      `${value["purl"]}: version=${displayedVersion}`,
     );
   }
 

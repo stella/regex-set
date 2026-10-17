@@ -142,15 +142,11 @@ test("version check traverses a CycloneDX SBOM without package-manifest fields",
     const valid = run();
     expect(valid.stderr.toString()).toBe("");
     expect(valid.exitCode).toBe(0);
+    for (const component of components)
+      component.version = "0.0.0";
     await write(
       "provenance/sbom.cdx.json",
-      JSON.stringify({
-        ...sbom,
-        components: components.map((component) => ({
-          ...component,
-          version: "0.0.0",
-        })),
-      }),
+      JSON.stringify(sbom),
     );
     const drift = run();
     expect(drift.exitCode).toBe(1);
@@ -159,6 +155,27 @@ test("version check traverses a CycloneDX SBOM without package-manifest fields",
     );
     expect(drift.stderr.toString()).not.toContain(
       "Release manifest requires",
+    );
+    const malformed = {
+      ...sbom,
+      components: components.map(
+        ({ version: _version, ...metadata }) =>
+          Object.assign(metadata, {
+            version: { unexpected: true },
+          }),
+      ),
+    };
+    await write(
+      "provenance/sbom.cdx.json",
+      JSON.stringify(malformed),
+    );
+    const malformedResult = run();
+    expect(malformedResult.exitCode).toBe(1);
+    expect(malformedResult.stderr.toString()).toContain(
+      'version={"unexpected":true}',
+    );
+    expect(malformedResult.stderr.toString()).not.toContain(
+      "[object Object]",
     );
   } finally {
     await rm(root, { recursive: true, force: true });
