@@ -92,8 +92,8 @@ const jsRegexSetBench = (
       re.lastIndex = 0;
       let m;
       while ((m = re.exec(hay)) !== null) {
-        const text = m[0]!;
-        all.push([m.index!, m.index! + text.length]);
+        const text = m[0];
+        all.push([m.index, m.index + text.length]);
         if (text.length === 0) {
           re.lastIndex++;
         }
