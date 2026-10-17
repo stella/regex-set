@@ -194,7 +194,7 @@ function collectSbomVersionDrift(
     const displayedVersion =
       typeof version === "string"
         ? version
-        : (JSON.stringify(version) ?? "<invalid>");
+        : JSON.stringify(version);
     results.push(
       `${value["purl"]}: version=${displayedVersion}`,
     );
