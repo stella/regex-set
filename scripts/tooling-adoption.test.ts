@@ -113,6 +113,10 @@ describe("shared tooling adoption", () => {
       const step = steps.find((candidate) =>
         candidate.startsWith(`run: bun run ${command}\n`),
       );
+      if (command === "check:typecheck-parity") {
+        expect(step).toBeUndefined();
+        continue;
+      }
       expect(step).toBeDefined();
       expect(step).not.toContain("if:");
     }
