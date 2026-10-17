@@ -113,7 +113,9 @@ export const createSingleThreadBinding = (
   )
     throw new Error("Invalid single-thread WASM module");
   const encoder = new TextEncoder();
-  const decoder = new TextDecoder();
+  const decoder = new TextDecoder("utf-8", {
+    ignoreBOM: true,
+  });
   const call = (
     op: number,
     { id = 0, options, strings = [], bytes }: Request = {},

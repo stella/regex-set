@@ -464,6 +464,32 @@ test("single-thread and existing threaded bindings produce identical public API 
   }
   initSync(bytes);
   try {
+    for (const { text, replacement, expected } of [
+      {
+        text: "\uFEFFfoo",
+        replacement: "x",
+        expected: "\uFEFFx",
+      },
+      {
+        text: "foo",
+        replacement: "\uFEFFx",
+        expected: "\uFEFFx",
+      },
+      {
+        text: "\uFEFFabsent",
+        replacement: "x",
+        expected: "\uFEFFabsent",
+      },
+    ]) {
+      const single = new RegexSet(["foo"]);
+      const original = new ThreadedSet(["foo"]);
+      expect(original.replaceAll(text, [replacement])).toBe(
+        expected,
+      );
+      expect(single.replaceAll(text, [replacement])).toBe(
+        expected,
+      );
+    }
     const corpus: {
       patterns: PatternEntry[];
       text: string;
