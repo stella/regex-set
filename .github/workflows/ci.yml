@@ -191,9 +191,9 @@ jobs:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
       - run: bun run check:toolchain
+        if: needs.check-changes.outputs.toolchain-changed == 'true'
       - run: bun run typecheck
       - run: bun run check:typecheck-parity
-        if: needs.check-changes.outputs.toolchain-changed == 'true'
       - run: bun test scripts/tooling-adoption.test.ts scripts/shared-policy.test.ts
 
   napi-ci:
