@@ -1,6 +1,12 @@
 import { Glob, YAML } from "bun";
 import { fileURLToPath } from "node:url";
 
+import {
+  readWasiRootEntry,
+  readWasiWorkflow,
+  readWasiPackage,
+} from "./release-script-inputs.mjs";
+
 const root = new URL("../", import.meta.url);
 const metadataPrefix = "// napi-rs-artifact-metadata:";
 
@@ -8,7 +14,7 @@ const requiredEntries = async () => {
   const [binding] = new Glob("*.wasi.cjs").scanSync(
     fileURLToPath(root),
   );
-  if (!binding) {
+  if (binding === undefined || binding === "") {
     throw new Error("No root WASI binding metadata found");
   }
 
@@ -17,42 +23,46 @@ const requiredEntries = async () => {
   )
     .split("\n", 1)
     .at(0);
-  if (!firstLine?.startsWith(metadataPrefix)) {
+  if (
+    firstLine === undefined ||
+    !firstLine.startsWith(metadataPrefix)
+  ) {
     throw new Error(
       `${binding} has no NAPI-RS artifact metadata`,
     );
   }
 
-  const { rootEntry } = JSON.parse(
+  /** @type {unknown} */
+  const metadata = JSON.parse(
     firstLine.slice(metadataPrefix.length),
   );
-  if (rootEntry !== null && typeof rootEntry !== "string") {
-    throw new Error(`${binding} has an invalid root entry`);
-  }
-  return ["browser.js", rootEntry].filter(Boolean);
+  const rootEntry = readWasiRootEntry(metadata);
+  return rootEntry === null || rootEntry === ""
+    ? ["browser.js"]
+    : ["browser.js", rootEntry];
 };
 
 const workflowContract = async () => {
+  /** @type {unknown} */
   const workflow = YAML.parse(
     await Bun.file(
       new URL(".github/workflows/release.yml", root),
     ).text(),
   );
-  const build = workflow?.jobs?.build;
-  const settings = build?.strategy?.matrix?.settings;
-  if (!Array.isArray(settings)) {
-    throw new Error("Release workflow has no build matrix");
-  }
-
-  const { napi, scripts } = await Bun.file(
+  const { targets: settings, uploads } =
+    readWasiWorkflow(workflow);
+  /** @type {unknown} */
+  const manifest = await Bun.file(
     new URL("package.json", root),
   ).json();
+  const { targets: napiTargets, scripts } =
+    readWasiPackage(manifest);
   for (const scriptName of [
     "build",
     "build:debug",
     "build:wasm",
   ]) {
-    const command = scripts?.[scriptName];
+    const command = scripts[scriptName];
     if (
       typeof command !== "string" ||
       !command.startsWith(
@@ -69,10 +79,9 @@ const workflowContract = async () => {
     ({ target }) => target,
   );
   if (
-    !Array.isArray(napi?.targets) ||
-    workflowTargets.length !== napi.targets.length ||
+    workflowTargets.length !== napiTargets.length ||
     workflowTargets.some(
-      (target) => !napi.targets.includes(target),
+      (target) => !napiTargets.includes(target),
     )
   ) {
     throw new Error(
@@ -80,11 +89,11 @@ const workflowContract = async () => {
     );
   }
 
-  const nativeUpload = build.steps?.find(
+  const nativeUpload = uploads.find(
     (step) => step.name === "Upload native binding",
   );
   if (
-    nativeUpload?.with?.path !==
+    nativeUpload?.path !==
     "${{ matrix.settings.node_artifact }}"
   ) {
     throw new Error(
@@ -111,17 +120,20 @@ const workflowContract = async () => {
     );
   }
 
-  const wasmUpload = build.steps?.find(
+  const wasmUpload = uploads.find(
     (step) => step.name === "Upload WASM bindings",
   );
-  if (typeof wasmUpload?.with?.path !== "string") {
+  if (typeof wasmUpload?.path !== "string") {
     throw new Error(
       "Release workflow has no WASM upload manifest",
     );
   }
-  return wasmUpload.with.path.trim().split(/\s+/u);
+  return wasmUpload.path.trim().split(/\s+/u);
 };
 
+/** @param {string[]} patterns
+ * @param {string} entry
+ */
 const isUploaded = (patterns, entry) => {
   const includes = patterns.filter(
     (pattern) => !pattern.startsWith("!"),
