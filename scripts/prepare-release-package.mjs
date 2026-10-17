@@ -5,6 +5,8 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { parseReleaseManifest } from "./release-script-inputs.mjs";
+
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
 
 function repoPath(...segments) {
@@ -15,8 +17,8 @@ function readText(filePath) {
   return fs.readFileSync(filePath, "utf8");
 }
 
-function readJson(filePath) {
-  return JSON.parse(readText(filePath));
+function readPackageManifest(filePath) {
+  return parseReleaseManifest(readText(filePath));
 }
 
 function writeJson(filePath, value) {
@@ -52,7 +54,7 @@ function platformPackages() {
       );
       return {
         packageJsonPath,
-        manifest: readJson(packageJsonPath),
+        manifest: readPackageManifest(packageJsonPath),
       };
     })
     .sort((left, right) =>
@@ -62,7 +64,7 @@ function platformPackages() {
 
 const version = readText(repoPath("VERSION")).trim();
 const packageJsonPath = repoPath("package.json");
-const root = readJson(packageJsonPath);
+const root = readPackageManifest(packageJsonPath);
 const [scope, baseName] = root.name.split("/");
 if (!scope || !baseName) {
   fail(`Expected scoped package name, got ${root.name}`);

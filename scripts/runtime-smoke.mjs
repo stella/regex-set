@@ -59,6 +59,7 @@ const isolatedRoot = await mkdtemp(
   path.join(tmpdir(), "regex-set-loader-"),
 );
 
+/** @param {{env: NodeJS.ProcessEnv, expectedError?: RegExp}} options */
 function runLoaderProbe({ env, expectedError }) {
   const loaderPath = path.join(isolatedRoot, "index.cjs");
   const probe = spawnSync(
@@ -73,7 +74,7 @@ function runLoaderProbe({ env, expectedError }) {
       env: { ...process.env, ...env },
     },
   );
-  if (expectedError) {
+  if (expectedError !== undefined) {
     assert.notEqual(probe.status, 0);
     assert.match(probe.stderr, expectedError);
     return;
