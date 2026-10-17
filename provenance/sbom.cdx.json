@@ -3164,6 +3164,36 @@
       "version": "1.0.6"
     },
     {
+      "bom-ref": "pkg:cargo/stella-regex-set-wasm-single-thread@1.0.6",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "Cargo.lock",
+            "confidence": 0.6,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.6,
+                "technique": "manifest-analysis",
+                "value": "Cargo.lock"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "name": "stella-regex-set-wasm-single-thread",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "Cargo.lock"
+        }
+      ],
+      "purl": "pkg:cargo/stella-regex-set-wasm-single-thread@1.0.6",
+      "type": "library",
+      "version": "1.0.6"
+    },
+    {
       "bom-ref": "pkg:cargo/stella-regex-set@1.0.6",
       "evidence": {
         "identity": [
@@ -4577,6 +4607,13 @@
       "ref": "pkg:cargo/stella-regex-set-core@1.0.6"
     },
     {
+      "dependsOn": [
+        "pkg:cargo/serde_json@1.0.151",
+        "pkg:cargo/stella-regex-set-core@1.0.6"
+      ],
+      "ref": "pkg:cargo/stella-regex-set-wasm-single-thread@1.0.6"
+    },
+    {
       "dependsOn": [],
       "ref": "pkg:cargo/strsim@0.11.1"
     },
@@ -4688,6 +4725,28 @@
           "name": "stella-regex-set",
           "purl": "pkg:cargo/stella-regex-set@1.0.6",
           "type": "application",
+          "version": "1.0.6"
+        },
+        {
+          "bom-ref": "pkg:cargo/stella-regex-set-wasm-single-thread@1.0.6",
+          "externalReferences": [
+            {
+              "type": "vcs",
+              "url": "https://github.com/stella/regex-set"
+            }
+          ],
+          "group": "",
+          "licenses": [
+            {
+              "license": {
+                "id": "Apache-2.0",
+                "url": "https://opensource.org/licenses/Apache-2.0"
+              }
+            }
+          ],
+          "name": "stella-regex-set-wasm-single-thread",
+          "purl": "pkg:cargo/stella-regex-set-wasm-single-thread@1.0.6",
+          "type": "library",
           "version": "1.0.6"
         },
         {
