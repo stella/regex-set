@@ -640,7 +640,6 @@ dependencies = [
 name = "stella-regex-set-wasm-single-thread"
 version = "1.0.6"
 dependencies = [
- "serde_json",
  "stella-regex-set-core",
 ]
 

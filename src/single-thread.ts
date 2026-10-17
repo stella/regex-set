@@ -16,10 +16,16 @@ export type InitSource = WasmBytes | URL | string;
 
 let binding: NativeBinding | undefined;
 
-const wasmBuffer = (bytes: WasmBytes): ArrayBuffer =>
-  bytes instanceof ArrayBuffer
-    ? bytes
-    : Uint8Array.from(bytes).buffer;
+const wasmBuffer = (bytes: WasmBytes): ArrayBuffer => {
+  const view = ArrayBuffer.isView(bytes)
+    ? new Uint8Array(
+        bytes.buffer,
+        bytes.byteOffset,
+        bytes.byteLength,
+      )
+    : new Uint8Array(bytes);
+  return Uint8Array.from(view).buffer;
+};
 
 const getBinding = () => {
   if (!binding)

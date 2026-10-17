@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { runInNewContext } from "node:vm";
 
 import {
   RegexSet as CoreRegexSet,
@@ -17,6 +18,7 @@ import {
   init,
   initSync,
 } from "../src/single-thread";
+import { createSingleThreadBinding } from "../src/single-thread-binding";
 
 const bytes = readFileSync(
   new URL(
@@ -70,6 +72,120 @@ test("both initializers honor Buffer and Uint8Array subarray bounds", async () =
     ]);
   }
 });
+
+test("both initializers accept an ArrayBuffer from another realm", async () => {
+  const foreign: unknown = runInNewContext(
+    "const view = new Uint8Array(source.length); view.set(source); view.buffer",
+    { source: bytes },
+  );
+  const isArrayBuffer = (
+    value: unknown,
+  ): value is ArrayBuffer =>
+    Object.prototype.toString.call(value) ===
+    "[object ArrayBuffer]";
+  if (!isArrayBuffer(foreign))
+    throw new Error("Invalid realm fixture");
+  expect(foreign instanceof ArrayBuffer).toBe(false);
+  initSync(foreign);
+  expect(new RegexSet(["realm"]).isMatch("realm")).toBe(
+    true,
+  );
+  await init(foreign);
+  expect(new RegexSet(["😀"]).findIter("a😀")).toEqual([
+    { pattern: 0, start: 1, end: 3, text: "😀" },
+  ]);
+});
+
+test("100 MiB inputs use bounded binary requests without JSON or numeric-array expansion", () => {
+  const instance = new WebAssembly.Instance(
+    new WebAssembly.Module(bytes),
+  );
+  const { memory, regex_input_alloc: allocate } =
+    instance.exports;
+  if (
+    !(memory instanceof WebAssembly.Memory) ||
+    typeof allocate !== "function"
+  )
+    throw new Error("Invalid WASM fixture");
+  let maxRequest = 0;
+  const binding = createSingleThreadBinding({
+    ...instance.exports,
+    regex_input_alloc: (length: number) => {
+      maxRequest = Math.max(maxRequest, length);
+      return allocate(length);
+    },
+  });
+  class BinaryRegexSet extends CoreRegexSet {
+    static override getBinding() {
+      return binding;
+    }
+  }
+  const size = 100 * 1024 * 1024;
+  const input = new Uint8Array(size);
+  const initialMemory = memory.buffer.byteLength;
+  const stringify = JSON.stringify;
+  const from = Array.from;
+  const results: unknown[] = [];
+  let invalidPreparedRejected = false;
+  try {
+    JSON.stringify = () => {
+      throw new Error("Transport used JSON");
+    };
+    Array.from = () => {
+      throw new Error("Transport expanded a numeric array");
+    };
+    const matcher = new binding.RegexSet(["needle", "é😀"]);
+    results.push(matcher._isMatchBuf(input));
+    results.push(matcher._findIterPackedBuf(input).length);
+    const text = "x".repeat(size);
+    results.push(matcher.isMatch(text));
+    results.push(matcher._findIterPacked(text).length);
+    results.push(matcher.whichMatch(text).length);
+    const replacement = "r".repeat(1024 * 1024);
+    results.push(
+      matcher.replaceAll("needle", [replacement, "other"])
+        .length,
+    );
+    const patterns = ["é😀"];
+    const prepared = BinaryRegexSet.prepare(patterns);
+    results.push(
+      new BinaryRegexSet(
+        patterns,
+        undefined,
+        prepared,
+      ).isMatch("é😀"),
+    );
+    try {
+      new BinaryRegexSet(patterns, undefined, input);
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        !error.message.includes("prepared regex")
+      )
+        throw error;
+      invalidPreparedRejected = true;
+    }
+  } finally {
+    JSON.stringify = stringify;
+    Array.from = from;
+  }
+  expect(results).toEqual([
+    false,
+    0,
+    false,
+    0,
+    0,
+    1024 * 1024,
+    true,
+  ]);
+  expect(invalidPreparedRejected).toBe(true);
+  // Includes the fixed header and the short pattern list on prepared loading.
+  expect(maxRequest).toBeLessThanOrEqual(size + 128);
+  // Input allocation/reallocation and Rust request processing remain bounded.
+  expect(
+    memory.buffer.byteLength - initialMemory,
+  ).toBeLessThanOrEqual(3 * size + 64 * 1024 * 1024);
+}, 60_000);
 
 test("packed inline import, init and match work without SAB, Worker, network or file fetching", () => {
   const entry = new URL(

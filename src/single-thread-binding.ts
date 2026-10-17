@@ -1,32 +1,99 @@
 import type { NativeBinding } from "./core";
 
-const numbers = (value: unknown): number[] => {
-  if (
-    !Array.isArray(value) ||
-    !value.every(
-      (item: unknown) => typeof item === "number",
-    )
-  )
+const OP = {
+  new: 1,
+  prepare: 2,
+  fromPrepared: 3,
+  patternCount: 4,
+  isMatch: 5,
+  findIter: 6,
+  replaceAll: 8,
+  findIterBuf: 9,
+  isMatchBuf: 10,
+  free: 16,
+  whichMatch: 17,
+  uax29Boundaries: 18,
+} as const;
+
+const number = (value: unknown): number => {
+  if (typeof value !== "number")
     throw new Error("Invalid numeric WASM response");
   return value;
 };
-const number = (value: unknown): number => {
-  if (typeof value !== "number")
-    throw new Error("Invalid WASM handle");
-  return value;
-};
-const boolean = (value: unknown): boolean => {
-  if (typeof value !== "boolean")
-    throw new Error("Invalid boolean WASM response");
-  return value;
-};
-const string = (value: unknown): string => {
-  if (typeof value !== "string")
-    throw new Error("Invalid string WASM response");
-  return value;
+
+// TextEncoder.encodeInto writes directly into the allocated linear-memory view.
+// Count UTF-8 bytes first so ASCII inputs reserve one byte per code unit.
+const utf8Length = (text: string): number => {
+  let bytes = 0;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    if (code < 0x80) bytes++;
+    else if (code < 0x800) bytes += 2;
+    else if (
+      code >= 0xd800 &&
+      code <= 0xdbff &&
+      i + 1 < text.length &&
+      text.charCodeAt(i + 1) >= 0xdc00 &&
+      text.charCodeAt(i + 1) <= 0xdfff
+    ) {
+      bytes += 4;
+      i++;
+    } else bytes += 3;
+  }
+  return bytes;
 };
 
-/** Transport only; patterns and matching use the shared public wrapper and Rust core. */
+const optionFlags = (
+  options?: Record<string, unknown>,
+): number => {
+  let flags = 0;
+  for (const [name, bit] of [
+    ["wholeWords", 8],
+    ["unicodeBoundaries", 16],
+  ] as const) {
+    const value = options?.[name];
+    if (value !== undefined && typeof value !== "boolean")
+      throw new Error(`${name} must be a boolean`);
+    if (
+      name === "unicodeBoundaries"
+        ? value === false
+        : value === true
+    )
+      flags |= bit;
+  }
+  return flags;
+};
+
+type Request = {
+  id?: number;
+  options?: Record<string, unknown>;
+  strings?: readonly string[];
+  bytes?: Uint8Array;
+};
+
+const scalar = (bytes: Uint8Array): number => {
+  if (bytes.byteLength !== 4)
+    throw new Error("Invalid scalar WASM response");
+  return new DataView(
+    bytes.buffer,
+    bytes.byteOffset,
+    4,
+  ).getUint32(0, true);
+};
+const packed = (bytes: Uint8Array): Uint32Array => {
+  if (bytes.byteLength % 4 !== 0)
+    throw new Error("Invalid packed WASM response");
+  const result = new Uint32Array(bytes.byteLength / 4);
+  const view = new DataView(
+    bytes.buffer,
+    bytes.byteOffset,
+    bytes.byteLength,
+  );
+  for (let i = 0; i < result.length; i++)
+    result[i] = view.getUint32(i * 4, true);
+  return result;
+};
+/** Binary transport only; matching and options use the shared Rust core. */
 export const createSingleThreadBinding = (
   exports: WebAssembly.Exports,
 ): NativeBinding => {
@@ -48,39 +115,70 @@ export const createSingleThreadBinding = (
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
   const call = (
-    op: string,
-    fields: Record<string, unknown> = {},
-  ): unknown => {
-    const input = encoder.encode(
-      JSON.stringify({ op, ...fields }),
-    );
-    const pointer = number(allocate(input.length));
-    new Uint8Array(
-      memory.buffer,
-      pointer,
-      input.length,
-    ).set(input);
-    run();
-    const response: unknown = JSON.parse(
-      decoder.decode(
+    op: number,
+    { id = 0, options, strings = [], bytes }: Request = {},
+  ): Uint8Array => {
+    const lengths = new Uint32Array(strings.length);
+    let size = 16 + (bytes?.byteLength ?? 0);
+    for (const [i, text] of strings.entries()) {
+      const length = utf8Length(text);
+      if (length > 0xffffffff)
+        throw new RangeError("WASM string is too large");
+      lengths[i] = length;
+      size += 4 + length;
+    }
+    if (size > 0xffffffff)
+      throw new RangeError("WASM request is too large");
+    const flags = optionFlags(options);
+    // A caller of this low-level adapter can supply a view of its own memory.
+    // Preserve it across allocation/growth; public prepared results are copies.
+    if (bytes?.buffer === memory.buffer)
+      bytes = Uint8Array.from(bytes);
+    const pointer = number(allocate(size)) >>> 0;
+    const view = new DataView(memory.buffer, pointer, size);
+    view.setUint32(0, op, true);
+    view.setUint32(4, id, true);
+    view.setUint32(8, flags, true);
+    view.setUint32(12, strings.length, true);
+    let cursor = 16;
+    for (const [i, text] of strings.entries()) {
+      const length = number(lengths[i]);
+      view.setUint32(cursor, length, true);
+      cursor += 4;
+      const written = encoder.encodeInto(
+        text,
         new Uint8Array(
           memory.buffer,
-          number(outputPointer()),
-          number(outputLength()),
+          pointer + cursor,
+          length,
         ),
-      ),
+      );
+      if (
+        written.read !== text.length ||
+        written.written !== length
+      )
+        throw new Error("Incomplete WASM string encoding");
+      cursor += length;
+    }
+    if (bytes)
+      new Uint8Array(
+        memory.buffer,
+        pointer + cursor,
+        bytes.byteLength,
+      ).set(bytes);
+    const status = number(run());
+    const output = new Uint8Array(
+      memory.buffer,
+      number(outputPointer()) >>> 0,
+      number(outputLength()) >>> 0,
     );
-    if (typeof response !== "object" || response === null)
-      throw new Error("Invalid WASM response");
-    if ("error" in response)
-      throw new Error(string(response.error));
-    if (!("value" in response))
-      throw new Error("Missing WASM response");
-    return response.value;
+    if (status !== 0)
+      throw new Error(decoder.decode(output));
+    return output;
   };
   const registry = new FinalizationRegistry<number>(
     (id) => {
-      call("free", { id });
+      call(OP.free, { id });
     },
   );
   class Matcher {
@@ -93,61 +191,63 @@ export const createSingleThreadBinding = (
       } | null,
       prepared?: Uint8Array | null,
     ) {
-      this.id = number(
-        call(prepared ? "fromPrepared" : "new", {
-          patterns,
+      this.id = scalar(
+        call(prepared ? OP.fromPrepared : OP.new, {
+          strings: patterns,
           options: options ?? undefined,
-          ...(prepared
-            ? { bytes: Array.from(prepared) }
-            : {}),
+          bytes: prepared ?? undefined,
         }),
       );
       registry.register(this, this.id);
     }
     get patternCount() {
-      return number(call("patternCount", { id: this.id }));
+      return scalar(call(OP.patternCount, { id: this.id }));
     }
     isMatch(haystack: string) {
-      return boolean(
-        call("isMatch", { id: this.id, haystack }),
+      return (
+        scalar(
+          call(OP.isMatch, {
+            id: this.id,
+            strings: [haystack],
+          }),
+        ) !== 0
       );
     }
     _isMatchBuf(bytes: Uint8Array) {
-      return boolean(
-        call("isMatchBuf", {
-          id: this.id,
-          bytes: Array.from(bytes),
-        }),
+      return (
+        scalar(
+          call(OP.isMatchBuf, { id: this.id, bytes }),
+        ) !== 0
       );
     }
     _findIterPacked(haystack: string) {
-      return Uint32Array.from(
-        numbers(
-          call("findIter", { id: this.id, haystack }),
-        ),
+      return packed(
+        call(OP.findIter, {
+          id: this.id,
+          strings: [haystack],
+        }),
       );
     }
     _findIterPackedBuf(bytes: Uint8Array) {
-      return Uint32Array.from(
-        numbers(
-          call("findIterBuf", {
-            id: this.id,
-            bytes: Array.from(bytes),
-          }),
-        ),
+      return packed(
+        call(OP.findIterBuf, { id: this.id, bytes }),
       );
     }
     whichMatch(haystack: string) {
-      return numbers(
-        call("whichMatch", { id: this.id, haystack }),
-      );
+      return [
+        ...packed(
+          call(OP.whichMatch, {
+            id: this.id,
+            strings: [haystack],
+          }),
+        ),
+      ];
     }
     replaceAll(haystack: string, replacements: string[]) {
-      return string(
-        call("replaceAll", {
+      return decoder.decode(
+        call(OP.replaceAll, {
           id: this.id,
-          haystack,
-          replacements,
+          strings: [haystack, ...replacements],
         }),
       );
     }
@@ -155,19 +255,12 @@ export const createSingleThreadBinding = (
   return {
     RegexSet: Matcher,
     _prepareRegexSet: (patterns, options) =>
-      Uint8Array.from(
-        numbers(
-          call("prepare", {
-            patterns,
-            options: options ?? undefined,
-          }),
-        ),
-      ),
-    _uax29Boundaries: (bytes) =>
-      numbers(
-        call("uax29Boundaries", {
-          bytes: Array.from(bytes),
-        }),
-      ),
+      call(OP.prepare, {
+        strings: patterns,
+        options: options ?? undefined,
+      }).slice(),
+    _uax29Boundaries: (bytes) => [
+      ...packed(call(OP.uax29Boundaries, { bytes })),
+    ],
   };
 };
