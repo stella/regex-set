@@ -230,14 +230,17 @@ function regexpToRust(re: RegExp): string {
   // scopeInlineFlags here; it only matters for
   // string patterns (handled in normalizeEntry).
   if (!flags) {
-    return re.source;
+    return javascriptCharacterClasses(re);
   }
 
   if (!flags.includes("i")) {
-    return `(?${flags})${re.source}`;
+    return `(?${flags})${javascriptCharacterClasses(re)}`;
   }
 
-  let src = re.source;
+  const unicodeClasses = re.unicode || re.unicodeSets;
+  let src = unicodeClasses
+    ? javascriptCharacterClasses(re)
+    : re.source;
   let leading = "";
   let trailing = "";
 
@@ -265,8 +268,73 @@ function regexpToRust(re: RegExp): string {
   }
 
   const uFlag =
-    needsAsciiMode(src) && !hasNonAscii(src) ? "-u" : "";
+    !unicodeClasses &&
+    needsAsciiMode(src) &&
+    !hasNonAscii(src)
+      ? "-u"
+      : "";
   return `${leading}(?${flags}${uFlag}:${src})${trailing}`;
+}
+
+// ECMAScript WhiteSpace and LineTerminator, including BOM but not NEL.
+const JS_WHITESPACE =
+  "\\x{0009}-\\x{000D}\\x{0020}\\x{00A0}\\x{1680}" +
+  "\\x{2000}-\\x{200A}\\x{2028}\\x{2029}\\x{202F}\\x{205F}\\x{3000}\\x{FEFF}";
+
+function javascriptCharacterClasses(re: RegExp): string {
+  let result = "";
+  let inClass = false;
+  const unicodeCase =
+    re.ignoreCase && (re.unicode || re.unicodeSets);
+  const word =
+    "a-zA-Z0-9_" +
+    (unicodeCase ? "\\x{017F}\\x{212A}" : "");
+  for (let i = 0; i < re.source.length; i++) {
+    const char = re.source.charAt(i);
+    if (char !== "\\") {
+      if (char === "[") inClass = true;
+      if (char === "]") inClass = false;
+      result += char;
+      continue;
+    }
+    const escaped = re.source.charAt(++i);
+    if (escaped === "b" || escaped === "B") {
+      if (inClass) {
+        result += escaped === "b" ? "\\x{0008}" : "B";
+        continue;
+      }
+      const beforeWord = `(?<=[${word}])`;
+      const beforeNonword = `(?<![${word}])`;
+      const afterWord = `(?=[${word}])`;
+      const afterNonword = `(?![${word}])`;
+      // JS word membership stays independent of the Rust Unicode boundary mode
+      // and of outer ignore-case scopes. /iu additionally folds Kelvin/long s.
+      result +=
+        escaped === "b"
+          ? `(?-i:(?:${beforeWord}${afterNonword}|${beforeNonword}${afterWord}))`
+          : `(?-i:(?:${beforeWord}${afterWord}|${beforeNonword}${afterNonword}))`;
+      continue;
+    }
+    let members: string;
+    switch (escaped.toLowerCase()) {
+      case "s":
+        members = JS_WHITESPACE;
+        break;
+      case "d":
+        members = "0-9";
+        break;
+      case "w":
+        members = word;
+        break;
+      default:
+        result += "\\" + escaped;
+        continue;
+    }
+    const negation =
+      escaped === escaped.toUpperCase() ? "^" : "";
+    result += `[${negation}${members}]`;
+  }
+  return result;
 }
 
 /**
@@ -278,7 +346,12 @@ function regexpToRust(re: RegExp): string {
  * -u, so skipping -u for them is zero-cost.
  */
 function needsAsciiMode(s: string): boolean {
-  return /\\[wWdDsSbB]/.test(s);
+  for (let i = 0; i < s.length; i++) {
+    if (s.charAt(i) !== "\\") continue;
+    const escaped = s.charAt(++i);
+    if ("wWdDsSbB".includes(escaped)) return true;
+  }
+  return false;
 }
 
 /**
@@ -307,7 +380,7 @@ function hasNonAscii(s: string): boolean {
  *
  * NOTE: -u also disables Unicode character classes
  * (\w, \d, \s become ASCII-only), matching the
- * behaviour of regexpToRust() for /i RegExps.
+ * behaviour of regexpToRust() for non-Unicode /i RegExps.
  */
 function scopeInlineFlags(src: string): string {
   // Handle bare (?i...) at the start: convert to
