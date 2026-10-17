@@ -67,7 +67,11 @@ matcher.findIter("foo bar");
 ```
 
 `init(url)` fetches bytes and calls `WebAssembly.instantiate`; it does not
-require a WASM MIME type. `init(bytes)` performs no I/O. For bytes already
+require a WASM MIME type. `init(request)` accepts a caller-supplied `Request`;
+`init(response)` consumes an existing successful `Response` without fetching.
+These inputs and byte buffers can come from another realm. Byte inputs include
+`ArrayBuffer` and its views (including `Buffer` and `DataView`); only the view's
+byte range is used. `init(bytes)` performs no I/O. For bytes already
 available to an injected script, `initSync(bytes)` performs no I/O and returns
 immediately. The asset is exported as
 `@stll/regex-set-wasm/single-thread/wasm` for bundlers or copying.

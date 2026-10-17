@@ -11,12 +11,37 @@ export type {
   NamedPattern,
 } from "./core";
 
-export type WasmBytes = ArrayBuffer | Uint8Array;
-export type InitSource = WasmBytes | URL | string;
+export type WasmBytes = ArrayBuffer | ArrayBufferView;
+export type InitSource =
+  | WasmBytes
+  | URL
+  | string
+  | Request
+  | Response;
 
 let binding: NativeBinding | undefined;
 
+const isWasmBytes = (
+  source: unknown,
+): source is WasmBytes =>
+  ArrayBuffer.isView(source) ||
+  Object.prototype.toString.call(source) ===
+    "[object ArrayBuffer]";
+
+const isResponse = (
+  source: InitSource,
+): source is Response =>
+  typeof source === "object" &&
+  "ok" in source &&
+  typeof source.ok === "boolean" &&
+  "arrayBuffer" in source &&
+  typeof source.arrayBuffer === "function";
+
 const wasmBuffer = (bytes: WasmBytes): ArrayBuffer => {
+  if (!isWasmBytes(bytes))
+    throw new TypeError(
+      "Expected an ArrayBuffer or ArrayBuffer view",
+    );
   const view = ArrayBuffer.isView(bytes)
     ? new Uint8Array(
         bytes.buffer,
@@ -42,20 +67,22 @@ export const initSync = (bytes: WasmBytes): void => {
   binding = createSingleThreadBinding(instance.exports);
 };
 
-/** Initialize from bytes (no I/O) or an explicit caller-supplied URL. */
+/** Initialize from bytes, a response body, or a caller-supplied fetch source. */
 export const init = async (
   source: InitSource,
 ): Promise<void> => {
   let bytes: WasmBytes;
-  if (typeof source === "string" || source instanceof URL) {
-    const response = await fetch(source);
+  if (isWasmBytes(source)) {
+    bytes = source;
+  } else {
+    const response = isResponse(source)
+      ? source
+      : await fetch(source);
     if (!response.ok)
       throw new Error(
         `Unable to load WASM: ${response.status} ${response.statusText}`,
       );
     bytes = await response.arrayBuffer();
-  } else {
-    bytes = source;
   }
   const { instance } = await WebAssembly.instantiate(
     wasmBuffer(bytes),

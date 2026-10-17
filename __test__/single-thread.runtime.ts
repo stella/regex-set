@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -94,6 +94,146 @@ test("both initializers accept an ArrayBuffer from another realm", async () => {
   expect(new RegexSet(["😀"]).findIter("a😀")).toEqual([
     { pattern: 0, start: 1, end: 3, text: "😀" },
   ]);
+});
+
+test("both initializers accept typed arrays and DataViews from another realm", async () => {
+  const foreign: unknown = runInNewContext(
+    `
+    const allocation = new Uint8Array(source.length + 64);
+    allocation.fill(0xa5);
+    allocation.set(source, 32);
+    [new Uint8Array(allocation.buffer, 32, source.length),
+     new DataView(allocation.buffer, 32, source.length)];
+  `,
+    { source: bytes },
+  );
+  if (!Array.isArray(foreign))
+    throw new Error("Invalid realm fixture");
+  for (const value of foreign) {
+    if (!ArrayBuffer.isView(value))
+      throw new Error("Invalid view fixture");
+    expect(value instanceof Uint8Array).toBe(false);
+    expect(value instanceof DataView).toBe(false);
+    initSync(value);
+    expect(new RegexSet(["view"]).isMatch("view")).toBe(
+      true,
+    );
+    await init(value);
+    expect(new RegexSet(["😀"]).isMatch("😀")).toBe(true);
+  }
+});
+
+// VM contexts do not expose Web API constructors. Reflect.construct preserves
+// genuine internal slots while giving the object a prototype from that realm.
+const foreignWebObject = (
+  Host: unknown,
+  args: unknown[],
+): unknown =>
+  runInNewContext(
+    `
+    function Foreign(...args) { return Reflect.construct(Host, args, new.target); }
+    Object.defineProperties(Foreign.prototype, Object.getOwnPropertyDescriptors(Host.prototype));
+    new Foreign(...args);
+  `,
+    { Host, args },
+  );
+
+const isURL = (value: unknown): value is URL =>
+  Object.prototype.toString.call(value) === "[object URL]";
+const isRequest = (value: unknown): value is Request =>
+  Object.prototype.toString.call(value) ===
+  "[object Request]";
+const isResponse = (value: unknown): value is Response =>
+  Object.prototype.toString.call(value) ===
+  "[object Response]";
+
+test("a URL from another realm is passed to fetch", async () => {
+  const foreign = foreignWebObject(URL, [
+    "https://extension.invalid/realm.wasm",
+  ]);
+  if (!isURL(foreign))
+    throw new Error("Invalid URL fixture");
+  expect(foreign instanceof URL).toBe(false);
+  expect(foreign.href).toBe(
+    "https://extension.invalid/realm.wasm",
+  );
+  const requests: unknown[] = [];
+  const fetcher = spyOn(
+    globalThis,
+    "fetch",
+  ).mockImplementation(async (source) => {
+    requests.push(source);
+    return new Response(bytes);
+  });
+  try {
+    await init(foreign);
+    expect(requests).toEqual([foreign]);
+    expect(new RegexSet(["url"]).isMatch("url")).toBe(true);
+  } finally {
+    fetcher.mockRestore();
+  }
+});
+
+test("a Request from another realm is passed to fetch", async () => {
+  const foreign = foreignWebObject(Request, [
+    "https://extension.invalid/request.wasm",
+  ]);
+  if (!isRequest(foreign))
+    throw new Error("Invalid Request fixture");
+  expect(foreign instanceof Request).toBe(false);
+  expect(foreign.url).toBe(
+    "https://extension.invalid/request.wasm",
+  );
+  const requests: unknown[] = [];
+  const fetcher = spyOn(
+    globalThis,
+    "fetch",
+  ).mockImplementation(async (source) => {
+    requests.push(source);
+    return new Response(bytes);
+  });
+  try {
+    await init(foreign);
+    expect(requests).toEqual([foreign]);
+    expect(
+      new RegexSet(["request"]).isMatch("request"),
+    ).toBe(true);
+  } finally {
+    fetcher.mockRestore();
+  }
+});
+
+test("a Response from another realm supplies bytes without fetching", async () => {
+  const foreign = foreignWebObject(Response, [bytes]);
+  if (!isResponse(foreign))
+    throw new Error("Invalid Response fixture");
+  expect(foreign instanceof Response).toBe(false);
+  expect(foreign.ok).toBe(true);
+  const fetcher = spyOn(
+    globalThis,
+    "fetch",
+  ).mockImplementation(async () => {
+    throw new Error("Unexpected fetch");
+  });
+  try {
+    await init(foreign);
+    expect(foreign.bodyUsed).toBe(true);
+    expect(
+      new RegexSet(["response"]).isMatch("response"),
+    ).toBe(true);
+    const failure = foreignWebObject(Response, [
+      "missing",
+      { status: 404 },
+    ]);
+    if (!isResponse(failure))
+      throw new Error("Invalid Response fixture");
+    await expect(init(failure)).rejects.toThrow("404");
+    expect(
+      new RegexSet(["still ready"]).isMatch("still ready"),
+    ).toBe(true);
+  } finally {
+    fetcher.mockRestore();
+  }
 });
 
 test("100 MiB inputs use bounded binary requests without JSON or numeric-array expansion", () => {
