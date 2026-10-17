@@ -240,7 +240,7 @@ function regexpToRust(re: RegExp): string {
   const unicodeClasses = re.unicode || re.unicodeSets;
   let src = unicodeClasses
     ? javascriptCharacterClasses(re)
-    : re.source;
+    : javascriptWhitespaceClasses(re);
   let leading = "";
   let trailing = "";
 
@@ -269,8 +269,8 @@ function regexpToRust(re: RegExp): string {
 
   const uFlag =
     !unicodeClasses &&
-    needsAsciiMode(src) &&
-    !hasNonAscii(src)
+    needsAsciiMode(re.source) &&
+    !hasNonAscii(re.source)
       ? "-u"
       : "";
   return `${leading}(?${flags}${uFlag}:${src})${trailing}`;
@@ -281,7 +281,10 @@ const JS_WHITESPACE =
   "\\x{0009}-\\x{000D}\\x{0020}\\x{00A0}\\x{1680}" +
   "\\x{2000}-\\x{200A}\\x{2028}\\x{2029}\\x{202F}\\x{205F}\\x{3000}\\x{FEFF}";
 
-function javascriptCharacterClasses(re: RegExp): string {
+function javascriptCharacterClasses(
+  re: RegExp,
+  shortcuts: "all" | "whitespace" = "all",
+): string {
   let result = "";
   let inClass = false;
   const unicodeCase =
@@ -315,6 +318,13 @@ function javascriptCharacterClasses(re: RegExp): string {
           : `(?-i:(?:${beforeWord}${afterWord}|${beforeNonword}${afterNonword}))`;
       continue;
     }
+    if (
+      shortcuts === "whitespace" &&
+      escaped.toLowerCase() !== "s"
+    ) {
+      result += "\\" + escaped;
+      continue;
+    }
     let members: string;
     switch (escaped.toLowerCase()) {
       case "s":
@@ -333,6 +343,86 @@ function javascriptCharacterClasses(re: RegExp): string {
     const negation =
       escaped === escaped.toUpperCase() ? "^" : "";
     result += `[${negation}${members}]`;
+  }
+  return result;
+}
+
+/** Preserve non-Unicode /i folding while giving whitespace its Unicode set. */
+function javascriptWhitespaceClasses(re: RegExp): string {
+  const asciiMode =
+    needsAsciiMode(re.source) && !hasNonAscii(re.source);
+  let result = "";
+  for (let i = 0; i < re.source.length; i++) {
+    const char = re.source.charAt(i);
+    if (char === "\\") {
+      const escaped = re.source.charAt(++i);
+      if (escaped === "s" || escaped === "S") {
+        const negation = escaped === "S" ? "^" : "";
+        result += `(?u:[${negation}${JS_WHITESPACE}])`;
+      } else {
+        result += "\\" + escaped;
+      }
+      continue;
+    }
+    if (char !== "[") {
+      result += char;
+      continue;
+    }
+    const start = i;
+    let whitespace = false;
+    while (++i < re.source.length) {
+      const member = re.source.charAt(i);
+      if (member === "]") break;
+      if (member !== "\\") continue;
+      const escaped = re.source.charAt(++i);
+      if (escaped === "s" || escaped === "S")
+        whitespace = true;
+    }
+    const original = re.source.slice(start, i + 1);
+    if (!whitespace) {
+      result += original;
+      continue;
+    }
+    // Legacy JS classes permit a literal hyphen next to a shortcut.
+    // Rust requires that hyphen to be escaped before expanding the shortcut.
+    let normalized = "";
+    let previousShortcut = false;
+    for (let j = 0; j < original.length; j++) {
+      const member = original.charAt(j);
+      if (member === "\\") {
+        const escaped = original.charAt(++j);
+        normalized += "\\" + escaped;
+        previousShortcut = "sSwWdD".includes(escaped);
+        continue;
+      }
+      const nextShortcut =
+        original.charAt(j + 1) === "\\" &&
+        "sSwWdD".includes(original.charAt(j + 2));
+      normalized +=
+        member === "-" && (previousShortcut || nextShortcut)
+          ? "\\-"
+          : member;
+      previousShortcut = false;
+    }
+    const classRegexp = new RegExp(normalized, "i");
+    if (!asciiMode) {
+      result += `(?u:${javascriptCharacterClasses(classRegexp, "whitespace")})`;
+      continue;
+    }
+    const body = original.slice(
+      original.startsWith("[^") ? 2 : 1,
+      -1,
+    );
+    const positive = new RegExp(`[${body}]`, "i");
+    let folds = "";
+    // At most 52 construction-only oracle checks preserve ASCII folding.
+    // Fold the positive body before restoring any outer class negation.
+    for (const letter of "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz") {
+      if (positive.test(letter)) folds += letter;
+    }
+    const translated =
+      javascriptCharacterClasses(classRegexp);
+    result += `(?u-i:${translated.slice(0, -1)}${folds}])`;
   }
   return result;
 }

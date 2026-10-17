@@ -74,7 +74,7 @@ describe("JavaScript RegExp character classes", () => {
       "\u0085",
       "\u200b",
     ]) {
-      for (const flags of ["", "u", "iu"]) {
+      for (const flags of ["", "i", "u", "iu"]) {
         assertOracle(
           new RegExp("Supreme\\sCourt", flags),
           `Supreme${separator}Court`,
@@ -133,6 +133,71 @@ describe("JavaScript RegExp character classes", () => {
     }
   });
 
+  test("non-Unicode whitespace classes retain ASCII word and literal folding", () => {
+    for (const source of [
+      "\\s",
+      "\\S",
+      "[\\s]",
+      "[\\S]",
+      "[^\\s]",
+      "[^\\S]",
+      "[a-z\\s]",
+      "[^a-z\\s]",
+      "[a-\\s]",
+      "[\\s-z]",
+      "[k\\s\\w]",
+      "[^k\\s\\w]",
+      "[\\s\\W]",
+      "[^\\s\\W]",
+      "[\\s\\d]",
+      "[\\s\\D]",
+      "[\\\\s\\s]",
+      "[^\\\\s\\s]",
+      "[\\]\\s]",
+      "[é\\s]",
+      "[\\b\\s]",
+      "[\\B\\s]",
+      "[\\x73\\s]",
+      "k\\s",
+      "\\\\s",
+      "[\\\\s]",
+    ]) {
+      const pattern = new RegExp(`^(?:${source})$`, "i");
+      for (const text of [
+        " ",
+        "\t",
+        "\n",
+        "\u00a0",
+        "\ufeff",
+        "\u0085",
+        "\u200b",
+        "a",
+        "A",
+        "k",
+        "K",
+        "s",
+        "S",
+        "\u212a",
+        "\u017f",
+        "é",
+        "É",
+        "1",
+        "_",
+        "\\",
+        "]",
+        "k\ufeff",
+        "K\ufeff",
+        "\u212a\ufeff",
+        "\\s",
+        "\b",
+        "b",
+        "B",
+      ]) {
+        assertOracle(pattern, text);
+      }
+    }
+  });
+
   test("keeps escaped backslashes outside Unicode flag changes", () => {
     const pattern = /(?<!\p{L})\\s(?:e?s)?(?!\p{L})/iu;
     for (const haystack of [
@@ -144,6 +209,40 @@ describe("JavaScript RegExp character classes", () => {
     ]) {
       assertOracle(pattern, haystack);
     }
+  });
+
+  test("generated non-Unicode whitespace patterns match their JavaScript witnesses", () => {
+    fc.assert(
+      fc.property(
+        fc.array(
+          fc.constantFrom(
+            { source: "\\s", witness: "\ufeff" },
+            { source: "\\S", witness: "k" },
+            { source: "[a-z\\s]", witness: "K" },
+            { source: "[^a-z\\s]", witness: "\u212a" },
+            { source: "[\\s\\w]", witness: "S" },
+            { source: "[^k\\s\\w]", witness: "\u017f" },
+            { source: "[\\s\\W]", witness: "\u212a" },
+            { source: "[\\\\s\\s]", witness: "s" },
+            { source: "\\\\s", witness: "\\s" },
+          ),
+          { minLength: 1, maxLength: 4 },
+        ),
+        fc.constantFrom("i", "im", "is"),
+        (entries, flags) => {
+          const pattern = new RegExp(
+            entries.map(({ source }) => source).join(""),
+            flags,
+          );
+          const witness = entries
+            .map(({ witness }) => witness)
+            .join("");
+          expect(pattern.test(witness)).toBe(true);
+          assertOracle(pattern, witness);
+        },
+      ),
+      { numRuns: 200 },
+    );
   });
 
   test("generated escaped shortcuts agree with JavaScript", () => {
