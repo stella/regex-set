@@ -1,0 +1,21 @@
+[package]
+name = "stella-regex-set-wasm-single-thread"
+version = "1.0.6"
+edition = "2024"
+description = "Single-thread WebAssembly bridge for the regex-set core"
+license = "Apache-2.0"
+publish = false
+repository = "https://github.com/stella/regex-set"
+readme = "../../README.md"
+keywords = ["regex", "search", "wasm"]
+categories = ["text-processing", "wasm"]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+serde_json = "1"
+stella-regex-set-core = { version = "1.0.6", path = "../core" }
+
+[lints]
+workspace = true

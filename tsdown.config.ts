@@ -36,6 +36,15 @@ export default defineConfig([
     plugins: [wasmFetchGuardPlugin("@stll/regex-set-wasm")],
   },
   {
+    entry: ["src/single-thread.ts"],
+    outDir: "wasm/dist",
+    format: ["esm"],
+    dts: true,
+    clean: false,
+    sourcemap: true,
+    hash: false,
+  },
+  {
     entry: ["wasi-worker-browser.mjs"],
     outDir: "wasm/dist",
     format: ["esm"],

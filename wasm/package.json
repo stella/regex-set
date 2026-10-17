@@ -34,7 +34,16 @@
     "./vite": {
       "types": "./dist/vite.d.mts",
       "import": "./dist/vite.mjs"
-    }
+    },
+    "./single-thread": {
+      "types": "./dist/single-thread.d.mts",
+      "import": "./dist/single-thread.mjs"
+    },
+    "./single-thread/inline": {
+      "types": "./dist/single-thread-inline.d.mts",
+      "import": "./dist/single-thread-inline.mjs"
+    },
+    "./single-thread/wasm": "./dist/regex-set.single-thread.wasm"
   },
   "publishConfig": {
     "access": "public"

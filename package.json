@@ -42,12 +42,12 @@
     "fix:loader": "node scripts/fix-napi-loader.mjs",
     "build": "node scripts/build-native.mjs --platform --dts index.d.cts --release",
     "build:debug": "node scripts/build-native.mjs --platform --dts index.d.cts",
-    "build:wasm": "node scripts/build-native.mjs --platform --target wasm32-wasip1-threads --dts index.d.cts --release",
-    "build:js": "node scripts/ensure-wasm-artifact.mjs && tsdown && node scripts/fix-napi-loader.mjs && node scripts/check-wasm-compat.mjs",
+    "build:wasm": "node scripts/build-single-thread.mjs && node scripts/build-native.mjs --platform --target wasm32-wasip1-threads --dts index.d.cts --release",
+    "build:js": "node scripts/ensure-wasm-artifact.mjs && tsdown && node scripts/fix-napi-loader.mjs && node scripts/check-wasm-compat.mjs && node scripts/pack-single-thread.mjs",
     "artifacts": "napi artifacts",
     "universal": "napi universal",
     "prepublishOnly": "napi prepublish -t npm && tsdown && node scripts/fix-napi-loader.mjs",
-    "test": "bun run check:release-artifacts && bun test __test__/index.spec.ts",
+    "test": "bun run check:release-artifacts && bun test __test__/index.spec.ts __test__/single-thread-import.spec.ts scripts/wasm-build-pipeline.test.mjs",
     "test:props": "bun test __test__/properties.spec.ts",
     "perf:contracts": "bun scripts/contract-fixture-perf.mjs",
     "test:runtime:bun": "bun scripts/runtime-smoke.mjs",
@@ -73,7 +73,9 @@
     "bench:install": "cd __bench__ && bun install",
     "bench:download": "bash __bench__/download-corpus.sh",
     "sync-ai": "bash scripts/sync-ai-skills.sh",
-    "sync-ai:check": "bash scripts/sync-ai-skills.sh --check"
+    "sync-ai:check": "bash scripts/sync-ai-skills.sh --check",
+    "build:single-thread": "node scripts/build-single-thread.mjs",
+    "test:single-thread": "bun test ./__test__/single-thread.runtime.ts"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^1.0.1",

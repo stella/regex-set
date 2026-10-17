@@ -1,3 +1,12 @@
+// Node 18 remains supported; newer runtimes use the native scalar normalization.
+const wellFormed = (text: string): string =>
+  typeof text.toWellFormed === "function"
+    ? text.toWellFormed()
+    : text.replace(
+        /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/gu,
+        "\uFFFD",
+      );
+
 /* Shared core: types, helpers, and the RegexSet
  * class that uses a late-bound native backend
  * (NAPI-RS or WASM).
@@ -816,6 +825,10 @@ function caseInsensitivePattern(p: string): string {
  * ```
  */
 export class RegexSet {
+  protected static getBinding(): NativeBinding {
+    return binding;
+  }
+
   private _inner: NativeRegexSetInstance;
   private _names: (string | undefined)[];
   private _hasNames: boolean;
@@ -831,6 +844,8 @@ export class RegexSet {
     prepared?: Uint8Array,
   ) {
     const nativeInput = buildNativeInput(patterns, options);
+    nativeInput.nativePatterns =
+      nativeInput.nativePatterns.map(wellFormed);
     this._names = nativeInput.names;
     this._hasNames = nativeInput.hasNames;
     this._patternCount = nativeInput.patternCount;
@@ -838,7 +853,7 @@ export class RegexSet {
     this._nativeIndexMap = nativeInput.nativeIndexMap;
     this._jsFallbacks = nativeInput.jsFallbacks;
     this._nativeSingles = [];
-    this._inner = new binding.RegexSet(
+    this._inner = new (new.target.getBinding().RegexSet)(
       nativeInput.nativePatterns,
       nativeInput.nativeOpts,
       prepared,
@@ -854,7 +869,7 @@ export class RegexSet {
           }
           return {
             pattern: original,
-            inner: new binding.RegexSet(
+            inner: new (new.target.getBinding().RegexSet)(
               [pattern],
               nativeInput.nativeOpts,
             ),
@@ -869,7 +884,9 @@ export class RegexSet {
     options?: Options,
   ): Uint8Array {
     const nativeInput = buildNativeInput(patterns, options);
-    return binding._prepareRegexSet(
+    nativeInput.nativePatterns =
+      nativeInput.nativePatterns.map(wellFormed);
+    return this.getBinding()._prepareRegexSet(
       nativeInput.nativePatterns,
       nativeInput.nativeOpts,
     );
@@ -882,6 +899,7 @@ export class RegexSet {
 
   /** Returns `true` if any pattern matches. */
   isMatch(haystack: string): boolean {
+    haystack = wellFormed(haystack);
     if (this._inner._isMatchBuf(encoder.encode(haystack))) {
       return true;
     }
@@ -894,6 +912,7 @@ export class RegexSet {
 
   /** Find all non-overlapping matches. */
   findIter(haystack: string): Match[] {
+    haystack = wellFormed(haystack);
     if (this._jsFallbacks.length > 0) {
       const all = this.findNativeSingles(haystack).concat(
         this.findJsFallbacks(haystack),
@@ -914,6 +933,7 @@ export class RegexSet {
 
   /** Which pattern indices matched (not where). */
   whichMatch(haystack: string): number[] {
+    haystack = wellFormed(haystack);
     const seen = new Set<number>();
     for (const pattern of this._inner.whichMatch(
       haystack,
@@ -942,6 +962,8 @@ export class RegexSet {
     haystack: string,
     replacements: string[],
   ): string {
+    haystack = wellFormed(haystack);
+    replacements = replacements.map(wellFormed);
     if (
       this._jsFallbacks.length === 0 &&
       this._nativeIndexMap.length === this._patternCount &&
