@@ -144,7 +144,10 @@ describe("JavaScript RegExp character classes", () => {
         `\\x${letter.charCodeAt(0).toString(16)}`,
       ]) {
         for (const flags of ["i", "iu"]) {
-          const pattern = new RegExp(`^(?:${source})$`, flags);
+          const pattern = new RegExp(
+            `^(?:${source})$`,
+            flags,
+          );
           for (const text of [
             letter,
             letter.toUpperCase(),
@@ -174,6 +177,8 @@ describe("JavaScript RegExp character classes", () => {
       /k.[^a]/i,
       /\w.[^a]/i,
       /(?<word>k).[^a]/i,
+      /(?<!a)k.[^a]/i,
+      /(?=k)k.[^a]/i,
       /\x6b.[^a]/i,
       /\u006b.[^a]/i,
       /[é\s].[^a]/i,
@@ -219,6 +224,32 @@ describe("JavaScript RegExp character classes", () => {
       "[^\\\\s\\s]",
       "[\\]\\s]",
       "[é\\s]",
+      "[é\\w]",
+      "[^é\\w]",
+      "[é\\W]",
+      "[^é\\W]",
+      "[é\\d]",
+      "[é\\D]",
+      "[ék]",
+      "[^ék]",
+      "[éS]",
+      "[À-Ö]",
+      "[^À-Ö]",
+      "[Σ\\w]",
+      "[^Σ\\w]",
+      "[ß\\s]",
+      "[ẞ\\s]",
+      "[µΜμ]",
+      "é",
+      "K",
+      "ſ",
+      "ß",
+      "ẞ",
+      "µ",
+      "Σ",
+      "\\u00e9",
+      "\\u212a",
+      "[\\u00e9\\w]",
       "[\\b\\s]",
       "[\\B\\s]",
       "[\\x73\\s]",
@@ -245,6 +276,20 @@ describe("JavaScript RegExp character classes", () => {
         "\u017f",
         "é",
         "É",
+        "ž",
+        "٣",
+        "À",
+        "à",
+        "Ö",
+        "ö",
+        "ß",
+        "ẞ",
+        "µ",
+        "Μ",
+        "μ",
+        "Σ",
+        "σ",
+        "ς",
         "1",
         "_",
         "\\",
@@ -282,6 +327,11 @@ describe("JavaScript RegExp character classes", () => {
           fc.constantFrom(
             { source: "\\s", witness: "\ufeff" },
             { source: "\\S", witness: "k" },
+            { source: "[é\\w]", witness: "É" },
+            { source: "[^é\\w]", witness: "ſ" },
+            { source: "[ék]", witness: "K" },
+            { source: "[Σ\\s]", witness: "ς" },
+            { source: "ß", witness: "ß" },
             { source: "[a-z\\s]", witness: "K" },
             { source: "[^a-z\\s]", witness: "\u212a" },
             { source: "[\\s\\w]", witness: "S" },
@@ -299,7 +349,9 @@ describe("JavaScript RegExp character classes", () => {
             flags,
           );
           const witness = entries
-            .map(({ witness: entryWitness }) => entryWitness)
+            .map(
+              ({ witness: entryWitness }) => entryWitness,
+            )
             .join("");
           expect(pattern.test(witness)).toBe(true);
           assertOracle(pattern, witness);

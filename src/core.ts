@@ -275,10 +275,7 @@ const JS_WHITESPACE =
   "\\x{0009}-\\x{000D}\\x{0020}\\x{00A0}\\x{1680}" +
   "\\x{2000}-\\x{200A}\\x{2028}\\x{2029}\\x{202F}\\x{205F}\\x{3000}\\x{FEFF}";
 
-function javascriptCharacterClasses(
-  re: RegExp,
-  shortcuts: "all" | "whitespace" = "all",
-): string {
+function javascriptCharacterClasses(re: RegExp): string {
   let result = "";
   let inClass = false;
   const unicodeCase =
@@ -312,13 +309,6 @@ function javascriptCharacterClasses(
           : `(?-i:(?:${beforeWord}${afterWord}|${beforeNonword}${afterNonword}))`;
       continue;
     }
-    if (
-      shortcuts === "whitespace" &&
-      escaped.toLowerCase() !== "s"
-    ) {
-      result += "\\" + escaped;
-      continue;
-    }
     let members: string;
     switch (escaped.toLowerCase()) {
       case "s":
@@ -341,6 +331,46 @@ function javascriptCharacterClasses(
   return result;
 }
 
+let legacyUnicodeFolds: Map<string, string[]> | undefined;
+
+/** Legacy JS folding uses one UTF-16 unit's uppercase, excluding ASCII folds. */
+function getLegacyUnicodeFolds(): Map<string, string[]> {
+  if (legacyUnicodeFolds) return legacyUnicodeFolds;
+  const groups = new Map<string, string[]>();
+  for (let code = 0x80; code <= 0xffff; code++) {
+    const char = String.fromCharCode(code);
+    const canonical = char.toUpperCase();
+    if (
+      canonical.length !== 1 ||
+      canonical === char ||
+      canonical.charCodeAt(0) < 0x80
+    )
+      continue;
+    const members = groups.get(canonical);
+    if (members) members.push(char);
+    else groups.set(canonical, [canonical, char]);
+  }
+  legacyUnicodeFolds = groups;
+  return groups;
+}
+
+function legacyLiteralPattern(literal: string): string {
+  if (/[a-z]/i.test(literal))
+    return `(?-i:[${literal.toLowerCase()}${literal.toUpperCase()}])`;
+  const code = literal.codePointAt(0);
+  if (code === undefined)
+    throw new Error("Missing literal");
+  const canonical = literal.toUpperCase();
+  const members =
+    canonical.length === 1 &&
+    canonical.charCodeAt(0) >= 0x80
+      ? getLegacyUnicodeFolds().get(canonical)
+      : undefined;
+  return members
+    ? `(?-i:[${members.join("")}])`
+    : `(?-i:\\x{${code.toString(16)}})`;
+}
+
 /** Keep legacy /i folding local so dots and complements remain Unicode-safe. */
 function javascriptLegacyCaseFolding(re: RegExp): string {
   let result = "";
@@ -357,11 +387,10 @@ function javascriptLegacyCaseFolding(re: RegExp): string {
         .slice(i)
         .match(/^(?:x[\da-f]{2}|u[\da-f]{4})/i)?.[0];
       if (hex) {
-        const token = "\\" + hex;
-        result +=
-          Number.parseInt(hex.slice(1), 16) < 128
-            ? `(?-u:${token})`
-            : token;
+        const literal = String.fromCharCode(
+          Number.parseInt(hex.slice(1), 16),
+        );
+        result += legacyLiteralPattern(literal);
         i += hex.length - 1;
         continue;
       }
@@ -393,7 +422,16 @@ function javascriptLegacyCaseFolding(re: RegExp): string {
       }
     }
     if (char !== "[") {
-      result += /[a-z]/i.test(char) ? `(?-u:${char})` : char;
+      const code = re.source.codePointAt(i);
+      if (code !== undefined && code >= 0x80) {
+        const literal = String.fromCodePoint(code);
+        result += legacyLiteralPattern(literal);
+        i += literal.length - 1;
+      } else {
+        result += /[a-z]/i.test(char)
+          ? legacyLiteralPattern(char)
+          : char;
+      }
       continue;
     }
     const start = i;
@@ -435,10 +473,6 @@ function javascriptLegacyCaseFolding(re: RegExp): string {
         Number.parseInt(match[1] ?? match[2] ?? "0", 16) >=
         128,
     );
-    if (hasNonAscii(original) || escapedNonAscii) {
-      result += `(?u:${javascriptCharacterClasses(classRegexp, "whitespace")})`;
-      continue;
-    }
     const body = original.slice(
       original.startsWith("[^") ? 2 : 1,
       -1,
@@ -450,9 +484,18 @@ function javascriptLegacyCaseFolding(re: RegExp): string {
     for (const letter of "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz") {
       if (positive.test(letter)) folds += letter;
     }
+    if (hasNonAscii(original) || escapedNonAscii) {
+      for (const [
+        canonical,
+        members,
+      ] of getLegacyUnicodeFolds()) {
+        if (positive.test(canonical))
+          folds += members.join("");
+      }
+    }
     const translated =
       javascriptCharacterClasses(classRegexp);
-    result += `(?u-i:${translated.slice(0, -1)}${folds}])`;
+    result += `(?-i:${translated.slice(0, -1)}${folds}])`;
   }
   return result;
 }
