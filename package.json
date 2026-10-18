@@ -50,7 +50,7 @@
     "test": "bun run check:release-artifacts && bun test __test__/index.spec.ts",
     "test:props": "bun test __test__/properties.spec.ts",
     "perf:contracts": "bun scripts/contract-fixture-perf.mjs",
-    "test:runtime:bun": "bun scripts/runtime-smoke.mjs",
+    "test:runtime:bun": "bun scripts/runtime-smoke.mjs && bun scripts/compiled-smoke.mjs",
     "test:runtime:node": "node scripts/runtime-smoke.mjs",
     "version:sync": "node scripts/version-sync.mjs sync",
     "version:check": "node scripts/version-sync.mjs check",
