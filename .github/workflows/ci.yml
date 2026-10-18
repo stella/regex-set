@@ -146,9 +146,9 @@ jobs:
         with:
           release-paths: |
             src/**
-            crates/core/src/**
+            crates/*/src/**
             Cargo.toml
-            crates/core/Cargo.toml
+            crates/*/Cargo.toml
             package.json
             wasm/package.json
             index.cjs
@@ -157,7 +157,7 @@ jobs:
             CHANGELOG.md
             VERSION
             Cargo.toml
-            crates/core/Cargo.toml
+            crates/*/Cargo.toml
             Cargo.lock
             bun.lock
             package.json

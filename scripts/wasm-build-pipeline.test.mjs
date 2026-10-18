@@ -12,6 +12,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const read = (path) =>
   readFileSync(new URL(path, import.meta.url), "utf8");
@@ -130,6 +131,43 @@ test("artifact runtime tests are explicitly scheduled after packaging", () => {
       expect(lines[index - 1].trim()).toBe(
         "- run: bun run build:js",
       );
+    }
+  }
+});
+
+test("changeset policy covers every workspace crate source and manifest", () => {
+  const workflow = Bun.YAML.parse(
+    read("../.github/workflows/ci.yml"),
+  );
+  const policy = workflow.jobs.changeset.steps.find(
+    (step) => step.uses?.includes("/changeset-policy@"),
+  );
+  const globs = (name) =>
+    policy.with[name]
+      .trim()
+      .split(/\s+/u)
+      .map((pattern) => new Bun.Glob(pattern));
+  const release = globs("release-paths");
+  const generated = globs("generated-paths");
+  const root = fileURLToPath(new URL("../", import.meta.url));
+  for (const pattern of [
+    "crates/*/src/**/*.rs",
+    "crates/*/Cargo.toml",
+  ]) {
+    const paths = [
+      ...new Bun.Glob(pattern).scanSync({ cwd: root }),
+    ];
+    expect(paths.length).toBeGreaterThan(0);
+    for (const path of paths) {
+      expect(
+        release.some((glob) => glob.match(path)),
+        path,
+      ).toBe(true);
+      if (path.endsWith("/Cargo.toml"))
+        expect(
+          generated.some((glob) => glob.match(path)),
+          path,
+        ).toBe(true);
     }
   }
 });
