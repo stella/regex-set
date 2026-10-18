@@ -139,7 +139,7 @@ describe("shared tooling adoption", () => {
     const release = read(".github/workflows/release.yml");
     expect(
       release.match(/node-version-file: .node-version/g),
-    ).toHaveLength(4);
+    ).toHaveLength(5);
     expect(
       release.match(/toolchain: "1.99.0"/g),
     ).toHaveLength(3);

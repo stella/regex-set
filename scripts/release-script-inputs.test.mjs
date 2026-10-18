@@ -8,6 +8,7 @@ import {
   readWasiRootEntry,
   readWasiWorkflow,
   readWasiPackage,
+  validateBuildScripts,
 } from "./release-script-inputs.mjs";
 
 void test("release schemas accept the actual package and workflow while preserving unrelated metadata", () => {
@@ -121,4 +122,25 @@ void test("WASI metadata boundaries reject malformed containers and consumed lea
       () => readWasiWorkflow({ jobs: { build } }),
       TypeError,
     );
+});
+
+void test("build scripts accept the composite WASM build and reject drift", () => {
+  const scripts = {
+    build:
+      "node scripts/build-native.mjs --platform --release",
+    "build:debug":
+      "node scripts/build-native.mjs --platform",
+    "build:wasm":
+      "node scripts/build-single-thread.mjs && node scripts/build-native.mjs --platform --target wasm32-wasip1-threads --dts index.d.cts --release",
+  };
+  assert.doesNotThrow(() => validateBuildScripts(scripts));
+  assert.throws(
+    () =>
+      validateBuildScripts({
+        ...scripts,
+        "build:wasm":
+          "node scripts/build-native.mjs --platform --target wasm32-wasip1-threads --dts index.d.cts --release",
+      }),
+    /must build the single-thread and threaded WASM artifacts/u,
+  );
 });

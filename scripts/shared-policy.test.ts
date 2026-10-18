@@ -157,6 +157,7 @@ test("native Node loads the single explicitly extended build-config import", () 
     JSON.parse(read("tsconfig.json")).compilerOptions,
   ).toEqual({
     allowImportingTsExtensions: true,
+    lib: ["ESNext", "DOM"],
   });
 });
 

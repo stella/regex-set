@@ -1,0 +1,4 @@
+{
+  "extends": "@stll/typescript-config/node.json",
+  "include": ["*.mjs"]
+}

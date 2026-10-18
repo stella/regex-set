@@ -156,3 +156,27 @@ export const readWasiPackage = (value) => {
     scripts: value["scripts"],
   };
 };
+
+const nativeBuildPrefix =
+  "node scripts/build-native.mjs ";
+const wasmBuildCommand =
+  "node scripts/build-single-thread.mjs && node scripts/build-native.mjs --platform --target wasm32-wasip1-threads --dts index.d.cts --release";
+
+/** @param {Record<string, unknown>} scripts */
+export const validateBuildScripts = (scripts) => {
+  for (const scriptName of ["build", "build:debug"]) {
+    const command = scripts[scriptName];
+    if (
+      typeof command !== "string" ||
+      !command.startsWith(nativeBuildPrefix) ||
+      command.includes("&&")
+    )
+      throw new TypeError(
+        `${scriptName} must forward arguments directly to build-native.mjs`,
+      );
+  }
+  if (scripts["build:wasm"] !== wasmBuildCommand)
+    throw new TypeError(
+      "build:wasm must build the single-thread and threaded WASM artifacts",
+    );
+};

@@ -6,11 +6,11 @@ import {
   RegexSet,
   init,
   initSync,
-} from "../wasm/dist/single-thread.mjs";
+} from "../../wasm/dist/single-thread.mjs";
 
 // Node provides the WASI API used by the existing threaded NAPI loader.
 const require = createRequire(import.meta.url);
-const threaded = require("../regex-set.wasi.cjs");
+const threaded = require("../../regex-set.wasi.cjs");
 class ThreadedSet extends RegexSet {
   static getBinding() {
     return threaded;

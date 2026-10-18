@@ -478,7 +478,7 @@ test("single-thread and existing threaded bindings produce identical public API 
     [
       fileURLToPath(
         new URL(
-          "./single-thread-parity.runtime.mjs",
+          "./node/single-thread-parity.runtime.mjs",
           import.meta.url,
         ),
       ),
