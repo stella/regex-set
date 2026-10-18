@@ -386,7 +386,8 @@ test("explicit initialization accepts bytes or caller URL and preserves binding 
   }
 });
 
-test("npm tarball contains and runs the single-thread entry and its runtime imports", () => {
+// npm.cmd requires a shell on Windows; this packaging check runs on POSIX.
+test.skipIf(process.platform === "win32")("npm tarball contains and runs the single-thread entry and its runtime imports", () => {
   const directory = mkdtempSync(
     join(tmpdir(), "regex-single-thread-pack-"),
   );

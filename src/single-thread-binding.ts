@@ -112,6 +112,20 @@ export const createSingleThreadBinding = (
     typeof outputLength !== "function"
   )
     throw new Error("Invalid single-thread WASM module");
+  let state: "ready" | "trapped" = "ready";
+  const invoke = (operation: () => unknown): number => {
+    if (state === "trapped")
+      throw new Error(
+        "Single-thread WASM instance trapped; call init() or initSync() again",
+      );
+    try {
+      return number(operation());
+    } catch (error) {
+      if (error instanceof WebAssembly.RuntimeError)
+        state = "trapped";
+      throw error;
+    }
+  };
   const encoder = new TextEncoder();
   const decoder = new TextDecoder("utf-8", {
     ignoreBOM: true,
@@ -136,7 +150,7 @@ export const createSingleThreadBinding = (
     // Preserve it across allocation/growth; public prepared results are copies.
     if (bytes?.buffer === memory.buffer)
       bytes = Uint8Array.from(bytes);
-    const pointer = number(allocate(size)) >>> 0;
+    const pointer = invoke(() => allocate(size)) >>> 0;
     const view = new DataView(memory.buffer, pointer, size);
     view.setUint32(0, op, true);
     view.setUint32(4, id, true);
@@ -168,11 +182,11 @@ export const createSingleThreadBinding = (
         pointer + cursor,
         bytes.byteLength,
       ).set(bytes);
-    const status = number(run());
+    const status = invoke(() => run());
     const output = new Uint8Array(
       memory.buffer,
-      number(outputPointer()) >>> 0,
-      number(outputLength()) >>> 0,
+      invoke(() => outputPointer()) >>> 0,
+      invoke(() => outputLength()) >>> 0,
     );
     if (status !== 0)
       throw new Error(decoder.decode(output));
@@ -180,7 +194,13 @@ export const createSingleThreadBinding = (
   };
   const registry = new FinalizationRegistry<number>(
     (id) => {
-      call(OP.free, { id });
+      if (state === "trapped") return;
+      try {
+        call(OP.free, { id });
+      } catch (error) {
+        if (!(error instanceof WebAssembly.RuntimeError))
+          throw error;
+      }
     },
   );
   class Matcher {
