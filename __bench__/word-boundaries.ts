@@ -25,8 +25,8 @@ const repeats = Math.ceil(TARGET_BYTES / paragraph.length);
 const text = paragraph.repeat(repeats);
 const set = new RegexSet(patterns);
 
-for (let index = 0; index < patterns.length; index++) {
-  const single = new RegexSet([patterns[index]!]);
+for (const [index, pattern] of patterns.entries()) {
+  const single = new RegexSet([pattern]);
   const [fast = 0, verified = 0, fallback = 0] =
     single._enginePathCounts();
   let path = "JavaScript fallback";
@@ -51,6 +51,6 @@ for (let index = 0; index < ITERATIONS; index++) {
 times.sort((left, right) => left - right);
 console.log(`bytes\t${Buffer.byteLength(text)}`);
 console.log(`matches\t${matches}`);
-console.log(
-  `median_ms\t${times[Math.floor(times.length / 2)]!.toFixed(3)}`,
-);
+const median = times.at(Math.floor(times.length / 2));
+if (median === undefined) throw new Error("No benchmark samples");
+console.log(`median_ms\t${median.toFixed(3)}`);
