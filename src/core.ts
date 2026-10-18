@@ -268,9 +268,7 @@ function regexpToRust(re: RegExp): string {
   }
 
   const uFlag =
-    !unicodeClasses &&
-    needsAsciiMode(re.source) &&
-    !hasNonAscii(re.source)
+    !unicodeClasses && !hasNonAscii(re.source)
       ? "-u"
       : "";
   return `${leading}(?${flags}${uFlag}:${src})${trailing}`;

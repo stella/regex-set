@@ -133,6 +133,29 @@ describe("JavaScript RegExp character classes", () => {
     }
   });
 
+  test("ASCII ignore-case literals retain JavaScript folding without shortcuts", () => {
+    for (const letter of "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz") {
+      for (const source of [
+        letter,
+        `[${letter}]`,
+        `\\x${letter.charCodeAt(0).toString(16)}`,
+      ]) {
+        for (const flags of ["i", "iu"]) {
+          const pattern = new RegExp(`^(?:${source})$`, flags);
+          for (const text of [
+            letter,
+            letter.toUpperCase(),
+            letter.toLowerCase(),
+            "\u017f",
+            "\u212a",
+          ]) {
+            assertOracle(pattern, text);
+          }
+        }
+      }
+    }
+  });
+
   test("non-Unicode whitespace classes retain ASCII word and literal folding", () => {
     for (const source of [
       "\\s",
@@ -235,7 +258,7 @@ describe("JavaScript RegExp character classes", () => {
             flags,
           );
           const witness = entries
-            .map(({ witness }) => witness)
+            .map(({ witness: entryWitness }) => entryWitness)
             .join("");
           expect(pattern.test(witness)).toBe(true);
           assertOracle(pattern, witness);
