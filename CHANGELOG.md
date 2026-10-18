@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.7
+
+### Patch Changes
+
+- [#191](https://github.com/stella/regex-set/pull/191) [`60bcfb3`](https://github.com/stella/regex-set/commit/60bcfb3bd335673b7b9830e5567412d69efd91dc) Thanks [@jan-kubica](https://github.com/jan-kubica)! - License the packages under Apache-2.0 and update the published license metadata.
+
+- [#202](https://github.com/stella/regex-set/pull/202) [`c8b636a`](https://github.com/stella/regex-set/commit/c8b636a2a5ce840aecb70568c46dbae355417bcf) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Update the napi and bon crates and the WASM runtime build tooling.
+
+- [#225](https://github.com/stella/regex-set/pull/225) [`d97ea5d`](https://github.com/stella/regex-set/commit/d97ea5db37354871ea2ff99491e588b90063c761) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Load the native binding with a static import so `bun build --compile` binaries can bundle it.
+
 ## 1.0.6
 
 ### Patch Changes
