@@ -170,7 +170,7 @@ jobs:
           package-files: package.json
 
   checks:
-    name: Typecheck and parity
+    name: Tooling policy
     if: >-
       always()
       && !cancelled()
@@ -192,7 +192,6 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run check:toolchain
         if: needs.check-changes.outputs.toolchain-changed == 'true'
-      - run: bun run typecheck
       - run: bun test scripts/tooling-adoption.test.ts scripts/shared-policy.test.ts
 
   napi-ci:
@@ -200,6 +199,7 @@ jobs:
     needs: [check-changes, trust-check]
     uses: stella/.github/.github/workflows/rust-napi-ci.yml@8f19eb7220047e5b06f6e75f0b9f908bfd01f5f6
     with:
+      typecheck: true
       node-version: "26.10.0"
       trusted: ${{ (github.event_name != 'pull_request' || needs.trust-check.outputs.trusted == 'true') && 'true' || 'false' }}
       rust-changed: ${{ needs.check-changes.outputs.rust-changed }}
