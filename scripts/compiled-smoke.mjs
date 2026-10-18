@@ -66,23 +66,32 @@ try {
       sourceRoot,
       "package.json",
     );
+    /** @type {unknown} */
     const packageJson = JSON.parse(
       await readFile(packageJsonPath, "utf8"),
     );
-    if (
-      typeof packageJson.main !== "string" ||
-      !packageJson.main.endsWith(".node")
-    ) {
+    const main =
+      typeof packageJson === "object" && packageJson !== null
+        ? Reflect.get(packageJson, "main")
+        : undefined;
+    if (typeof main !== "string" || !main.endsWith(".node")) {
       continue;
+    }
+    const name =
+      typeof packageJson === "object" && packageJson !== null
+        ? Reflect.get(packageJson, "name")
+        : undefined;
+    if (typeof name !== "string") {
+      throw new Error(`${packageJsonPath} has no package name`);
     }
 
     const packagedNativePath = path.join(
       sourceRoot,
-      packageJson.main,
+      main,
     );
     const rootNativePath = path.join(
       repositoryRoot,
-      packageJson.main,
+      main,
     );
     let nativePath = packagedNativePath;
     try {
@@ -101,7 +110,7 @@ try {
     const destination = path.join(
       stagingRoot,
       "node_modules",
-      packageJson.name,
+      name,
     );
     await mkdir(destination, { recursive: true });
     await Promise.all([
@@ -111,7 +120,7 @@ try {
       ),
       copyFile(
         nativePath,
-        path.join(destination, packageJson.main),
+        path.join(destination, main),
       ),
     ]);
     nativePackageCount++;
