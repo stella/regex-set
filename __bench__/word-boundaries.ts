@@ -27,15 +27,12 @@ const set = new RegexSet(patterns);
 
 for (let index = 0; index < patterns.length; index++) {
   const single = new RegexSet([patterns[index]!]);
-  const [fast, verified, fallback] =
+  const [fast = 0, verified = 0, fallback = 0] =
     single._enginePathCounts();
-  const path = fast
-    ? "DFA"
-    : verified
-      ? "verified DFA"
-      : fallback
-        ? "fallback"
-        : "JavaScript fallback";
+  let path = "JavaScript fallback";
+  if (fast > 0) path = "DFA";
+  else if (verified > 0) path = "verified DFA";
+  else if (fallback > 0) path = "fallback";
   console.log(
     `${String(index + 1).padStart(2, "0")}\t${path}`,
   );
