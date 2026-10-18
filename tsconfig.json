@@ -1,9 +1,14 @@
 {
   "extends": "@stll/typescript-config/node.json",
   "compilerOptions": {
-    "allowImportingTsExtensions": true,
-    "types": ["node"]
+    "allowImportingTsExtensions": true
   },
-  "include": ["*.d.ts", "src/**/*.ts", "tsdown.config.ts"],
+  "include": [
+    "*.d.ts",
+    "*.d.cts",
+    "src/**/*.ts",
+    "tsdown.config.ts",
+    "oxlint.config.ts"
+  ],
   "exclude": ["node_modules", "dist", "wasm/dist", "npm"]
 }
