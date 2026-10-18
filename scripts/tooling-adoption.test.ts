@@ -40,6 +40,7 @@ describe("shared tooling adoption", () => {
     );
     expect(tsconfig.compilerOptions).toEqual({
       allowImportingTsExtensions: true,
+      lib: ["ESNext", "DOM"],
     });
   });
 

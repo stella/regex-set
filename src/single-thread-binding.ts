@@ -66,9 +66,9 @@ const optionFlags = (
 
 type Request = {
   id?: number;
-  options?: Record<string, unknown>;
+  options?: Record<string, unknown> | undefined;
   strings?: readonly string[];
-  bytes?: Uint8Array;
+  bytes?: Uint8Array | undefined;
 };
 
 const scalar = (bytes: Uint8Array): number => {
@@ -148,7 +148,7 @@ export const createSingleThreadBinding = (
     const flags = optionFlags(options);
     // A caller of this low-level adapter can supply a view of its own memory.
     // Preserve it across allocation/growth; public prepared results are copies.
-    if (bytes?.buffer === memory.buffer)
+    if (bytes && bytes.buffer === memory.buffer)
       bytes = Uint8Array.from(bytes);
     const pointer = invoke(() => allocate(size)) >>> 0;
     const view = new DataView(memory.buffer, pointer, size);
