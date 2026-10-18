@@ -61,6 +61,27 @@ await normalizeGeneratedFile("regex-set.wasi-browser.js", {
 await normalizeGeneratedFile("wasi-worker-browser.mjs");
 await normalizeGeneratedFile("wasi-worker.mjs");
 
+const declarationPath = new URL(
+  "../index.d.cts",
+  import.meta.url,
+);
+const declarationSource = await readFile(
+  declarationPath,
+  "utf8",
+);
+const defaultExportDeclaration = `
+import type { NativeBinding } from "./src/core";
+
+declare const binding: NativeBinding
+export default binding
+`;
+if (!declarationSource.includes("export default binding")) {
+  await writeFile(
+    declarationPath,
+    `${declarationSource.trimEnd()}\n${defaultExportDeclaration}`,
+  );
+}
+
 const contractResult = spawnSync(
   "bun",
   [

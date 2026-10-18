@@ -25,3 +25,8 @@ export interface Options {
   wholeWords?: boolean
   unicodeBoundaries?: boolean
 }
+
+import type { NativeBinding } from "./src/core";
+
+declare const binding: NativeBinding
+export default binding
