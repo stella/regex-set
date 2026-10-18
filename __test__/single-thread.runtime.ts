@@ -1,18 +1,12 @@
 import { expect, spyOn, test } from "bun:test";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { runInNewContext } from "node:vm";
 
-import {
-  RegexSet as CoreRegexSet,
-  type NativeBinding,
-  type Options,
-  type PatternEntry,
-} from "../src/core";
+import { RegexSet as CoreRegexSet } from "../src/core";
 import {
   RegexSet,
   init,
@@ -227,7 +221,15 @@ test("a Response from another realm supplies bytes without fetching", async () =
     ]);
     if (!isResponse(failure))
       throw new Error("Invalid Response fixture");
-    await expect(init(failure)).rejects.toThrow("404");
+    await init(failure).then(
+      () => {
+        throw new Error("Expected HTTP rejection");
+      },
+      (error) => {
+        if (!(error instanceof Error)) throw error;
+        expect(error.message).toContain("404");
+      },
+    );
     expect(
       new RegexSet(["still ready"]).isMatch("still ready"),
     ).toBe(true);
@@ -357,7 +359,13 @@ test("explicit initialization accepts bytes or caller URL and preserves binding 
   const requested: string[] = [];
   try {
     globalThis.fetch = (async (input) => {
-      requested.push(String(input));
+      requested.push(
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url,
+      );
       return new Response(bytes);
     }) as typeof fetch;
     await init(bytes);
@@ -373,9 +381,17 @@ test("explicit initialization accepts bytes or caller URL and preserves binding 
       new Response("missing", {
         status: 404,
       })) as typeof fetch;
-    await expect(
-      init("https://extension.invalid/missing.wasm"),
-    ).rejects.toThrow("404");
+    await init(
+      "https://extension.invalid/missing.wasm",
+    ).then(
+      () => {
+        throw new Error("Expected HTTP rejection");
+      },
+      (error) => {
+        if (!(error instanceof Error)) throw error;
+        expect(error.message).toContain("404");
+      },
+    );
     expect(
       new RegexSet(["still initialized"]).isMatch(
         "still initialized",
@@ -387,55 +403,57 @@ test("explicit initialization accepts bytes or caller URL and preserves binding 
 });
 
 // npm.cmd requires a shell on Windows; this packaging check runs on POSIX.
-test.skipIf(process.platform === "win32")("npm tarball contains and runs the single-thread entry and its runtime imports", () => {
-  const directory = mkdtempSync(
-    join(tmpdir(), "regex-single-thread-pack-"),
-  );
-  try {
-    const output = execFileSync(
-      "npm",
-      [
-        "pack",
-        "--json",
-        "--ignore-scripts",
-        "--pack-destination",
-        directory,
-      ],
-      {
-        cwd: new URL("../wasm/", import.meta.url),
-        encoding: "utf8",
-      },
+test.skipIf(process.platform === "win32")(
+  "npm tarball contains and runs the single-thread entry and its runtime imports",
+  () => {
+    const directory = mkdtempSync(
+      join(tmpdir(), "regex-single-thread-pack-"),
     );
-    const [packed] = JSON.parse(output);
-    const files = packed.files.map(
-      (file: { path: string }) => file.path,
-    );
-    for (const expected of [
-      "dist/single-thread.mjs",
-      "dist/single-thread.d.mts",
-      "dist/single-thread-inline.mjs",
-      "dist/single-thread-inline.d.mts",
-      "dist/regex-set.single-thread.wasm",
-      "dist/single-thread-size.json",
-    ])
-      expect(files).toContain(expected);
-    execFileSync("tar", [
-      "-xzf",
-      join(directory, packed.filename),
-      "-C",
-      directory,
-    ]);
-    const entry = pathToFileURL(
-      join(
+    try {
+      const output = execFileSync(
+        "npm",
+        [
+          "pack",
+          "--json",
+          "--ignore-scripts",
+          "--pack-destination",
+          directory,
+        ],
+        {
+          cwd: new URL("../wasm/", import.meta.url),
+          encoding: "utf8",
+        },
+      );
+      const [packed] = JSON.parse(output);
+      const files = packed.files.map(
+        (file: { path: string }) => file.path,
+      );
+      for (const expected of [
+        "dist/single-thread.mjs",
+        "dist/single-thread.d.mts",
+        "dist/single-thread-inline.mjs",
+        "dist/single-thread-inline.d.mts",
+        "dist/regex-set.single-thread.wasm",
+        "dist/single-thread-size.json",
+      ])
+        expect(files).toContain(expected);
+      execFileSync("tar", [
+        "-xzf",
+        join(directory, packed.filename),
+        "-C",
         directory,
-        "package/dist/single-thread-inline.mjs",
-      ),
-    ).href;
-    const result = Bun.spawnSync(
-      [
-        process.execPath,
-        "-e",
-        `
+      ]);
+      const entry = pathToFileURL(
+        join(
+          directory,
+          "package/dist/single-thread-inline.mjs",
+        ),
+      ).href;
+      const result = Bun.spawnSync(
+        [
+          process.execPath,
+          "-e",
+          `
       globalThis.fetch = () => {throw new Error('unexpected fetch')};
       Reflect.deleteProperty(globalThis, 'SharedArrayBuffer');
       Reflect.deleteProperty(globalThis, 'Worker');
@@ -443,144 +461,28 @@ test.skipIf(process.platform === "win32")("npm tarball contains and runs the sin
       initSync();
       if (!new RegexSet(['packed']).isMatch('packed')) throw new Error('packed runtime failed');
     `,
-      ],
-      { cwd: directory },
-    );
-    expect(result.stderr.toString()).toBe("");
-    expect(result.exitCode).toBe(0);
-  } finally {
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
+        ],
+        { cwd: directory },
+      );
+      expect(result.stderr.toString()).toBe("");
+      expect(result.exitCode).toBe(0);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  },
+);
 
-test("single-thread and existing threaded bindings produce identical public API results", async () => {
-  const require = createRequire(import.meta.url);
-  // SAFETY: generated NAPI loader exposes the binding contract exercised below.
-  const threaded =
-    require("../regex-set.wasi.cjs") as NativeBinding;
-  class ThreadedSet extends CoreRegexSet {
-    protected static override getBinding() {
-      return threaded;
-    }
-  }
-  initSync(bytes);
-  try {
-    for (const { text, replacement, expected } of [
-      {
-        text: "\uFEFFfoo",
-        replacement: "x",
-        expected: "\uFEFFx",
-      },
-      {
-        text: "foo",
-        replacement: "\uFEFFx",
-        expected: "\uFEFFx",
-      },
-      {
-        text: "\uFEFFabsent",
-        replacement: "x",
-        expected: "\uFEFFabsent",
-      },
-    ]) {
-      const single = new RegexSet(["foo"]);
-      const original = new ThreadedSet(["foo"]);
-      expect(original.replaceAll(text, [replacement])).toBe(
-        expected,
-      );
-      expect(single.replaceAll(text, [replacement])).toBe(
-        expected,
-      );
-    }
-    const corpus: {
-      patterns: PatternEntry[];
-      text: string;
-    }[] = [
-      {
-        patterns: ["foo", "foobar", "bar", "foo"],
-        text: "foobar foo",
-      },
-      { patterns: [/hello/iu, /\d+/u], text: "HELLO 123" },
-      {
-        patterns: ["😀", "é", "中", "İ"],
-        text: "😀é中 İ i",
-      },
-      {
-        patterns: [{ pattern: "foo", name: "named" }],
-        text: "foo",
-      },
-      { patterns: ["(?<!a)b", "a+"], text: "aaab b" },
-      { patterns: ["\ud800"], text: "a\ud800b" },
-      { patterns: [], text: "anything" },
-      { patterns: ["absent"], text: "" },
-    ];
-    for (const caseInsensitive of [false, true]) {
-      for (const wholeWords of [false, true]) {
-        for (const unicodeBoundaries of [false, true]) {
-          const options: Options = {
-            caseInsensitive,
-            wholeWords,
-            unicodeBoundaries,
-          };
-          for (const { patterns, text } of corpus) {
-            const single = new RegexSet(patterns, options);
-            const original = new ThreadedSet(
-              patterns,
-              options,
-            );
-            expect(single.patternCount).toBe(
-              original.patternCount,
-            );
-            expect(single.isMatch(text)).toBe(
-              original.isMatch(text),
-            );
-            expect(single.findIter(text)).toEqual(
-              original.findIter(text),
-            );
-            expect(single.whichMatch(text)).toEqual(
-              original.whichMatch(text),
-            );
-            const replacements = patterns.map(
-              (_, index) => `[${index}]`,
-            );
-            expect(
-              single.replaceAll(text, replacements),
-            ).toBe(original.replaceAll(text, replacements));
-            const prepared = ThreadedSet.prepare(
-              patterns,
-              options,
-            );
-            expect(
-              new RegexSet(
-                patterns,
-                options,
-                prepared,
-              ).findIter(text),
-            ).toEqual(original.findIter(text));
-            const singlePrepared = RegexSet.prepare(
-              patterns,
-              options,
-            );
-            expect(
-              new ThreadedSet(
-                patterns,
-                options,
-                singlePrepared,
-              ).findIter(text),
-            ).toEqual(single.findIter(text));
-          }
-        }
-      }
-    }
-    await init(bytes);
-    expect(new ThreadedSet(["old"]).isMatch("old")).toBe(
-      true,
-    );
-    expect(new RegexSet(["new"]).isMatch("new")).toBe(true);
-  } finally {
-    const dispose = Reflect.get(
-      threaded,
-      Symbol.for("napi.rs.wasi.dispose"),
-    );
-    if (typeof dispose === "function") await dispose();
-  }
+test("single-thread and existing threaded bindings produce identical public API results", () => {
+  execFileSync(
+    "node",
+    [
+      fileURLToPath(
+        new URL(
+          "./single-thread-parity.runtime.mjs",
+          import.meta.url,
+        ),
+      ),
+    ],
+    { timeout: 60_000 },
+  );
 });
