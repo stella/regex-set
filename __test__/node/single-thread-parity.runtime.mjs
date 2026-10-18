@@ -18,7 +18,7 @@ class ThreadedSet extends RegexSet {
 }
 const bytes = readFileSync(
   new URL(
-    "../regex-set.single-thread.wasm",
+    "../../regex-set.single-thread.wasm",
     import.meta.url,
   ),
 );
