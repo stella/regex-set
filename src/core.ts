@@ -240,7 +240,7 @@ function regexpToRust(re: RegExp): string {
   const unicodeClasses = re.unicode || re.unicodeSets;
   let src = unicodeClasses
     ? javascriptCharacterClasses(re)
-    : javascriptWhitespaceClasses(re);
+    : javascriptLegacyCaseFolding(re);
   let leading = "";
   let trailing = "";
 
@@ -267,11 +267,7 @@ function regexpToRust(re: RegExp): string {
     }
   }
 
-  const uFlag =
-    !unicodeClasses && !hasNonAscii(re.source)
-      ? "-u"
-      : "";
-  return `${leading}(?${flags}${uFlag}:${src})${trailing}`;
+  return `${leading}(?${flags}:${src})${trailing}`;
 }
 
 // ECMAScript WhiteSpace and LineTerminator, including BOM but not NEL.
@@ -345,42 +341,69 @@ function javascriptCharacterClasses(
   return result;
 }
 
-/** Preserve non-Unicode /i folding while giving whitespace its Unicode set. */
-function javascriptWhitespaceClasses(re: RegExp): string {
-  const asciiMode =
-    needsAsciiMode(re.source) && !hasNonAscii(re.source);
+/** Keep legacy /i folding local so dots and complements remain Unicode-safe. */
+function javascriptLegacyCaseFolding(re: RegExp): string {
   let result = "";
   for (let i = 0; i < re.source.length; i++) {
     const char = re.source.charAt(i);
     if (char === "\\") {
       const escaped = re.source.charAt(++i);
-      if (escaped === "s" || escaped === "S") {
-        const negation = escaped === "S" ? "^" : "";
-        result += `(?u:[${negation}${JS_WHITESPACE}])`;
-      } else {
-        result += "\\" + escaped;
+      if ("sSwWdDbB".includes(escaped)) {
+        const token = new RegExp("\\" + escaped, "i");
+        result += `(?-i:${javascriptCharacterClasses(token)})`;
+        continue;
       }
+      const hex = re.source
+        .slice(i)
+        .match(/^(?:x[\da-f]{2}|u[\da-f]{4})/i)?.[0];
+      if (hex) {
+        const token = "\\" + hex;
+        result +=
+          Number.parseInt(hex.slice(1), 16) < 128
+            ? `(?-u:${token})`
+            : token;
+        i += hex.length - 1;
+        continue;
+      }
+      // Preserve named backreferences as one token, including the group name.
+      if (
+        escaped === "k" &&
+        re.source.charAt(i + 1) === "<"
+      ) {
+        const end = re.source.indexOf(">", i + 2);
+        if (end !== -1) {
+          result += re.source.slice(i - 1, end + 1);
+          i = end;
+          continue;
+        }
+      }
+      result += "\\" + escaped;
       continue;
     }
+    // Named capture names are syntax, not case-insensitive literal text.
+    if (
+      re.source.startsWith("(?<", i) &&
+      !"=!".includes(re.source.charAt(i + 3))
+    ) {
+      const end = re.source.indexOf(">", i + 3);
+      if (end !== -1) {
+        result += re.source.slice(i, end + 1);
+        i = end;
+        continue;
+      }
+    }
     if (char !== "[") {
-      result += char;
+      result += /[a-z]/i.test(char) ? `(?-u:${char})` : char;
       continue;
     }
     const start = i;
-    let whitespace = false;
     while (++i < re.source.length) {
       const member = re.source.charAt(i);
       if (member === "]") break;
       if (member !== "\\") continue;
-      const escaped = re.source.charAt(++i);
-      if (escaped === "s" || escaped === "S")
-        whitespace = true;
+      i++;
     }
     const original = re.source.slice(start, i + 1);
-    if (!whitespace) {
-      result += original;
-      continue;
-    }
     // Legacy JS classes permit a literal hyphen next to a shortcut.
     // Rust requires that hyphen to be escaped before expanding the shortcut.
     let normalized = "";
@@ -403,7 +426,16 @@ function javascriptWhitespaceClasses(re: RegExp): string {
       previousShortcut = false;
     }
     const classRegexp = new RegExp(normalized, "i");
-    if (!asciiMode) {
+    const escapedNonAscii = [
+      ...normalized.matchAll(
+        /\\(?:x([\da-f]{2})|u([\da-f]{4}))/gi,
+      ),
+    ].some(
+      (match) =>
+        Number.parseInt(match[1] ?? match[2] ?? "0", 16) >=
+        128,
+    );
+    if (hasNonAscii(original) || escapedNonAscii) {
       result += `(?u:${javascriptCharacterClasses(classRegexp, "whitespace")})`;
       continue;
     }

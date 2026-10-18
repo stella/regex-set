@@ -12,9 +12,10 @@ const assertOracle = (
     { unicodeBoundaries: false },
   ]) {
     const set = new RegexSet([pattern], options);
-    expect(set.isMatch(haystack)).toBe(
-      pattern.test(haystack),
-    );
+    expect(
+      set.isMatch(haystack),
+      `${pattern} on ${JSON.stringify(haystack)}`,
+    ).toBe(pattern.test(haystack));
   }
 };
 
@@ -138,6 +139,8 @@ describe("JavaScript RegExp character classes", () => {
       for (const source of [
         letter,
         `[${letter}]`,
+        `[^${letter}]`,
+        `${letter}.[^a]`,
         `\\x${letter.charCodeAt(0).toString(16)}`,
       ]) {
         for (const flags of ["i", "iu"]) {
@@ -146,12 +149,50 @@ describe("JavaScript RegExp character classes", () => {
             letter,
             letter.toUpperCase(),
             letter.toLowerCase(),
+            `${letter}xb`,
+            `${letter.toUpperCase()}xb`,
+            `${letter}xa`,
+            "\u017fxb",
+            "\u212axb",
+            "éxb",
+            "😀xb",
             "\u017f",
             "\u212a",
           ]) {
             assertOracle(pattern, text);
           }
         }
+      }
+    }
+  });
+
+  test("dots and complemented classes remain Unicode-safe in legacy ignore-case patterns", () => {
+    for (const pattern of [
+      /./i,
+      /.+/i,
+      /[^a]/i,
+      /k.[^a]/i,
+      /\w.[^a]/i,
+      /(?<word>k).[^a]/i,
+      /\x6b.[^a]/i,
+      /\u006b.[^a]/i,
+      /[é\s].[^a]/i,
+      /[\u00e9\s].[^a]/i,
+    ]) {
+      for (const text of [
+        "",
+        "a",
+        "A",
+        "kxb",
+        "Kxb",
+        "\u212axb",
+        "é",
+        "Éxb",
+        "😀",
+        "k😀b",
+        "ſxb",
+      ]) {
+        assertOracle(pattern, text);
       }
     }
   });
