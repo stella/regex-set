@@ -21,12 +21,15 @@ const distEntry = path.join(
   "dist/index.mjs",
 );
 const distSource = await readFile(distEntry, "utf8");
-
-assert.match(
-  distSource,
-  /import\s+[^;]+from\s*["']\.\.\/index\.cjs["']/,
+// The probe must find the addon inside the executable, never through a
+// loader override that points back at a file on disk.
+const probeEnvironment = Object.fromEntries(
+  Object.entries(process.env).filter(
+    ([name]) =>
+      name !== "NAPI_RS_NATIVE_LIBRARY_PATH" &&
+      name !== "NAPI_RS_FORCE_WASI",
+  ),
 );
-assert.doesNotMatch(distSource, /createRequire/);
 
 const stagingRoot = await mkdtemp(
   path.join(tmpdir(), "regex-set-compiled-"),
@@ -132,8 +135,9 @@ try {
       "--outfile",
       "probe",
     ],
-    { cwd: stagingRoot, encoding: "utf8" },
+    { cwd: stagingRoot, encoding: "utf8", timeout: 120_000 },
   );
+  assert.ifError(compile.error);
   assert.equal(
     compile.status,
     0,
@@ -149,13 +153,23 @@ try {
   const probe = spawnSync("./probe", [], {
     cwd: stagingRoot,
     encoding: "utf8",
+    env: probeEnvironment,
+    timeout: 30_000,
   });
+  assert.ifError(probe.error);
   assert.equal(
     probe.status,
     0,
     probe.stderr || probe.stdout,
   );
   assert.equal(probe.stdout, "[ 1 ]\n");
+
+  // Checked after the boot so a regression is reported by the binary itself.
+  assert.match(
+    distSource,
+    /import\s+[^;]+from\s*["']\.\.\/index\.cjs["']/,
+  );
+  assert.doesNotMatch(distSource, /createRequire/);
 } finally {
   await rm(stagingRoot, { force: true, recursive: true });
 }
