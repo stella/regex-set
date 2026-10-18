@@ -359,13 +359,9 @@ test("explicit initialization accepts bytes or caller URL and preserves binding 
   const requested: string[] = [];
   try {
     globalThis.fetch = (async (input) => {
-      requested.push(
-        typeof input === "string"
-          ? input
-          : input instanceof URL
-            ? input.href
-            : input.url,
-      );
+      if (typeof input === "string") requested.push(input);
+      else if (input instanceof URL) requested.push(input.href);
+      else requested.push(input.url);
       return new Response(bytes);
     }) as typeof fetch;
     await init(bytes);
