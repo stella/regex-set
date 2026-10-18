@@ -2141,6 +2141,16 @@ impl RegexSet {
     self.pattern_count
   }
 
+  /// Pattern counts for the fast DFA, verified DFA, and fancy fallback paths.
+  #[must_use]
+  pub fn engine_path_counts(&self) -> [u32; 3] {
+    [
+      u32::try_from(self.fast_info.len()).unwrap_or(u32::MAX),
+      u32::try_from(self.slow_info.len()).unwrap_or(u32::MAX),
+      u32::try_from(self.fallbacks.len()).unwrap_or(u32::MAX),
+    ]
+  }
+
   // ── Core match collection (single source) ──
 
   /// Collect all verified matches from both the

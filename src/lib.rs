@@ -60,6 +60,12 @@ impl RegexSet {
     self.inner.pattern_count()
   }
 
+  #[napi(js_name = "_enginePathCounts")]
+  #[must_use]
+  pub fn engine_path_counts(&self) -> Vec<u32> {
+    self.inner.engine_path_counts().to_vec()
+  }
+
   #[napi]
   #[must_use]
   #[allow(clippy::needless_pass_by_value)]

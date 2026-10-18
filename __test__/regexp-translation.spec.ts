@@ -20,6 +20,42 @@ const assertOracle = (
 };
 
 describe("JavaScript RegExp character classes", () => {
+  test("keeps plain word boundaries on the DFA path", () => {
+    const set = new RegexSet([
+      /\bčl\.\s*\d+\b/,
+      /\bIČO:\s*[0-9]{8}\b/,
+    ]);
+
+    expect(set._enginePathCounts()).toEqual([0, 2, 0]);
+  });
+
+  test("uses JavaScript word membership for Unicode case folding", () => {
+    for (const char of ["\u212a", "\u017f"]) {
+      for (const flags of ["", "iu"]) {
+        for (const boundary of ["\\b", "\\B"]) {
+          const pattern = new RegExp(
+            `${boundary}${char}`,
+            flags,
+          );
+          for (const text of [
+            char,
+            `é${char}`,
+            ` ${char}`,
+          ]) {
+            assertOracle(pattern, text);
+          }
+        }
+      }
+    }
+  });
+
+  test("keeps word-boundary escapes inside nested Unicode sets", () => {
+    const pattern = new RegExp(String.raw`^[[a]\b]$`, "v");
+    for (const text of ["a", "\b", "b", "["]) {
+      assertOracle(pattern, text);
+    }
+  });
+
   test("keeps JavaScript word boundaries independent of engine boundary options", () => {
     expect(/\bfoo/iu.test("éfoo")).toBe(true);
     expect(/\Bfoo/iu.test("éfoo")).toBe(false);

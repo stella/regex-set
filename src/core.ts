@@ -32,6 +32,7 @@ type NativeOptions = {
 
 type NativeRegexSetInstance = {
   patternCount: number;
+  _enginePathCounts(): Uint32Array;
   isMatch(haystack: string): boolean;
   _isMatchBuf(haystack: Buffer | Uint8Array): boolean;
   _findIterPacked(haystack: string): Uint32Array;
@@ -277,7 +278,7 @@ const JS_WHITESPACE =
 
 function javascriptCharacterClasses(re: RegExp): string {
   let result = "";
-  let inClass = false;
+  let classDepth = 0;
   const unicodeCase =
     re.ignoreCase && (re.unicode || re.unicodeSets);
   const word =
@@ -286,15 +287,23 @@ function javascriptCharacterClasses(re: RegExp): string {
   for (let i = 0; i < re.source.length; i++) {
     const char = re.source.charAt(i);
     if (char !== "\\") {
-      if (char === "[") inClass = true;
-      if (char === "]") inClass = false;
+      if (
+        char === "[" &&
+        (classDepth === 0 || re.unicodeSets)
+      )
+        classDepth++;
+      if (char === "]" && classDepth > 0) classDepth--;
       result += char;
       continue;
     }
     const escaped = re.source.charAt(++i);
     if (escaped === "b" || escaped === "B") {
-      if (inClass) {
+      if (classDepth > 0) {
         result += escaped === "b" ? "\\x{0008}" : "B";
+        continue;
+      }
+      if (!unicodeCase) {
+        result += `(?-u:\\${escaped})`;
         continue;
       }
       const beforeWord = `(?<=[${word}])`;
@@ -1114,6 +1123,11 @@ export class RegexSet {
   /** Number of patterns. */
   get patternCount(): number {
     return this._patternCount;
+  }
+
+  /** Internal diagnostics: fast DFA, verified DFA, and fallback pattern counts. */
+  _enginePathCounts(): number[] {
+    return [...this._inner._enginePathCounts()];
   }
 
   /** Returns `true` if any pattern matches. */
