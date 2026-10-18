@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 
 const workflow = (name: string) =>
   Bun.YAML.parse(
@@ -31,7 +31,8 @@ test("optional proofs run only on demand while shared CI remains enabled", () =>
       (step: { run?: string }) =>
         step.run === "bun run typecheck",
     ),
-  ).toBe(true);
+  ).toBe(false);
+  expect(ci.jobs["napi-ci"].with.typecheck).toBe(true);
   expect(
     ci.jobs.checks.steps.some(
       (step: { run?: string }) =>
@@ -50,4 +51,25 @@ test("optional proofs run only on demand while shared CI remains enabled", () =>
         step.run === "timeout 180s bun run perf:contracts",
     ),
   ).toBe(true);
+});
+
+test("workflow checkouts do not persist repository credentials", () => {
+  const files = readdirSync(
+    new URL("../.github/workflows/", import.meta.url),
+  );
+  for (const file of files.filter((name) =>
+    /\.ya?ml$/u.test(name),
+  )) {
+    const parsed = workflow(file.replace(/\.ya?ml$/u, ""));
+    for (const job of Object.keys(parsed.jobs)) {
+      for (const step of parsed.jobs[job].steps ?? []) {
+        if (!step.uses?.startsWith("actions/checkout@"))
+          continue;
+        expect(
+          step.with?.["persist-credentials"],
+          `${file}: ${job}`,
+        ).toBe(false);
+      }
+    }
+  }
 });
