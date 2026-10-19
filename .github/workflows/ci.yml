@@ -213,6 +213,28 @@ jobs:
       install-command: bun install --frozen-lockfile && bun run check:toolchain
     secrets: inherit
 
+  single-thread:
+    name: Single-thread WebAssembly
+    if: ${{ always() && !cancelled() && needs.check-changes.result == 'success' && (github.event_name != 'pull_request' || needs.trust-check.outputs.trusted == 'true') }}
+    needs: [check-changes, trust-check]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: "1.99.0"
+          targets: wasm32-unknown-unknown
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - run: bun run test:single-thread
+
   hawk:
     name: Hawk
     if: >-
@@ -257,7 +279,16 @@ jobs:
 
   ci-result:
     if: always()
-    needs: [check-changes, trust-check, changeset, checks, napi-ci, hawk]
+    needs:
+      [
+        check-changes,
+        trust-check,
+        changeset,
+        checks,
+        napi-ci,
+        single-thread,
+        hawk,
+      ]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -278,11 +309,13 @@ jobs:
           CHANGESET_RESULT: ${{ needs.changeset.result }}
           CHECKS_RESULT: ${{ needs.checks.result }}
           NAPI_RESULT: ${{ needs.napi-ci.result }}
+          SINGLE_THREAD_RESULT: ${{ needs.single-thread.result }}
           HAWK_RESULT: ${{ needs.hawk.result }}
         run: |
           test "$DETECTOR_RESULT" = success
           test "$CHECKS_RESULT" = success
           test "$NAPI_RESULT" = success
+          test "$SINGLE_THREAD_RESULT" = success
 
           if [ "$EVENT_NAME" = pull_request ]; then
             test "$TRUST_RESULT" = success

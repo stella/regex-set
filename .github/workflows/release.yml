@@ -265,6 +265,7 @@ jobs:
             cp -- "$dir"/* .
           done
       - run: bun run build:js
+      - run: bun run test:single-thread
       - run: node scripts/prepare-release-package.mjs
       - name: Pack release tarballs
         shell: bash

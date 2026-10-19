@@ -3,6 +3,8 @@ import type { WasmExports } from "./single-thread-runtime";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+const LONE_SURROGATE =
+  /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/gu;
 const REINITIALIZE =
   "The single-thread WebAssembly instance trapped; call init() or initSync() again";
 
@@ -12,6 +14,9 @@ type Reply = {
   error?: string;
 };
 
+const napiString = (value: string) =>
+  value.replaceAll(LONE_SURROGATE, "\uFFFD");
+
 export const createSingleThreadBinding = (
   wasm: WasmExports,
   onTrap: () => void,
@@ -20,7 +25,13 @@ export const createSingleThreadBinding = (
 
   const request = (body: object): unknown => {
     if (trapped) throw new Error(REINITIALIZE);
-    const bytes = encoder.encode(JSON.stringify(body));
+    const bytes = encoder.encode(
+      JSON.stringify(body, (_key, value: unknown) =>
+        typeof value === "string"
+          ? napiString(value)
+          : value,
+      ),
+    );
     try {
       const pointer = wasm.alloc(bytes.length);
       new Uint8Array(

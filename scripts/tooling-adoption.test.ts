@@ -121,6 +121,49 @@ describe("shared tooling adoption", () => {
     }
   });
 
+  test("CI and release verify the real single-thread artifact", () => {
+    const ci = read(".github/workflows/ci.yml");
+    const parsedCi = Bun.YAML.parse(ci);
+    const singleThread = parsedCi.jobs["single-thread"];
+    expect(singleThread.steps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ run: "bun run build" }),
+        expect.objectContaining({
+          run: "bun run test:single-thread",
+        }),
+      ]),
+    );
+    expect(
+      singleThread.steps.find(
+        (step: Record<string, unknown>) =>
+          typeof step.uses === "string" &&
+          step.uses.startsWith("dtolnay/rust-toolchain@"),
+      ).with.targets,
+    ).toBe("wasm32-unknown-unknown");
+    expect(parsedCi.jobs["ci-result"].needs).toContain(
+      "single-thread",
+    );
+    expect(ci).toContain(
+      'test "$SINGLE_THREAD_RESULT" = success',
+    );
+
+    const release = read(".github/workflows/release.yml");
+    const pack = release
+      .split("  pack:\n")
+      .at(1)
+      ?.split("  attest:\n")
+      .at(0);
+    expect(pack).toContain(
+      "run: bun run test:single-thread",
+    );
+    expect(
+      pack?.indexOf("run: bun run build:js"),
+    ).toBeLessThan(
+      pack?.indexOf("run: bun run test:single-thread") ??
+        -1,
+    );
+  });
+
   test("runtime selectors share policy pins with one bounded Hawk exception", () => {
     const declaration = JSON.parse(
       read("stll-toolchain.json"),
