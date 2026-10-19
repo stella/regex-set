@@ -7,6 +7,7 @@ import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
 import {
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -21,6 +22,57 @@ import config from "../oxlint.config";
 const root = new URL("../", import.meta.url);
 const read = (path: string) =>
   readFileSync(new URL(path, root), "utf8");
+
+const expandPackageScripts = (
+  command: string,
+  scripts: Record<string, string>,
+  resolving = new Set<string>(),
+): string =>
+  command.replace(
+    /\b(?:bun|npm|pnpm|yarn) run ([\w:-]+)/gu,
+    (invocation, name: string) => {
+      const script = scripts[name];
+      if (script === undefined || resolving.has(name)) {
+        return invocation;
+      }
+      return `${invocation} ${expandPackageScripts(
+        script,
+        scripts,
+        new Set([...resolving, name]),
+      )}`;
+    },
+  );
+
+const singleThreadArtifactOrderingViolations = (
+  workflows: Record<string, string>,
+  scripts: Record<string, string>,
+) => {
+  const violations: string[] = [];
+  for (const [path, source] of Object.entries(workflows)) {
+    const jobs = Bun.YAML.parse(source).jobs ?? {};
+    for (const [jobName, job] of Object.entries<{
+      steps?: { run?: unknown }[];
+    }>(jobs)) {
+      let artifactBuilt = false;
+      for (const [index, step] of (job.steps ?? []).entries()) {
+        if (typeof step.run !== "string") continue;
+        const command = expandPackageScripts(step.run, scripts);
+        const consumesArtifact =
+          command.includes("test:single-thread") ||
+          /\b(?:bun|npm|pnpm|yarn)\s+(?:pack|publish)\b/u.test(
+            command,
+          );
+        if (consumesArtifact && !artifactBuilt) {
+          violations.push(`${path}:${jobName}:step ${index + 1}`);
+        }
+        if (command.includes("build-single-thread.mjs")) {
+          artifactBuilt = true;
+        }
+      }
+    }
+  }
+  return violations;
+};
 
 describe("shared tooling adoption", () => {
   test("uses central lint defaults and every portable safety rule", () => {
@@ -170,21 +222,6 @@ describe("shared tooling adoption", () => {
         toolchain.with.targets.split(/,\s*/),
       ).toContain("wasm32-unknown-unknown");
     }
-    const pack = release
-      .split("  pack:\n")
-      .at(1)
-      ?.split("  attest:\n")
-      .at(0);
-    expect(pack).toContain(
-      "run: bun run test:single-thread",
-    );
-    expect(
-      pack?.indexOf("run: bun run build:js"),
-    ).toBeLessThan(
-      pack?.indexOf("run: bun run test:single-thread") ??
-        -1,
-    );
-
     const scripts = Object.fromEntries(
       Object.entries(
         JSON.parse(read("package.json")).scripts,
@@ -200,6 +237,32 @@ describe("shared tooling adoption", () => {
     expect(scripts["build:package"]).toContain(
       "build-single-thread.mjs",
     );
+    const workflowDirectory = new URL(
+      ".github/workflows/",
+      root,
+    );
+    const workflows = Object.fromEntries(
+      readdirSync(workflowDirectory)
+        .filter((path) => /\.ya?ml$/u.test(path))
+        .map((path) => [
+          path,
+          read(`.github/workflows/${path}`),
+        ]),
+    );
+    expect(
+      singleThreadArtifactOrderingViolations(
+        workflows,
+        scripts,
+      ),
+    ).toEqual([]);
+    expect(
+      singleThreadArtifactOrderingViolations(
+        {
+          "negative.yml": `jobs:\n  unsafe:\n    steps:\n      - run: bun run build:js\n      - run: bun run test:single-thread\n`,
+        },
+        scripts,
+      ),
+    ).toEqual(["negative.yml:unsafe:step 2"]);
 
     const napiCommands = Object.entries(
       parsedCi.jobs["napi-ci"].with,
