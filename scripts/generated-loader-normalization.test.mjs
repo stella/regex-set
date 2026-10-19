@@ -170,34 +170,79 @@ const analyzeCleanupBoundaries = (filename, content) => {
       ancestor = parents.get(ancestor);
     }
 
-    const inspectExpression = (
-      expression,
-      incomingChecks,
-    ) => {
-      if (
-        !expression?.type ||
-        functionTypes.has(expression.type)
+    const crashCheckPosition = (statement) => {
+      let expression;
+      const consequent = statement.consequent;
+      const exitsFunction =
+        ["ReturnStatement", "ThrowStatement"].includes(
+          consequent?.type,
+        ) ||
+        (consequent?.type === "BlockStatement" &&
+          consequent.body.length > 0 &&
+          ["ReturnStatement", "ThrowStatement"].includes(
+            consequent.body.at(-1).type,
+          ));
+      if (statement.type === "ExpressionStatement") {
+        expression = unwrapExpression(statement.expression);
+      } else if (
+        statement.type === "IfStatement" &&
+        statement.alternate === null &&
+        exitsFunction
       ) {
-        return incomingChecks;
+        expression = unwrapExpression(statement.test);
       }
-      let checks = incomingChecks;
-      if (expression.type === "CallExpression") {
-        const callee = unwrapExpression(expression.callee);
+      if (expression?.type !== "CallExpression") {
+        return undefined;
+      }
+      const callee = unwrapExpression(expression.callee);
+      return callee.type === "Identifier" &&
+        crashCheckCalls.has(callee.name)
+        ? expression.start
+        : undefined;
+    };
+
+    const precedingCrashChecks = (call) => {
+      const checks = new Set();
+      let child = call;
+      let current = parents.get(child);
+      while (current && current !== node) {
         if (
-          callee.type === "Identifier" &&
-          crashCheckCalls.has(callee.name)
+          current.type === "BlockStatement" &&
+          current.body.includes(child)
         ) {
-          return new Set([expression.start]);
+          const childIndex = current.body.indexOf(child);
+          for (const statement of current.body.slice(
+            0,
+            childIndex,
+          )) {
+            const position = crashCheckPosition(statement);
+            if (position !== undefined) checks.add(position);
+          }
         }
+        child = current;
+        current = parents.get(current);
+      }
+      return checks;
+    };
+
+    const inspect = (current) => {
+      if (
+        current !== node &&
+        functionTypes.has(current.type)
+      ) {
+        return;
+      }
+      if (current.type === "CallExpression") {
         const boundaryName = findCleanupCall(
-          expression,
+          current,
           cleanupAliases,
         );
         if (boundaryName !== undefined) {
           boundaries.push({
             name: boundaryName,
-            position: expression.start,
+            position: current.start,
           });
+          const checks = precedingCrashChecks(current);
           if (checks.size === 0) {
             unchecked.push(
               `${filename}: ${functionName} -> ${boundaryName}`,
@@ -208,98 +253,18 @@ const analyzeCleanupBoundaries = (filename, content) => {
           }
         }
       }
-      for (const value of Object.values(expression)) {
+      for (const value of Object.values(current)) {
         if (Array.isArray(value)) {
           for (const item of value) {
-            if (item?.type) {
-              checks = inspectExpression(item, checks);
-            }
+            if (item?.type) inspect(item);
           }
         } else if (value?.type) {
-          checks = inspectExpression(value, checks);
+          inspect(value);
         }
       }
-      return checks;
     };
 
-    const intersectChecks = (left, right) =>
-      new Set(
-        [...left].filter((check) => right.has(check)),
-      );
-
-    const inspectStatement = (
-      statement,
-      incomingChecks,
-    ) => {
-      if (!statement?.type) return incomingChecks;
-      if (statement.type === "BlockStatement") {
-        let checks = incomingChecks;
-        for (const child of statement.body) {
-          checks = inspectStatement(child, checks);
-        }
-        return checks;
-      }
-      if (statement.type === "IfStatement") {
-        const afterTest = inspectExpression(
-          statement.test,
-          incomingChecks,
-        );
-        const consequent = inspectStatement(
-          statement.consequent,
-          afterTest,
-        );
-        const alternate = statement.alternate
-          ? inspectStatement(statement.alternate, afterTest)
-          : afterTest;
-        return intersectChecks(consequent, alternate);
-      }
-      if (
-        [
-          "DoWhileStatement",
-          "ForInStatement",
-          "ForOfStatement",
-          "ForStatement",
-          "WhileStatement",
-        ].includes(statement.type)
-      ) {
-        let afterHeader = incomingChecks;
-        for (const key of [
-          "init",
-          "left",
-          "right",
-          "test",
-        ]) {
-          afterHeader = inspectExpression(
-            statement[key],
-            afterHeader,
-          );
-        }
-        inspectStatement(statement.body, afterHeader);
-        return afterHeader;
-      }
-      if (statement.type === "TryStatement") {
-        const afterBlock = inspectStatement(
-          statement.block,
-          incomingChecks,
-        );
-        if (statement.handler) {
-          inspectStatement(
-            statement.handler.body,
-            incomingChecks,
-          );
-        }
-        if (statement.finalizer) {
-          return inspectStatement(
-            statement.finalizer,
-            intersectChecks(afterBlock, incomingChecks),
-          );
-        }
-        return intersectChecks(afterBlock, incomingChecks);
-      }
-      return inspectExpression(statement, incomingChecks);
-    };
-
-    inspectStatement(node.body, new Set());
+    inspect(node.body);
   };
 
   visit(source, (node, parent) => {
@@ -471,6 +436,54 @@ const unchecked = (condition) => {
     expect(unchecked).toEqual([
       "unrelated-conditional.js: unchecked -> finish",
     ]);
+  });
+
+  test.each([
+    [
+      "logical-expression.js",
+      "condition && __abortWasiDisposalIfThreadCrashed();",
+    ],
+    [
+      "conditional-expression.js",
+      "condition ? __abortWasiDisposalIfThreadCrashed() : 0;",
+    ],
+    [
+      "loop-body.js",
+      "while (condition) __abortWasiDisposalIfThreadCrashed();",
+    ],
+  ])(
+    "does not accept a conditional crash check in %s",
+    (filename, conditionalCheck) => {
+      const unchecked =
+        findUncheckedContextDestructionBoundaries(
+          filename,
+          `const finish = exports?.napi_prepare_wasm_env_cleanup_finish;
+const unchecked = (condition) => {
+  ${conditionalCheck}
+  finish();
+};`,
+        );
+
+      expect(unchecked).toEqual([
+        `${filename}: unchecked -> finish`,
+      ]);
+    },
+  );
+
+  test("accepts an unconditional crash guard in an enclosing block", () => {
+    const unchecked =
+      findUncheckedContextDestructionBoundaries(
+        "enclosing-guard.js",
+        `const finish = exports?.napi_prepare_wasm_env_cleanup_finish;
+const checked = (condition) => {
+  if (__hasWasiThreadCrashed()) throw new Error("crashed");
+  if (condition) {
+    finish();
+  }
+};`,
+      );
+
+    expect(unchecked).toEqual([]);
   });
 
   test("flags an unchecked arrow callback that finishes cleanup", () => {
