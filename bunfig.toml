@@ -12,3 +12,6 @@ minimumReleaseAgeExcludes = [
   "@stll/regex-set-linux-arm64-gnu", # quarantine-excluded-since: 2026-04-15T13:00:54.000Z
   "@stll/regex-set-wasm32-wasi", # quarantine-excluded-since: 2026-04-15T13:00:54.000Z
 ]
+
+[test]
+pathIgnorePatterns = ["single-thread-test"]

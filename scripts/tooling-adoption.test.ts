@@ -136,6 +136,9 @@ describe("shared tooling adoption", () => {
         }),
       ]),
     );
+    expect(parsedCi.jobs.checks.steps).toContainEqual({
+      run: "node scripts/build-single-thread.test.mjs",
+    });
     const singleThreadToolchain = singleThread.steps.find(
       (step: Record<string, unknown>) =>
         typeof step.uses === "string" &&
@@ -182,12 +185,69 @@ describe("shared tooling adoption", () => {
         -1,
     );
 
-    const scripts = JSON.parse(
-      read("package.json"),
-    ).scripts;
+    const scripts = Object.fromEntries(
+      Object.entries(
+        JSON.parse(read("package.json")).scripts,
+      ).map(([name, command]) => {
+        expect(typeof command).toBe("string");
+        return [name, String(command)];
+      }),
+    );
     expect(scripts.build).not.toContain("build:package");
+    expect(scripts["build:js"]).not.toContain(
+      "build:package",
+    );
     expect(scripts["build:package"]).toContain(
       "build-single-thread.mjs",
+    );
+
+    const napiCommands = Object.entries(
+      parsedCi.jobs["napi-ci"].with,
+    )
+      .filter(
+        ([name, value]) =>
+          name.endsWith("-command") &&
+          typeof value === "string",
+      )
+      .map(([, value]) => value as string);
+    const sharedScripts = [
+      "build",
+      "build:js",
+      "test",
+      "test:props",
+      "test:runtime:bun",
+      "test:runtime:node",
+    ];
+    const pending = [
+      ...napiCommands,
+      ...sharedScripts.map((name) => scripts[name]),
+    ];
+    const resolved = new Set<string>();
+    while (pending.length > 0) {
+      const command = pending.pop();
+      if (!command || resolved.has(command)) continue;
+      resolved.add(command);
+      for (const match of command.matchAll(
+        /bun run ([\w:-]+)/g,
+      )) {
+        const dependency = scripts[match[1]];
+        if (typeof dependency === "string") {
+          pending.push(dependency);
+        }
+      }
+    }
+    expect([...resolved].join("\n")).not.toContain(
+      "build-single-thread.mjs",
+    );
+    expect(scripts["test:single-thread"]).toBe(
+      "bun --config=bunfig.single-thread.toml test",
+    );
+    expect(scripts.test).not.toContain("single-thread");
+    expect(read("bunfig.toml")).toContain(
+      'pathIgnorePatterns = ["single-thread-test"]',
+    );
+    expect(read("bunfig.single-thread.toml")).toContain(
+      'root = "./single-thread-test"',
     );
   });
 
