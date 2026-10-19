@@ -20,7 +20,7 @@ rmSync(wasmArtifact, { force: true });
 rmSync(wasmDist, { force: true, recursive: true });
 
 try {
-  execFileSync("bun", ["run", "build"], {
+  execFileSync("bun", ["run", "build:package"], {
     cwd: root,
     stdio: "inherit",
   });

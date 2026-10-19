@@ -129,17 +129,22 @@ describe("shared tooling adoption", () => {
       expect.arrayContaining([
         expect.objectContaining({ run: "bun run build" }),
         expect.objectContaining({
+          run: "bun run build:package",
+        }),
+        expect.objectContaining({
           run: "bun run test:single-thread",
         }),
       ]),
     );
-    expect(
-      singleThread.steps.find(
-        (step: Record<string, unknown>) =>
-          typeof step.uses === "string" &&
-          step.uses.startsWith("dtolnay/rust-toolchain@"),
-      ).with.targets,
-    ).toBe("wasm32-unknown-unknown");
+    const singleThreadToolchain = singleThread.steps.find(
+      (step: Record<string, unknown>) =>
+        typeof step.uses === "string" &&
+        step.uses.startsWith("dtolnay/rust-toolchain@"),
+    );
+    expect(singleThreadToolchain.with).toMatchObject({
+      toolchain: "1.99.0",
+      targets: "wasm32-unknown-unknown",
+    });
     expect(parsedCi.jobs["ci-result"].needs).toContain(
       "single-thread",
     );
@@ -148,6 +153,20 @@ describe("shared tooling adoption", () => {
     );
 
     const release = read(".github/workflows/release.yml");
+    const parsedRelease = Bun.YAML.parse(release);
+    for (const jobName of ["verify", "pack"]) {
+      const toolchain = parsedRelease.jobs[
+        jobName
+      ].steps.find(
+        (step: Record<string, unknown>) =>
+          typeof step.uses === "string" &&
+          step.uses.startsWith("dtolnay/rust-toolchain@"),
+      );
+      expect(toolchain.with.toolchain).toBe("1.99.0");
+      expect(
+        toolchain.with.targets.split(/,\s*/),
+      ).toContain("wasm32-unknown-unknown");
+    }
     const pack = release
       .split("  pack:\n")
       .at(1)
@@ -161,6 +180,14 @@ describe("shared tooling adoption", () => {
     ).toBeLessThan(
       pack?.indexOf("run: bun run test:single-thread") ??
         -1,
+    );
+
+    const scripts = JSON.parse(
+      read("package.json"),
+    ).scripts;
+    expect(scripts.build).not.toContain("build:package");
+    expect(scripts["build:package"]).toContain(
+      "build-single-thread.mjs",
     );
   });
 
@@ -184,7 +211,7 @@ describe("shared tooling adoption", () => {
     ).toHaveLength(4);
     expect(
       release.match(/toolchain: "1.99.0"/g),
-    ).toHaveLength(3);
+    ).toHaveLength(4);
     expect(release).not.toMatch(/node-version: "22/);
   });
 

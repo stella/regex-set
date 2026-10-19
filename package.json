@@ -40,7 +40,7 @@
   "scripts": {
     "check:toolchain": "stll-toolchain-check",
     "fix:loader": "node scripts/fix-napi-loader.mjs",
-    "build": "node scripts/build-native.mjs --platform --dts index.d.cts --release && bun run build:package",
+    "build": "node scripts/build-native.mjs --platform --dts index.d.cts --release",
     "build:debug": "node scripts/build-native.mjs --platform --dts index.d.cts",
     "build:wasm": "node scripts/build-native.mjs --platform --target wasm32-wasip1-threads --dts index.d.cts --release",
     "build:single-thread": "node scripts/build-single-thread.mjs",

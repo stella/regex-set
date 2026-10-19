@@ -233,6 +233,7 @@ jobs:
           targets: wasm32-unknown-unknown
       - run: bun install --frozen-lockfile
       - run: bun run build
+      - run: bun run build:package
       - run: bun run test:single-thread
 
   hawk:

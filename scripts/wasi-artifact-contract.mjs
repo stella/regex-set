@@ -73,10 +73,10 @@ const workflowContract = async () => {
   }
   if (
     scripts.build !==
-    "node scripts/build-native.mjs --platform --dts index.d.cts --release && bun run build:package"
+    "node scripts/build-native.mjs --platform --dts index.d.cts --release"
   ) {
     throw new Error(
-      "build must build the native binding before the package artifacts",
+      "build must build only the native binding",
     );
   }
   const workflowTargets = settings.map(
