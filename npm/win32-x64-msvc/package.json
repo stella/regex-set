@@ -1,6 +1,6 @@
 {
   "name": "@stll/regex-set-win32-x64-msvc",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "cpu": [
     "x64"
   ],
