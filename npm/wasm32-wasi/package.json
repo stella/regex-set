@@ -1,6 +1,6 @@
 {
   "name": "@stll/regex-set-wasm32-wasi",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "cpu": [
     "wasm32"
   ],
