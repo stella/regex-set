@@ -57,11 +57,7 @@ const workflowContract = async () => {
   ).json();
   const { targets: napiTargets, scripts } =
     readWasiPackage(manifest);
-  for (const scriptName of [
-    "build",
-    "build:debug",
-    "build:wasm",
-  ]) {
+  for (const scriptName of ["build:debug", "build:wasm"]) {
     const command = scripts[scriptName];
     if (
       typeof command !== "string" ||
@@ -74,6 +70,14 @@ const workflowContract = async () => {
         `${scriptName} must forward arguments directly to build-native.mjs`,
       );
     }
+  }
+  if (
+    scripts.build !==
+    "node scripts/build-native.mjs --platform --dts index.d.cts --release && bun run build:package"
+  ) {
+    throw new Error(
+      "build must build the native binding before the package artifacts",
+    );
   }
   const workflowTargets = settings.map(
     ({ target }) => target,
