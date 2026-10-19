@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.8
+
+### Patch Changes
+
+- [#229](https://github.com/stella/regex-set/pull/229) [`b052ed2`](https://github.com/stella/regex-set/commit/b052ed24eeaaf5f8263671b7624b75b80858c3b9) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Publish the current runtime packages to npm.
+
 ## 1.0.7
 
 ### Patch Changes
