@@ -4061,6 +4061,61 @@
       "version": "1.1.0"
     },
     {
+      "bom-ref": "pkg:npm/acorn@8.19.0",
+      "description": "ECMAScript parser",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "node_modules/acorn/package.json",
+            "confidence": 0.7,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.7,
+                "technique": "manifest-analysis",
+                "value": "node_modules/acorn/package.json"
+              }
+            ]
+          }
+        ],
+        "occurrences": [
+          {
+            "location": "scripts/generated-loader-normalization.test.mjs#1"
+          }
+        ]
+      },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/acornjs/acorn"
+        },
+        {
+          "type": "vcs",
+          "url": "git+https://github.com/acornjs/acorn.git"
+        }
+      ],
+      "group": "",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+          }
+        }
+      ],
+      "name": "acorn",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "node_modules/acorn/package.json"
+        }
+      ],
+      "purl": "pkg:npm/acorn@8.19.0",
+      "scope": "required",
+      "type": "library",
+      "version": "8.19.0"
+    },
+    {
       "authors": [
         {
           "name": "Evan You"
