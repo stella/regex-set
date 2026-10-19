@@ -1,8 +1,128 @@
+import { parse } from "acorn";
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 
 import { normalizeGeneratedLoader } from "./generated-loader-normalization.mjs";
 
+// oxlint-disable typescript/strict-boolean-expressions -- Acorn's dynamically shaped AST is fixture data inspected by the normalizer test.
+
+const contextDestructionBoundaries = new Set([
+  "__destroyEmnapiContext",
+  "__drainWasmEnvCleanup",
+  "__prepareWasmEnvCleanupWithTurns",
+]);
+
+const findUncheckedContextDestructionBoundaries = (
+  filename,
+  content,
+) => {
+  const source = parse(content, {
+    ecmaVersion: "latest",
+    sourceType: "module",
+  });
+  const unchecked = [];
+
+  const inspectFunction = (node) => {
+    if (!node.id || !node.body) {
+      return;
+    }
+    const crashChecks = [];
+    const boundaries = [];
+    const visitBody = (child) => {
+      if (
+        child !== node.body &&
+        [
+          "ArrowFunctionExpression",
+          "FunctionDeclaration",
+          "FunctionExpression",
+        ].includes(child.type)
+      ) {
+        return;
+      }
+      if (
+        child.type === "CallExpression" &&
+        child.callee.type === "Identifier"
+      ) {
+        if (
+          [
+            "__abortWasiDisposalIfThreadCrashed",
+            "__hasWasiThreadCrashed",
+          ].includes(child.callee.name)
+        ) {
+          crashChecks.push(child.start);
+        } else if (
+          contextDestructionBoundaries.has(
+            child.callee.name,
+          )
+        ) {
+          boundaries.push({
+            name: child.callee.name,
+            position: child.start,
+          });
+        }
+      }
+      for (const value of Object.values(child)) {
+        if (Array.isArray(value)) {
+          for (const item of value) {
+            if (item?.type) visitBody(item);
+          }
+        } else if (value?.type) {
+          visitBody(value);
+        }
+      }
+    };
+    visitBody(node.body);
+    for (const boundary of boundaries) {
+      if (
+        !crashChecks.some(
+          (position) => position < boundary.position,
+        )
+      ) {
+        unchecked.push(
+          `${filename}: ${node.id.name} -> ${boundary.name}`,
+        );
+      }
+    }
+  };
+  const visitFunctions = (node) => {
+    if (node.type === "FunctionDeclaration") {
+      inspectFunction(node);
+    }
+    for (const value of Object.values(node)) {
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          if (item?.type) visitFunctions(item);
+        }
+      } else if (value?.type) {
+        visitFunctions(value);
+      }
+    }
+  };
+  visitFunctions(source);
+  return unchecked;
+};
+
 describe("normalizeGeneratedLoader", () => {
+  test("checks every context-destroying path in both loaders for a preceding crash check", () => {
+    const filenames = [
+      "regex-set.wasi-browser.js",
+      "regex-set.wasi.cjs",
+    ];
+    const unchecked = filenames.flatMap((filename) =>
+      findUncheckedContextDestructionBoundaries(
+        filename,
+        normalizeGeneratedLoader(
+          readFileSync(
+            new URL(`../${filename}`, import.meta.url),
+            "utf8",
+          ),
+        ),
+      ),
+    );
+
+    expect(unchecked).toEqual([]);
+  });
+
   test("removes generator suppression comments without changing the code", () => {
     const generated = `/* eslint-disable */
 // oxlint-disable-next-line no-eval -- generated worker
@@ -242,6 +362,82 @@ function __rollbackWasiInitialization() {
     await expect(initialization).rejects.toThrow(
       "initialization failed",
     );
+    expect(fixture.terminated()).toBe(1);
+    expect(fixture.timerCount()).toBe(0);
+  });
+
+  test("skips context destruction when rollback crashes during settlement draining", async () => {
+    const generated = `
+let __wasiAddonCrashFlag;
+let __wasiDisposePromise;
+let destroyed = 0;
+let terminated = 0;
+const timers = new Set();
+const __isThenable = (value) => value && typeof value.then === "function";
+const __terminateWasiWorkers = () => { terminated += 1; };
+const __retainFailedWasiRollback = (errors) => errors;
+const __drainWasiAsyncWork = () => {};
+const __prepareWasmEnvCleanupWithTurns = () => {};
+const __drainWasmEnvCleanup = () => new Promise((resolve) => { timers.add(resolve); });
+const __destroyEmnapiContext = () => { destroyed += 1; };
+const __finishWasiInitializationRollback = (errors) => errors;
+function __destroyContextForWasiRollback(cleanupErrors) {
+  let destroyResult;
+  try {
+    destroyResult = __destroyEmnapiContext();
+  } catch (cleanupError) {
+    cleanupErrors.push(cleanupError);
+    return __finishWasiInitializationRollback(cleanupErrors);
+  }
+  if (__isThenable(destroyResult)) return Promise.resolve(destroyResult).then(() => __finishWasiInitializationRollback(cleanupErrors));
+  return __finishWasiInitializationRollback(cleanupErrors);
+}
+function __rollbackWasiInitialization() {
+  function __rollbackWasmEnvForWasiInitialization() {
+    const cleanupErrors = [];
+    const prepareResult = __prepareWasmEnvCleanupWithTurns();
+    if (__isThenable(prepareResult)) return Promise.resolve(prepareResult).then(() => __drainWasmEnvForWasiRollback(cleanupErrors));
+    return __drainWasmEnvForWasiRollback(cleanupErrors);
+  }
+  function __drainWasmEnvForWasiRollback(cleanupErrors) {
+    let drainResult = __drainWasmEnvCleanup();
+    if (__isThenable(drainResult)) return Promise.resolve(drainResult).then(() => __destroyContextForWasiRollback(cleanupErrors));
+    return __destroyContextForWasiRollback(cleanupErrors);
+  }
+  const asyncWorkResult = __drainWasiAsyncWork();
+  if (__isThenable(asyncWorkResult)) return Promise.resolve(asyncWorkResult).then(__rollbackWasmEnvForWasiInitialization, (error) => __retainFailedWasiRollback([error]));
+  return __rollbackWasmEnvForWasiInitialization();
+}
+
+// A view of the addon's crash flag, one word of the shared wasm memory, for the fixture.
+`;
+    const normalized = normalizeGeneratedLoader(generated);
+    // oxlint-disable-next-line typescript/no-implied-eval -- The generated loader fixture must execute to prove its rollback behavior.
+    const fixture = new Function(
+      `${normalized}\nreturn {
+        failInitialization: async () => { const error = new Error("initialization failed"); const cleanupErrors = await __rollbackWasiInitialization(); if (cleanupErrors.length) error.cause = cleanupErrors[0]; throw error; },
+        crash() { __wasiAddonCrashFlag = new Int32Array(new SharedArrayBuffer(4)); Atomics.store(__wasiAddonCrashFlag, 0, 1); },
+        runPollTimer() { const callback = timers.values().next().value; timers.delete(callback); callback(); },
+        timerCount: () => timers.size,
+        destroyed: () => destroyed,
+        terminated: () => terminated,
+      };`,
+    )();
+    const initialization = fixture.failInitialization();
+    expect(fixture.timerCount()).toBe(1);
+    fixture.crash();
+    fixture.runPollTimer();
+
+    // oxlint-disable-next-line typescript/await-thenable, typescript/no-confusing-void-expression -- The generated fixture's dynamically constructed initialization value is intentionally untyped.
+    await expect(initialization).rejects.toThrow(
+      "initialization failed",
+    );
+    // oxlint-disable-next-line typescript/await-thenable, typescript/no-confusing-void-expression -- The generated fixture's dynamically constructed initialization value is intentionally untyped.
+    await expect(initialization).rejects.toHaveProperty(
+      "cause.message",
+      "napi-rs: WASI binding cannot be disposed after a worker thread crashed",
+    );
+    expect(fixture.destroyed()).toBe(0);
     expect(fixture.terminated()).toBe(1);
     expect(fixture.timerCount()).toBe(0);
   });

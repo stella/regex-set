@@ -1371,6 +1371,7 @@ function __finishWasiInitializationRollback(cleanupErrors) {
 }
 
 function __destroyContextForWasiRollback(cleanupErrors) {
+  __abortWasiDisposalIfThreadCrashed();
   let destroyResult;
   try {
     destroyResult = __destroyEmnapiContext();

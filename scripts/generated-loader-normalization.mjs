@@ -117,6 +117,10 @@ function __rollbackWasiInitializationAfterThreadCrash() {
       "function __continueWasiDisposal() {\n  __abortWasiDisposalIfThreadCrashed();\n  const destroyResult",
     )
     .replace(
+      "function __destroyContextForWasiRollback(cleanupErrors) {\n  let destroyResult",
+      "function __destroyContextForWasiRollback(cleanupErrors) {\n  __abortWasiDisposalIfThreadCrashed();\n  let destroyResult",
+    )
+    .replace(
       "function __drainWasmEnvForWasiDisposal() {\n  const drainResult",
       "function __drainWasmEnvForWasiDisposal() {\n  __abortWasiDisposalIfThreadCrashed();\n  const drainResult",
     )
