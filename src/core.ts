@@ -32,6 +32,7 @@ type NativeOptions = {
 
 type NativeRegexSetInstance = {
   patternCount: number;
+  _enginePathCounts(): Uint32Array;
   isMatch(haystack: string): boolean;
   _isMatchBuf(haystack: Buffer | Uint8Array): boolean;
   _findIterPacked(haystack: string): Uint32Array;
@@ -230,14 +231,17 @@ function regexpToRust(re: RegExp): string {
   // scopeInlineFlags here; it only matters for
   // string patterns (handled in normalizeEntry).
   if (!flags) {
-    return re.source;
+    return javascriptCharacterClasses(re);
   }
 
   if (!flags.includes("i")) {
-    return `(?${flags})${re.source}`;
+    return `(?${flags})${javascriptCharacterClasses(re)}`;
   }
 
-  let src = re.source;
+  const unicodeClasses = re.unicode || re.unicodeSets;
+  let src = unicodeClasses
+    ? javascriptCharacterClasses(re)
+    : javascriptLegacyCaseFolding(re);
   let leading = "";
   let trailing = "";
 
@@ -264,9 +268,245 @@ function regexpToRust(re: RegExp): string {
     }
   }
 
-  const uFlag =
-    needsAsciiMode(src) && !hasNonAscii(src) ? "-u" : "";
-  return `${leading}(?${flags}${uFlag}:${src})${trailing}`;
+  return `${leading}(?${flags}:${src})${trailing}`;
+}
+
+// ECMAScript WhiteSpace and LineTerminator, including BOM but not NEL.
+const JS_WHITESPACE =
+  "\\x{0009}-\\x{000D}\\x{0020}\\x{00A0}\\x{1680}" +
+  "\\x{2000}-\\x{200A}\\x{2028}\\x{2029}\\x{202F}\\x{205F}\\x{3000}\\x{FEFF}";
+
+function javascriptCharacterClasses(re: RegExp): string {
+  let result = "";
+  let classDepth = 0;
+  const unicodeCase =
+    re.ignoreCase && (re.unicode || re.unicodeSets);
+  const word =
+    "a-zA-Z0-9_" +
+    (unicodeCase ? "\\x{017F}\\x{212A}" : "");
+  for (let i = 0; i < re.source.length; i++) {
+    const char = re.source.charAt(i);
+    if (char !== "\\") {
+      if (
+        char === "[" &&
+        (classDepth === 0 || re.unicodeSets)
+      )
+        classDepth++;
+      if (char === "]" && classDepth > 0) classDepth--;
+      result += char;
+      continue;
+    }
+    const escaped = re.source.charAt(++i);
+    if (escaped === "b" || escaped === "B") {
+      if (classDepth > 0) {
+        result += escaped === "b" ? "\\x{0008}" : "B";
+        continue;
+      }
+      if (!unicodeCase) {
+        result += `(?-u:\\${escaped})`;
+        continue;
+      }
+      const beforeWord = `(?<=[${word}])`;
+      const beforeNonword = `(?<![${word}])`;
+      const afterWord = `(?=[${word}])`;
+      const afterNonword = `(?![${word}])`;
+      // JS word membership stays independent of the Rust Unicode boundary mode
+      // and of outer ignore-case scopes. /iu additionally folds Kelvin/long s.
+      result +=
+        escaped === "b"
+          ? `(?-i:(?:${beforeWord}${afterNonword}|${beforeNonword}${afterWord}))`
+          : `(?-i:(?:${beforeWord}${afterWord}|${beforeNonword}${afterNonword}))`;
+      continue;
+    }
+    let members: string;
+    switch (escaped.toLowerCase()) {
+      case "s":
+        members = JS_WHITESPACE;
+        break;
+      case "d":
+        members = "0-9";
+        break;
+      case "w":
+        members = word;
+        break;
+      default:
+        result += "\\" + escaped;
+        continue;
+    }
+    const negation =
+      escaped === escaped.toUpperCase() ? "^" : "";
+    result += `[${negation}${members}]`;
+  }
+  return result;
+}
+
+let legacyUnicodeFolds: Map<string, string[]> | undefined;
+
+/** Legacy JS folding uses one UTF-16 unit's uppercase, excluding ASCII folds. */
+function getLegacyUnicodeFolds(): Map<string, string[]> {
+  if (legacyUnicodeFolds) return legacyUnicodeFolds;
+  const groups = new Map<string, string[]>();
+  for (let code = 0x80; code <= 0xffff; code++) {
+    const char = String.fromCharCode(code);
+    const canonical = char.toUpperCase();
+    if (
+      canonical.length !== 1 ||
+      canonical === char ||
+      canonical.charCodeAt(0) < 0x80
+    )
+      continue;
+    const members = groups.get(canonical);
+    if (members) members.push(char);
+    else groups.set(canonical, [canonical, char]);
+  }
+  legacyUnicodeFolds = groups;
+  return groups;
+}
+
+function legacyLiteralPattern(literal: string): string {
+  if (/[a-z]/i.test(literal))
+    return `(?-i:[${literal.toLowerCase()}${literal.toUpperCase()}])`;
+  const code = literal.codePointAt(0);
+  if (code === undefined)
+    throw new Error("Missing literal");
+  const canonical = literal.toUpperCase();
+  const members =
+    canonical.length === 1 &&
+    canonical.charCodeAt(0) >= 0x80
+      ? getLegacyUnicodeFolds().get(canonical)
+      : undefined;
+  return members
+    ? `(?-i:[${members.join("")}])`
+    : `(?-i:\\x{${code.toString(16)}})`;
+}
+
+/** Keep legacy /i folding local so dots and complements remain Unicode-safe. */
+function javascriptLegacyCaseFolding(re: RegExp): string {
+  let result = "";
+  for (let i = 0; i < re.source.length; i++) {
+    const char = re.source.charAt(i);
+    if (char === "\\") {
+      const escaped = re.source.charAt(++i);
+      if ("sSwWdDbB".includes(escaped)) {
+        const token = new RegExp("\\" + escaped, "i");
+        result += `(?-i:${javascriptCharacterClasses(token)})`;
+        continue;
+      }
+      const hex = re.source
+        .slice(i)
+        .match(/^(?:x[\da-f]{2}|u[\da-f]{4})/i)?.[0];
+      if (hex) {
+        const literal = String.fromCharCode(
+          Number.parseInt(hex.slice(1), 16),
+        );
+        result += legacyLiteralPattern(literal);
+        i += hex.length - 1;
+        continue;
+      }
+      // Preserve named backreferences as one token, including the group name.
+      if (
+        escaped === "k" &&
+        re.source.charAt(i + 1) === "<"
+      ) {
+        const end = re.source.indexOf(">", i + 2);
+        if (end !== -1) {
+          result += re.source.slice(i - 1, end + 1);
+          i = end;
+          continue;
+        }
+      }
+      result += "\\" + escaped;
+      continue;
+    }
+    // Named capture names are syntax, not case-insensitive literal text.
+    if (
+      re.source.startsWith("(?<", i) &&
+      !"=!".includes(re.source.charAt(i + 3))
+    ) {
+      const end = re.source.indexOf(">", i + 3);
+      if (end !== -1) {
+        result += re.source.slice(i, end + 1);
+        i = end;
+        continue;
+      }
+    }
+    if (char !== "[") {
+      const code = re.source.codePointAt(i);
+      if (code !== undefined && code >= 0x80) {
+        const literal = String.fromCodePoint(code);
+        result += legacyLiteralPattern(literal);
+        i += literal.length - 1;
+      } else {
+        result += /[a-z]/i.test(char)
+          ? legacyLiteralPattern(char)
+          : char;
+      }
+      continue;
+    }
+    const start = i;
+    while (++i < re.source.length) {
+      const member = re.source.charAt(i);
+      if (member === "]") break;
+      if (member !== "\\") continue;
+      i++;
+    }
+    const original = re.source.slice(start, i + 1);
+    // Legacy JS classes permit a literal hyphen next to a shortcut.
+    // Rust requires that hyphen to be escaped before expanding the shortcut.
+    let normalized = "";
+    let previousShortcut = false;
+    for (let j = 0; j < original.length; j++) {
+      const member = original.charAt(j);
+      if (member === "\\") {
+        const escaped = original.charAt(++j);
+        normalized += "\\" + escaped;
+        previousShortcut = "sSwWdD".includes(escaped);
+        continue;
+      }
+      const nextShortcut =
+        original.charAt(j + 1) === "\\" &&
+        "sSwWdD".includes(original.charAt(j + 2));
+      normalized +=
+        member === "-" && (previousShortcut || nextShortcut)
+          ? "\\-"
+          : member;
+      previousShortcut = false;
+    }
+    const classRegexp = new RegExp(normalized, "i");
+    const escapedNonAscii = [
+      ...normalized.matchAll(
+        /\\(?:x([\da-f]{2})|u([\da-f]{4}))/gi,
+      ),
+    ].some(
+      (match) =>
+        Number.parseInt(match[1] ?? match[2] ?? "0", 16) >=
+        128,
+    );
+    const body = original.slice(
+      original.startsWith("[^") ? 2 : 1,
+      -1,
+    );
+    const positive = new RegExp(`[${body}]`, "i");
+    let folds = "";
+    // At most 52 construction-only oracle checks preserve ASCII folding.
+    // Fold the positive body before restoring any outer class negation.
+    for (const letter of "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz") {
+      if (positive.test(letter)) folds += letter;
+    }
+    if (hasNonAscii(original) || escapedNonAscii) {
+      for (const [
+        canonical,
+        members,
+      ] of getLegacyUnicodeFolds()) {
+        if (positive.test(canonical))
+          folds += members.join("");
+      }
+    }
+    const translated =
+      javascriptCharacterClasses(classRegexp);
+    result += `(?-i:${translated.slice(0, -1)}${folds}])`;
+  }
+  return result;
 }
 
 /**
@@ -278,7 +518,12 @@ function regexpToRust(re: RegExp): string {
  * -u, so skipping -u for them is zero-cost.
  */
 function needsAsciiMode(s: string): boolean {
-  return /\\[wWdDsSbB]/.test(s);
+  for (let i = 0; i < s.length; i++) {
+    if (s.charAt(i) !== "\\") continue;
+    const escaped = s.charAt(++i);
+    if ("wWdDsSbB".includes(escaped)) return true;
+  }
+  return false;
 }
 
 /**
@@ -307,7 +552,7 @@ function hasNonAscii(s: string): boolean {
  *
  * NOTE: -u also disables Unicode character classes
  * (\w, \d, \s become ASCII-only), matching the
- * behaviour of regexpToRust() for /i RegExps.
+ * behaviour of regexpToRust() for non-Unicode /i RegExps.
  */
 function scopeInlineFlags(src: string): string {
   // Handle bare (?i...) at the start: convert to
@@ -878,6 +1123,11 @@ export class RegexSet {
   /** Number of patterns. */
   get patternCount(): number {
     return this._patternCount;
+  }
+
+  /** Internal diagnostics: fast DFA, verified DFA, and fallback pattern counts. */
+  _enginePathCounts(): number[] {
+    return [...this._inner._enginePathCounts()];
   }
 
   /** Returns `true` if any pattern matches. */

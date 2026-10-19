@@ -3,6 +3,7 @@
 export declare class RegexSet {
   constructor(patterns: Array<string>, options?: Options | undefined | null, prepared?: Buffer | undefined | null)
   get patternCount(): number
+  _enginePathCounts(): Array<number>
   isMatch(haystack: string): boolean
   _isMatchBuf(haystack: Buffer): boolean
   _findIterPacked(haystack: string): Uint32Array

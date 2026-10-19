@@ -2141,6 +2141,16 @@ impl RegexSet {
     self.pattern_count
   }
 
+  /// Pattern counts for the fast DFA, verified DFA, and fancy fallback paths.
+  #[must_use]
+  pub fn engine_path_counts(&self) -> [u32; 3] {
+    [
+      u32::try_from(self.fast_info.len()).unwrap_or(u32::MAX),
+      u32::try_from(self.slow_info.len()).unwrap_or(u32::MAX),
+      u32::try_from(self.fallbacks.len()).unwrap_or(u32::MAX),
+    ]
+  }
+
   // ── Core match collection (single source) ──
 
   /// Collect all verified matches from both the
@@ -2351,10 +2361,19 @@ impl RegexSet {
       };
       let input = Input::new(haystack).range(at..).anchored(Anchored::Yes);
       if let Some(m) = individual.find(input) {
-        if m.start() == at
-          && check_match(haystack, m.start(), m.end(), pi, mode).is_ok()
-        {
-          return Some((pi.original_index, m.start(), m.end()));
+        if m.start() != at {
+          continue;
+        }
+        match check_match(haystack, m.start(), m.end(), pi, mode) {
+          Ok(()) => return Some((pi.original_index, m.start(), m.end())),
+          Err(Rejection::Verifier) => {
+            if let Some((start, end)) =
+              try_verifier_fallback(pi, haystack, m.start(), m.end(), mode)
+            {
+              return Some((pi.original_index, start, end));
+            }
+          }
+          Err(Rejection::Boundary) => {}
         }
       }
     }
