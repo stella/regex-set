@@ -159,6 +159,66 @@ let __emnapiWasmEnvCleanupDrainPromise;
 let __wasiDisposed = false;
 let __wasiAsyncWorkDrainPromise;
 let __wasiDisposePromise;
+let __wasiThreadCrashDisposePromise;
+
+function __hasWasiThreadCrashed() {
+  return (
+    __wasiAddonCrashFlag !== undefined &&
+    Atomics.load(__wasiAddonCrashFlag, 0) !== 0
+  );
+}
+
+function __getWasiThreadCrashError() {
+  return new Error(
+    "napi-rs: WASI binding cannot be disposed after a worker thread crashed",
+  );
+}
+
+function __disposeWasiBindingAfterThreadCrash() {
+  if (__wasiThreadCrashDisposePromise) {
+    return __wasiThreadCrashDisposePromise;
+  }
+  let workerResult;
+  try {
+    workerResult = __terminateWasiWorkers();
+  } catch (error) {
+    workerResult = Promise.reject(error);
+  }
+  __wasiThreadCrashDisposePromise = Promise.resolve(
+    workerResult,
+  ).then(
+    () => {
+      throw __getWasiThreadCrashError();
+    },
+    (error) => {
+      throw error;
+    },
+  );
+  return __wasiThreadCrashDisposePromise;
+}
+
+function __abortWasiDisposalIfThreadCrashed() {
+  if (
+    __wasiDisposePromise !== undefined &&
+    __hasWasiThreadCrashed()
+  ) {
+    throw __getWasiThreadCrashError();
+  }
+}
+
+function __settleWasiDisposalAfterThreadCrash(
+  resolve,
+  reject,
+) {
+  if (!__hasWasiThreadCrashed()) {
+    return false;
+  }
+  __disposeWasiBindingAfterThreadCrash().then(
+    resolve,
+    reject,
+  );
+  return true;
+}
 let __completeWasiDisposal = function () {};
 // Overridden by loader flavors that have a last-resort reclaim for a rollback
 // that stopped short of destroying the context. See
@@ -687,6 +747,15 @@ function __prepareWasmEnvCleanupWithTurns() {
   // Publish the closer before yielding: from here until `finishCleanup` runs,
   // a caller that cannot yield is entitled to end this handshake itself.
   __finishParkedWasmEnvCleanup = finishCleanup;
+  const finishCleanupUnlessCrashed = () => {
+    try {
+      __abortWasiDisposalIfThreadCrashed();
+    } catch (error) {
+      __finishParkedWasmEnvCleanup = undefined;
+      throw error;
+    }
+    finishCleanup();
+  };
   return (async () => {
     // Unbounded, exactly like the async-work drain below. The wait ends when
     // the addon reports its runtime work finished; the turns spent here are
@@ -694,6 +763,7 @@ function __prepareWasmEnvCleanupWithTurns() {
     const pace = __createWasmRuntimePollPace();
     for (;;) {
       await __yieldWasmRuntimePollTurn(pace);
+      __abortWasiDisposalIfThreadCrashed();
       try {
         if (!workPending()) {
           return;
@@ -704,7 +774,10 @@ function __prepareWasmEnvCleanupWithTurns() {
         return;
       }
     }
-  })().then(finishCleanup, finishCleanup);
+  })().then(
+    finishCleanupUnlessCrashed,
+    finishCleanupUnlessCrashed,
+  );
 }
 
 // Turns to wait for while the addon still reports queued settlements. Reaching
@@ -1046,6 +1119,7 @@ function __drainWasiAsyncWork() {
             __WASI_ASYNC_WORK_POLL_INTERVAL_MS,
           );
         });
+        __abortWasiDisposalIfThreadCrashed();
       }
     })(),
   ).then(
@@ -1203,6 +1277,9 @@ function __disposeWasiBinding() {
   if (__wasiDisposePromise) {
     return __wasiDisposePromise;
   }
+  if (!__wasiDisposed && __hasWasiThreadCrashed()) {
+    return __disposeWasiBindingAfterThreadCrash();
+  }
   if (__wasiDisposed) {
     return Promise.resolve();
   }
@@ -1219,6 +1296,14 @@ function __disposeWasiBinding() {
   try {
     result = __startWasiDisposal();
   } catch (error) {
+    if (
+      __settleWasiDisposalAfterThreadCrash(
+        resolveDispose,
+        rejectDispose,
+      )
+    ) {
+      return disposePromise;
+    }
     __wasiDisposePromise = undefined;
     rejectDispose(error);
     return disposePromise;
@@ -1230,6 +1315,14 @@ function __disposeWasiBinding() {
       resolveDispose(value);
     },
     (error) => {
+      if (
+        __settleWasiDisposalAfterThreadCrash(
+          resolveDispose,
+          rejectDispose,
+        )
+      ) {
+        return;
+      }
       __wasiDisposePromise = undefined;
       rejectDispose(error);
     },

@@ -8,7 +8,8 @@
 export declare const __napiBindingTarget:
   | "native"
   | "wasm32-wasi"
-  | "wasm32-wasip1";
+  | "wasm32-wasip1"
+  | undefined;
 
 export declare class RegexSet {
   constructor(

@@ -111,3 +111,25 @@ const contractResult = spawnSync(
 if (contractResult.status !== 0) {
   process.exit(contractResult.status ?? 1);
 }
+
+// Some napi platform builds finish writing the browser loader and declaration
+// after the first normalization pass. Normalize these derived artifacts again
+// at the process boundary so the checked-in output always carries the local
+// loader fixes.
+await normalizeGeneratedFile("index.d.cts");
+await normalizeGeneratedFile("regex-set.wasi-browser.js");
+
+const finalFormatResult = spawnSync(
+  "bun",
+  [
+    "x",
+    "oxfmt",
+    "index.d.cts",
+    "regex-set.wasi-browser.js",
+  ],
+  { stdio: "inherit" },
+);
+
+if (finalFormatResult.status !== 0) {
+  process.exit(finalFormatResult.status ?? 1);
+}
