@@ -6,10 +6,16 @@ import { normalizeGeneratedLoader } from "./generated-loader-normalization.mjs";
 
 // oxlint-disable typescript/strict-boolean-expressions -- Acorn's dynamically shaped AST is fixture data inspected by the normalizer test.
 
-const contextDestructionBoundaries = new Set([
+const cleanupFunctionCalls = new Set([
   "__destroyEmnapiContext",
   "__drainWasmEnvCleanup",
   "__prepareWasmEnvCleanupWithTurns",
+]);
+
+const functionTypes = new Set([
+  "ArrowFunctionExpression",
+  "FunctionDeclaration",
+  "FunctionExpression",
 ]);
 
 const findUncheckedContextDestructionBoundaries = (
@@ -19,46 +25,102 @@ const findUncheckedContextDestructionBoundaries = (
   const source = parse(content, {
     ecmaVersion: "latest",
     sourceType: "module",
+    locations: true,
   });
   const unchecked = [];
+  const cleanupAliases = new Set(["finishParked"]);
 
-  const inspectFunction = (node) => {
-    if (!node.id || !node.body) {
+  const visit = (node, callback) => {
+    callback(node);
+    for (const value of Object.values(node)) {
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          if (item?.type) visit(item, callback);
+        }
+      } else if (value?.type) {
+        visit(value, callback);
+      }
+    }
+  };
+
+  visit(source, (node) => {
+    if (
+      node.type !== "VariableDeclarator" ||
+      node.id.type !== "Identifier" ||
+      node.init?.type !== "MemberExpression"
+    ) {
       return;
     }
+    const property = node.init.property;
+    const propertyName =
+      property.type === "Identifier"
+        ? property.name
+        : property.value;
+    if (
+      typeof propertyName === "string" &&
+      propertyName.includes("cleanup")
+    ) {
+      cleanupAliases.add(node.id.name);
+    }
+  });
+
+  const getFunctionName = (node, parent) => {
+    if (node.id?.name) return node.id.name;
+    if (parent?.type === "VariableDeclarator") {
+      return parent.id.name;
+    }
+    if (
+      ["Property", "MethodDefinition"].includes(
+        parent?.type,
+      )
+    ) {
+      return parent.key.name ?? parent.key.value;
+    }
+    return `<callback@${node.loc.start.line}>`;
+  };
+
+  const inspectFunction = (node, parent) => {
     const crashChecks = [];
     const boundaries = [];
     const visitBody = (child) => {
       if (
         child !== node.body &&
-        [
-          "ArrowFunctionExpression",
-          "FunctionDeclaration",
-          "FunctionExpression",
-        ].includes(child.type)
+        functionTypes.has(child.type)
       ) {
         return;
       }
-      if (
-        child.type === "CallExpression" &&
-        child.callee.type === "Identifier"
-      ) {
-        if (
-          [
-            "__abortWasiDisposalIfThreadCrashed",
-            "__hasWasiThreadCrashed",
-          ].includes(child.callee.name)
-        ) {
-          crashChecks.push(child.start);
+      if (child.type === "CallExpression") {
+        if (child.callee.type === "Identifier") {
+          if (
+            [
+              "__abortWasiDisposalIfThreadCrashed",
+              "__hasWasiThreadCrashed",
+            ].includes(child.callee.name)
+          ) {
+            crashChecks.push(child.start);
+          } else if (
+            cleanupFunctionCalls.has(child.callee.name) ||
+            cleanupAliases.has(child.callee.name)
+          ) {
+            boundaries.push({
+              name: child.callee.name,
+              position: child.start,
+            });
+          }
         } else if (
-          contextDestructionBoundaries.has(
-            child.callee.name,
-          )
+          child.callee.type === "MemberExpression"
         ) {
-          boundaries.push({
-            name: child.callee.name,
-            position: child.start,
-          });
+          const property = child.callee.property;
+          const propertyName =
+            property.type === "Identifier"
+              ? property.name
+              : property.value;
+          if (propertyName === "destroy") {
+            boundaries.push({
+              name: "context.destroy",
+              position: child.start,
+            });
+          }
         }
       }
       for (const value of Object.values(child)) {
@@ -79,22 +141,23 @@ const findUncheckedContextDestructionBoundaries = (
         )
       ) {
         unchecked.push(
-          `${filename}: ${node.id.name} -> ${boundary.name}`,
+          `${filename}: ${getFunctionName(node, parent)} -> ${boundary.name}`,
         );
       }
     }
   };
-  const visitFunctions = (node) => {
-    if (node.type === "FunctionDeclaration") {
-      inspectFunction(node);
+
+  const visitFunctions = (node, parent) => {
+    if (functionTypes.has(node.type)) {
+      inspectFunction(node, parent);
     }
     for (const value of Object.values(node)) {
       if (Array.isArray(value)) {
         for (const item of value) {
-          if (item?.type) visitFunctions(item);
+          if (item?.type) visitFunctions(item, node);
         }
       } else if (value?.type) {
-        visitFunctions(value);
+        visitFunctions(value, node);
       }
     }
   };
@@ -123,6 +186,19 @@ describe("normalizeGeneratedLoader", () => {
     expect(unchecked).toEqual([]);
   });
 
+  test("flags an unchecked arrow callback that finishes cleanup", () => {
+    const unchecked =
+      findUncheckedContextDestructionBoundaries(
+        "unchecked.js",
+        `const finish = exports.napi_prepare_wasm_env_cleanup_finish;
+const unchecked = () => finish();`,
+      );
+
+    expect(unchecked).toEqual([
+      "unchecked.js: unchecked -> finish",
+    ]);
+  });
+
   test("removes generator suppression comments without changing the code", () => {
     const generated = `/* eslint-disable */
 // oxlint-disable-next-line no-eval -- generated worker
@@ -137,7 +213,7 @@ const worker = true;${"  "}
     );
   });
 
-  test("aborts browser disposal after a worker crash without leaving a poll timer", async () => {
+  test("aborts browser disposal after a worker startup error without leaving a poll timer", async () => {
     const generated = `
 let __wasiAddonCrashFlag;
 let __wasiDisposed = false;
@@ -154,6 +230,20 @@ const __napiInstance = {
   },
 };
 const __isThenable = (value) => value && typeof value.then === "function";
+const __wasiWorkers = new Set();
+const __shareWasiAddonCrashFlag = () => {};
+const startupListeners = {};
+const startupWorker = {
+  addEventListener(name, listener) { startupListeners[name] = listener; },
+};
+function createStartupWorker() {
+      const worker = startupWorker;
+      __wasiWorkers.add(worker);
+      __shareWasiAddonCrashFlag(worker);
+
+      return worker;
+}
+createStartupWorker();
 function __terminateWasiWorkers() {
   terminated += 1;
 }
@@ -229,10 +319,7 @@ const runtimePollFixture = (pace) => {
     // oxlint-disable-next-line typescript/no-implied-eval -- The generated loader fixture must execute to prove its disposal behavior.
     const loadFixture = new Function(
       `${normalized}\nreturn {
-        crash() {
-          __wasiAddonCrashFlag = new Int32Array(new SharedArrayBuffer(4));
-          Atomics.store(__wasiAddonCrashFlag, 0, 1);
-        },
+        failWorkerStartup(error) { startupListeners.error({ error }); },
         dispose: __disposeWasiBinding,
         getTerminated: () => terminated,
         runPollTimer() {
@@ -247,7 +334,9 @@ const runtimePollFixture = (pace) => {
     const disposal = fixture.dispose();
     expect(fixture.timerCount()).toBe(1);
 
-    fixture.crash();
+    fixture.failWorkerStartup(
+      new Error("worker failed to load"),
+    );
     fixture.runPollTimer();
 
     // oxlint-disable-next-line typescript/await-thenable, typescript/no-confusing-void-expression -- The generated fixture's dynamically constructed disposal value is intentionally untyped.
@@ -273,6 +362,8 @@ let __wasiAddonCrashFlag;
 let __wasiDisposePromise;
 let destroyed = 0;
 let releaseDrain;
+const threadManager = {};
+const __getWasiThreadManager = () => threadManager;
 const __isThenable = (value) => value && typeof value.then === "function";
 const __terminateWasiWorkers = () => {};
 const __destroyEmnapiContext = () => { destroyed += 1; };
@@ -294,7 +385,7 @@ function __drainWasmEnvForWasiDisposal() {
     const fixture = new Function(
       `${normalized}\nreturn {
         begin() { __wasiDisposePromise = __drainWasmEnvForWasiDisposal(); return __wasiDisposePromise; },
-        crash() { __wasiAddonCrashFlag = new Int32Array(new SharedArrayBuffer(4)); Atomics.store(__wasiAddonCrashFlag, 0, 1); },
+        crash() { threadManager._fatalError = new Error("worker import failed"); },
         release: () => releaseDrain(),
         destroyed: () => destroyed,
       };`,
@@ -310,13 +401,27 @@ function __drainWasmEnvForWasiDisposal() {
     expect(fixture.destroyed()).toBe(0);
   });
 
-  test("terminates a crashed worker during initialization rollback without another poll", async () => {
+  test("terminates a worker with a startup error during initialization rollback without another poll", async () => {
     const generated = `
 let __wasiAddonCrashFlag;
 let __wasiDisposePromise;
 let terminated = 0;
 const timers = new Set();
 const __isThenable = (value) => value && typeof value.then === "function";
+const __wasiWorkers = new Set();
+const __shareWasiAddonCrashFlag = () => {};
+const startupListeners = {};
+const startupWorker = {
+  addEventListener(name, listener) { startupListeners[name] = listener; },
+};
+function createStartupWorker() {
+      const worker = startupWorker;
+      __wasiWorkers.add(worker);
+      __shareWasiAddonCrashFlag(worker);
+
+      return worker;
+}
+createStartupWorker();
 const __terminateWasiWorkers = () => { terminated += 1; };
 const __retainFailedWasiRollback = (errors) => errors;
 const __drainWasiAsyncWork = () => new Promise((resolve) => { timers.add(resolve); });
@@ -347,7 +452,7 @@ function __rollbackWasiInitialization() {
     const fixture = new Function(
       `${normalized}\nreturn {
         failInitialization: async () => { const error = new Error("initialization failed"); const cleanupErrors = await __rollbackWasiInitialization(); if (cleanupErrors.length) error.cause = cleanupErrors[0]; throw error; },
-        crash() { __wasiAddonCrashFlag = new Int32Array(new SharedArrayBuffer(4)); Atomics.store(__wasiAddonCrashFlag, 0, 1); },
+        failWorkerStartup(error) { startupListeners.error({ error }); },
         runPollTimer() { const callback = timers.values().next().value; timers.delete(callback); callback(); },
         timerCount: () => timers.size,
         terminated: () => terminated,
@@ -355,7 +460,9 @@ function __rollbackWasiInitialization() {
     )();
     const initialization = fixture.failInitialization();
     expect(fixture.timerCount()).toBe(1);
-    fixture.crash();
+    fixture.failWorkerStartup(
+      new Error("static import failed"),
+    );
     fixture.runPollTimer();
 
     // oxlint-disable-next-line typescript/await-thenable, typescript/no-confusing-void-expression -- The generated fixture's dynamically constructed initialization value is intentionally untyped.

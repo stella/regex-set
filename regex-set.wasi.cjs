@@ -913,6 +913,7 @@ function __wrapEmnapiContextDestroyForSettlement(
       enumerable: false,
       writable: true,
       value: function () {
+        __abortWasiDisposalIfThreadCrashed();
         // Reentered from a promise hook that fired inside the barrier: the
         // frame running it destroys as soon as it returns.
         if (isPreparingEnvCleanup?.()) {
@@ -931,6 +932,7 @@ function __isPreparingWasmEnvCleanup() {
 }
 
 function __prepareWasmEnvCleanup() {
+  __abortWasiDisposalIfThreadCrashed();
   if (__emnapiWasmEnvCleanupPrepared) {
     return;
   }
@@ -1329,6 +1331,7 @@ function __prepareWasmEnvCleanupWithTurns() {
   }
   __emnapiWasmEnvCleanupRan = true;
   const finishCleanup = () => {
+    __abortWasiDisposalIfThreadCrashed();
     if (__emnapiWasmEnvCleanupPrepared) {
       // Already closed by a caller that could not yield — the 'exit' teardown
       // reached `__prepareWasmEnvCleanup` while this poll was parked. `…_finish`
@@ -1515,6 +1518,7 @@ function __drainWasmEnvCleanup() {
 }
 
 function __destroyEmnapiContext() {
+  __abortWasiDisposalIfThreadCrashed();
   if (
     __emnapiContextDestroyed ||
     __emnapiContext === undefined

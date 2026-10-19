@@ -16,18 +16,49 @@ const normalizeBrowserCrashDisposal = (content) => {
       `let __wasiDisposePromise;
 let __wasiThreadCrashDisposePromise;
 let __wasiInitializationRollbackActive = false;
+let __wasiThreadCrashed = false;
+let __wasiThreadCrashWorkerError;
+
+function __recordWasiThreadCrashError(error) {
+  __wasiThreadCrashed = true;
+  if (
+    __wasiThreadCrashWorkerError === undefined &&
+    error !== undefined
+  ) {
+    __wasiThreadCrashWorkerError = error;
+  }
+}
 
 function __hasWasiThreadCrashed() {
-  return (
-    __wasiAddonCrashFlag !== undefined &&
-    Atomics.load(__wasiAddonCrashFlag, 0) !== 0
-  );
+  if (
+    __wasiThreadCrashed ||
+    (__wasiAddonCrashFlag !== undefined &&
+      Atomics.load(__wasiAddonCrashFlag, 0) !== 0)
+  ) {
+    return true;
+  }
+  const manager =
+    typeof __getWasiThreadManager === "function"
+      ? __getWasiThreadManager()
+      : undefined;
+  return Boolean(manager && manager._fatalError);
 }
 
 function __getWasiThreadCrashError() {
-  return new Error(
+  const error = new Error(
     "napi-rs: WASI binding cannot be disposed after a worker thread crashed",
   );
+  const manager =
+    typeof __getWasiThreadManager === "function"
+      ? __getWasiThreadManager()
+      : undefined;
+  const cause =
+    __wasiThreadCrashWorkerError ??
+    (manager ? manager._fatalError : undefined);
+  if (cause !== undefined && cause !== null) {
+    error.cause = cause;
+  }
+  return error;
 }
 
 function __disposeWasiBindingAfterThreadCrash() {
@@ -74,6 +105,18 @@ function __rollbackWasiInitializationAfterThreadCrash() {
   void __disposeWasiBindingAfterThreadCrash().catch(() => {});
   return [crashError];
 }`,
+    )
+    .replace(
+      `      __wasiWorkers.add(worker);
+      __shareWasiAddonCrashFlag(worker);`,
+      `      __wasiWorkers.add(worker);
+      worker.addEventListener("error", (event) => {
+        __recordWasiThreadCrashError(event.error ?? event);
+      });
+      worker.addEventListener("messageerror", (event) => {
+        __recordWasiThreadCrashError(event);
+      });
+      __shareWasiAddonCrashFlag(worker);`,
     )
     .replace(
       `  __finishParkedWasmEnvCleanup = finishCleanup;
@@ -233,8 +276,30 @@ function __rollbackWasiInitialization() {
 };
 
 /** @param {string} content */
+const normalizeCleanupCrashChecks = (content) =>
+  content
+    .replace(
+      "function __prepareWasmEnvCleanup() {\n  if (",
+      "function __prepareWasmEnvCleanup() {\n  __abortWasiDisposalIfThreadCrashed();\n  if (",
+    )
+    .replace(
+      "  const finishCleanup = () => {\n    if (",
+      "  const finishCleanup = () => {\n    __abortWasiDisposalIfThreadCrashed();\n    if (",
+    )
+    .replace(
+      "function __destroyEmnapiContext() {\n  if (",
+      "function __destroyEmnapiContext() {\n  __abortWasiDisposalIfThreadCrashed();\n  if (",
+    )
+    .replace(
+      "      value: function () {\n        // Reentered",
+      "      value: function () {\n        __abortWasiDisposalIfThreadCrashed();\n        // Reentered",
+    );
+
+/** @param {string} content */
 export const normalizeGeneratedLoader = (content) =>
-  normalizeBrowserCrashDisposal(content)
+  normalizeCleanupCrashChecks(
+    normalizeBrowserCrashDisposal(content),
+  )
     .replace(suppressionComment, "")
     .replace(
       '| "wasm32-wasip1";',

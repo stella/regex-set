@@ -161,18 +161,49 @@ let __wasiAsyncWorkDrainPromise;
 let __wasiDisposePromise;
 let __wasiThreadCrashDisposePromise;
 let __wasiInitializationRollbackActive = false;
+let __wasiThreadCrashed = false;
+let __wasiThreadCrashWorkerError;
+
+function __recordWasiThreadCrashError(error) {
+  __wasiThreadCrashed = true;
+  if (
+    __wasiThreadCrashWorkerError === undefined &&
+    error !== undefined
+  ) {
+    __wasiThreadCrashWorkerError = error;
+  }
+}
 
 function __hasWasiThreadCrashed() {
-  return (
-    __wasiAddonCrashFlag !== undefined &&
-    Atomics.load(__wasiAddonCrashFlag, 0) !== 0
-  );
+  if (
+    __wasiThreadCrashed ||
+    (__wasiAddonCrashFlag !== undefined &&
+      Atomics.load(__wasiAddonCrashFlag, 0) !== 0)
+  ) {
+    return true;
+  }
+  const manager =
+    typeof __getWasiThreadManager === "function"
+      ? __getWasiThreadManager()
+      : undefined;
+  return Boolean(manager && manager._fatalError);
 }
 
 function __getWasiThreadCrashError() {
-  return new Error(
+  const error = new Error(
     "napi-rs: WASI binding cannot be disposed after a worker thread crashed",
   );
+  const manager =
+    typeof __getWasiThreadManager === "function"
+      ? __getWasiThreadManager()
+      : undefined;
+  const cause =
+    __wasiThreadCrashWorkerError ??
+    (manager ? manager._fatalError : undefined);
+  if (cause !== undefined && cause !== null) {
+    error.cause = cause;
+  }
+  return error;
 }
 
 function __disposeWasiBindingAfterThreadCrash() {
@@ -319,6 +350,7 @@ function __wrapEmnapiContextDestroyForSettlement(
       enumerable: false,
       writable: true,
       value: function () {
+        __abortWasiDisposalIfThreadCrashed();
         // Reentered from a promise hook that fired inside the barrier: the
         // frame running it destroys as soon as it returns.
         if (isPreparingEnvCleanup?.()) {
@@ -337,6 +369,7 @@ function __isPreparingWasmEnvCleanup() {
 }
 
 function __prepareWasmEnvCleanup() {
+  __abortWasiDisposalIfThreadCrashed();
   if (__emnapiWasmEnvCleanupPrepared) {
     return;
   }
@@ -735,6 +768,7 @@ function __prepareWasmEnvCleanupWithTurns() {
   }
   __emnapiWasmEnvCleanupRan = true;
   const finishCleanup = () => {
+    __abortWasiDisposalIfThreadCrashed();
     if (__emnapiWasmEnvCleanupPrepared) {
       // Already closed by a caller that could not yield — the 'exit' teardown
       // reached `__prepareWasmEnvCleanup` while this poll was parked. `…_finish`
@@ -921,6 +955,7 @@ function __drainWasmEnvCleanup() {
 }
 
 function __destroyEmnapiContext() {
+  __abortWasiDisposalIfThreadCrashed();
   if (
     __emnapiContextDestroyed ||
     __emnapiContext === undefined
@@ -1641,6 +1676,12 @@ try {
         },
       );
       __wasiWorkers.add(worker);
+      worker.addEventListener("error", (event) => {
+        __recordWasiThreadCrashError(event.error ?? event);
+      });
+      worker.addEventListener("messageerror", (event) => {
+        __recordWasiThreadCrashError(event);
+      });
       __shareWasiAddonCrashFlag(worker);
 
       return worker;
