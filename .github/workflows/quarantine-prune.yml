@@ -13,7 +13,7 @@ jobs:
     if: github.repository == 'stella/regex-set'
     permissions:
       contents: read
-    uses: stella/.github/.github/workflows/quarantine-prune.yml@5764ab66e4df84cfd2e642c7d7e4678261e668f8
+    uses: stella/.github/.github/workflows/quarantine-prune.yml@07debc754995bab35e446511859f1d93e1ad127a
     secrets:
       CHANGELOG_APP_ID: ${{ secrets.CHANGELOG_APP_ID }}
       CHANGELOG_APP_PRIVATE_KEY: ${{ secrets.CHANGELOG_APP_PRIVATE_KEY }}
