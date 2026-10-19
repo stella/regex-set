@@ -2361,10 +2361,19 @@ impl RegexSet {
       };
       let input = Input::new(haystack).range(at..).anchored(Anchored::Yes);
       if let Some(m) = individual.find(input) {
-        if m.start() == at
-          && check_match(haystack, m.start(), m.end(), pi, mode).is_ok()
-        {
-          return Some((pi.original_index, m.start(), m.end()));
+        if m.start() != at {
+          continue;
+        }
+        match check_match(haystack, m.start(), m.end(), pi, mode) {
+          Ok(()) => return Some((pi.original_index, m.start(), m.end())),
+          Err(Rejection::Verifier) => {
+            if let Some((start, end)) =
+              try_verifier_fallback(pi, haystack, m.start(), m.end(), mode)
+            {
+              return Some((pi.original_index, start, end));
+            }
+          }
+          Err(Rejection::Boundary) => {}
         }
       }
     }

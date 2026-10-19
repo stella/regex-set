@@ -370,6 +370,21 @@ function isAscii(s: string): boolean {
 }
 
 describe("property: JS oracle on feature patterns", () => {
+  test("backtracks a shadowed greedy match before a negative lookahead", () => {
+    const patterns = [
+      String.raw`(?<=\s)\w+(?!\d)`,
+      String.raw`[a-z]+(?!\d)`,
+    ];
+    const haystack = "aa0";
+    const set = new RegexSet(patterns, {
+      unicodeBoundaries: false,
+    });
+
+    expect(set.findIter(haystack)).toEqual([
+      { pattern: 1, start: 0, end: 1, text: "a" },
+    ]);
+  });
+
   test("findIter matches JS RegExp on ASCII text", () => {
     fc.assert(
       fc.property(
