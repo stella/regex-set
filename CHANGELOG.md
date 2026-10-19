@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.9
+
+### Patch Changes
+
+- [#212](https://github.com/stella/regex-set/pull/212) [`aaedfa0`](https://github.com/stella/regex-set/commit/aaedfa0a221e1d442197ce34a8dd5cd5a33b7561) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Preserve backtracked matches from shadowed lookaround patterns.
+
+- [#212](https://github.com/stella/regex-set/pull/212) [`aaedfa0`](https://github.com/stella/regex-set/commit/aaedfa0a221e1d442197ce34a8dd5cd5a33b7561) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Keep ordinary JavaScript word boundaries on the shared DFA path.
+
+- [#212](https://github.com/stella/regex-set/pull/212) [`aaedfa0`](https://github.com/stella/regex-set/commit/aaedfa0a221e1d442197ce34a8dd5cd5a33b7561) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Preserve JavaScript RegExp whitespace, word classes, word boundaries, and escaped backslashes during translation. Unicode RegExp word boundaries use JavaScript word membership independently of the engine boundary option, including Kelvin sign and long-s folding for `/iu`.
+
 ## 1.0.8
 
 ### Patch Changes

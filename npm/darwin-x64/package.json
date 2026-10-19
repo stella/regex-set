@@ -1,6 +1,6 @@
 {
   "name": "@stll/regex-set-darwin-x64",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "cpu": [
     "x64"
   ],
