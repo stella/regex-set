@@ -71,6 +71,7 @@ function __disposeWasiBinding() {
     resolveDispose = resolve;
     rejectDispose = reject;
   });
+
   __wasiDisposePromise = disposePromise;
 
   let result;
@@ -144,6 +145,105 @@ const runtimePollFixture = (pace) => {
     expect(normalizeGeneratedLoader(normalized)).toBe(
       normalized,
     );
+  });
+
+  test("checks for a crash before destroying the context after settlement draining", async () => {
+    const generated = `
+let __wasiAddonCrashFlag;
+let __wasiDisposePromise;
+let destroyed = 0;
+let releaseDrain;
+const __isThenable = (value) => value && typeof value.then === "function";
+const __terminateWasiWorkers = () => {};
+const __destroyEmnapiContext = () => { destroyed += 1; };
+const __finishWasiDisposal = () => {};
+const __drainWasmEnvCleanup = () => new Promise((resolve) => { releaseDrain = resolve; });
+function __continueWasiDisposal() {
+  const destroyResult = __destroyEmnapiContext();
+  if (__isThenable(destroyResult)) return Promise.resolve(destroyResult).then(__finishWasiDisposal);
+  return __finishWasiDisposal();
+}
+function __drainWasmEnvForWasiDisposal() {
+  const drainResult = __drainWasmEnvCleanup();
+  if (__isThenable(drainResult)) return Promise.resolve(drainResult).then(__continueWasiDisposal);
+  return __continueWasiDisposal();
+}
+`;
+    const normalized = normalizeGeneratedLoader(generated);
+    // oxlint-disable-next-line typescript/no-implied-eval -- The generated loader fixture must execute to prove its disposal behavior.
+    const fixture = new Function(
+      `${normalized}\nreturn {
+        begin() { __wasiDisposePromise = __drainWasmEnvForWasiDisposal(); return __wasiDisposePromise; },
+        crash() { __wasiAddonCrashFlag = new Int32Array(new SharedArrayBuffer(4)); Atomics.store(__wasiAddonCrashFlag, 0, 1); },
+        release: () => releaseDrain(),
+        destroyed: () => destroyed,
+      };`,
+    )();
+    const disposal = fixture.begin();
+    fixture.crash();
+    fixture.release();
+
+    // oxlint-disable-next-line typescript/await-thenable, typescript/no-confusing-void-expression -- The generated fixture's dynamically constructed disposal value is intentionally untyped.
+    await expect(disposal).rejects.toThrow(
+      "worker thread crashed",
+    );
+    expect(fixture.destroyed()).toBe(0);
+  });
+
+  test("terminates a crashed worker during initialization rollback without another poll", async () => {
+    const generated = `
+let __wasiAddonCrashFlag;
+let __wasiDisposePromise;
+let terminated = 0;
+const timers = new Set();
+const __isThenable = (value) => value && typeof value.then === "function";
+const __terminateWasiWorkers = () => { terminated += 1; };
+const __retainFailedWasiRollback = (errors) => errors;
+const __drainWasiAsyncWork = () => new Promise((resolve) => { timers.add(resolve); });
+const __prepareWasmEnvCleanupWithTurns = () => {};
+const __drainWasmEnvCleanup = () => {};
+const __destroyContextForWasiRollback = () => [];
+function __rollbackWasiInitialization() {
+  function __rollbackWasmEnvForWasiInitialization() {
+    const cleanupErrors = [];
+    const prepareResult = __prepareWasmEnvCleanupWithTurns();
+    if (__isThenable(prepareResult)) return Promise.resolve(prepareResult).then(() => __drainWasmEnvForWasiRollback(cleanupErrors));
+    return __drainWasmEnvForWasiRollback(cleanupErrors);
+  }
+  function __drainWasmEnvForWasiRollback(cleanupErrors) {
+    let drainResult = __drainWasmEnvCleanup();
+    if (__isThenable(drainResult)) return Promise.resolve(drainResult).then(() => __destroyContextForWasiRollback(cleanupErrors));
+    return __destroyContextForWasiRollback(cleanupErrors);
+  }
+  const asyncWorkResult = __drainWasiAsyncWork();
+  if (__isThenable(asyncWorkResult)) return Promise.resolve(asyncWorkResult).then(__rollbackWasmEnvForWasiInitialization, (error) => __retainFailedWasiRollback([error]));
+  return __rollbackWasmEnvForWasiInitialization();
+}
+
+// A view of the addon's crash flag, one word of the shared wasm memory, for the fixture.
+`;
+    const normalized = normalizeGeneratedLoader(generated);
+    // oxlint-disable-next-line typescript/no-implied-eval -- The generated loader fixture must execute to prove its rollback behavior.
+    const fixture = new Function(
+      `${normalized}\nreturn {
+        failInitialization: async () => { const error = new Error("initialization failed"); const cleanupErrors = await __rollbackWasiInitialization(); if (cleanupErrors.length) error.cause = cleanupErrors[0]; throw error; },
+        crash() { __wasiAddonCrashFlag = new Int32Array(new SharedArrayBuffer(4)); Atomics.store(__wasiAddonCrashFlag, 0, 1); },
+        runPollTimer() { const callback = timers.values().next().value; timers.delete(callback); callback(); },
+        timerCount: () => timers.size,
+        terminated: () => terminated,
+      };`,
+    )();
+    const initialization = fixture.failInitialization();
+    expect(fixture.timerCount()).toBe(1);
+    fixture.crash();
+    fixture.runPollTimer();
+
+    // oxlint-disable-next-line typescript/await-thenable, typescript/no-confusing-void-expression -- The generated fixture's dynamically constructed initialization value is intentionally untyped.
+    await expect(initialization).rejects.toThrow(
+      "initialization failed",
+    );
+    expect(fixture.terminated()).toBe(1);
+    expect(fixture.timerCount()).toBe(0);
   });
 
   test("allows an unstamped binding target in generated declarations", () => {

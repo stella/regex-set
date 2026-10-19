@@ -160,6 +160,7 @@ let __wasiDisposed = false;
 let __wasiAsyncWorkDrainPromise;
 let __wasiDisposePromise;
 let __wasiThreadCrashDisposePromise;
+let __wasiInitializationRollbackActive = false;
 
 function __hasWasiThreadCrashed() {
   return (
@@ -199,7 +200,8 @@ function __disposeWasiBindingAfterThreadCrash() {
 
 function __abortWasiDisposalIfThreadCrashed() {
   if (
-    __wasiDisposePromise !== undefined &&
+    (__wasiDisposePromise !== undefined ||
+      __wasiInitializationRollbackActive) &&
     __hasWasiThreadCrashed()
   ) {
     throw __getWasiThreadCrashError();
@@ -218,6 +220,14 @@ function __settleWasiDisposalAfterThreadCrash(
     reject,
   );
   return true;
+}
+
+function __rollbackWasiInitializationAfterThreadCrash() {
+  const crashError = __getWasiThreadCrashError();
+  void __disposeWasiBindingAfterThreadCrash().catch(
+    () => {},
+  );
+  return [crashError];
 }
 let __completeWasiDisposal = function () {};
 // Overridden by loader flavors that have a last-resort reclaim for a rollback
@@ -1219,6 +1229,7 @@ function __finishWasiDisposal() {
 }
 
 function __continueWasiDisposal() {
+  __abortWasiDisposalIfThreadCrashed();
   const destroyResult = __destroyEmnapiContext();
   if (__isThenable(destroyResult)) {
     return Promise.resolve(destroyResult).then(
@@ -1229,6 +1240,7 @@ function __continueWasiDisposal() {
 }
 
 function __drainWasmEnvForWasiDisposal() {
+  __abortWasiDisposalIfThreadCrashed();
   const drainResult = __drainWasmEnvCleanup();
   if (__isThenable(drainResult)) {
     return Promise.resolve(drainResult).then(
@@ -1239,6 +1251,7 @@ function __drainWasmEnvForWasiDisposal() {
 }
 
 function __cleanUpWasmEnvForWasiDisposal() {
+  __abortWasiDisposalIfThreadCrashed();
   // Run the pre-teardown barrier — yielding the turns its two-phase form asks
   // for, when the addon has one — then let the settlements it queued actually
   // reach JavaScript, and only then destroy the environment. Doing any two of
@@ -1430,10 +1443,11 @@ function __retainFailedWasiRollback(cleanupErrors) {
  * goes away. That is the deliberate choice: a hung promise is a silent liveness
  * bug with no upper bound, while the retained bookkeeping is bounded by the page.
  */
-function __rollbackWasiInitialization() {
+function __runWasiInitializationRollbackSteps() {
   // The environment teardown this rollback performs, kept nested so it cannot
   // be reached without the async-work drain below running first.
   function __rollbackWasmEnvForWasiInitialization() {
+    __abortWasiDisposalIfThreadCrashed();
     const cleanupErrors = [];
     let prepareResult;
     try {
@@ -1459,6 +1473,7 @@ function __rollbackWasiInitialization() {
   // did not finish never gets here: it retains instead, exactly as a drain that
   // did not finish does.
   function __drainWasmEnvForWasiRollback(cleanupErrors) {
+    __abortWasiDisposalIfThreadCrashed();
     let drainResult;
     try {
       drainResult = __drainWasmEnvCleanup();
@@ -1506,6 +1521,44 @@ function __rollbackWasiInitialization() {
     );
   }
   return __rollbackWasmEnvForWasiInitialization();
+}
+
+function __rollbackWasiInitialization() {
+  if (__hasWasiThreadCrashed()) {
+    return __rollbackWasiInitializationAfterThreadCrash();
+  }
+  __wasiInitializationRollbackActive = true;
+  let result;
+  try {
+    result = __runWasiInitializationRollbackSteps();
+  } catch (error) {
+    __wasiInitializationRollbackActive = false;
+    if (__hasWasiThreadCrashed()) {
+      return __rollbackWasiInitializationAfterThreadCrash();
+    }
+    throw error;
+  }
+  if (!__isThenable(result)) {
+    __wasiInitializationRollbackActive = false;
+    return __hasWasiThreadCrashed()
+      ? __rollbackWasiInitializationAfterThreadCrash()
+      : result;
+  }
+  return Promise.resolve(result).then(
+    (cleanupErrors) => {
+      __wasiInitializationRollbackActive = false;
+      return __hasWasiThreadCrashed()
+        ? __rollbackWasiInitializationAfterThreadCrash()
+        : cleanupErrors;
+    },
+    (error) => {
+      __wasiInitializationRollbackActive = false;
+      if (__hasWasiThreadCrashed()) {
+        return __rollbackWasiInitializationAfterThreadCrash();
+      }
+      throw error;
+    },
+  );
 }
 
 // A view of the addon's crash flag, one word of the shared wasm memory, for the

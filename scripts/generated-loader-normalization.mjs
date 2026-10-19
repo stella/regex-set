@@ -15,6 +15,7 @@ const normalizeBrowserCrashDisposal = (content) => {
       "let __wasiDisposePromise;",
       `let __wasiDisposePromise;
 let __wasiThreadCrashDisposePromise;
+let __wasiInitializationRollbackActive = false;
 
 function __hasWasiThreadCrashed() {
   return (
@@ -51,7 +52,11 @@ function __disposeWasiBindingAfterThreadCrash() {
 }
 
 function __abortWasiDisposalIfThreadCrashed() {
-  if (__wasiDisposePromise !== undefined && __hasWasiThreadCrashed()) {
+  if (
+    (__wasiDisposePromise !== undefined ||
+      __wasiInitializationRollbackActive) &&
+    __hasWasiThreadCrashed()
+  ) {
     throw __getWasiThreadCrashError();
   }
 }
@@ -62,6 +67,12 @@ function __settleWasiDisposalAfterThreadCrash(resolve, reject) {
   }
   __disposeWasiBindingAfterThreadCrash().then(resolve, reject);
   return true;
+}
+
+function __rollbackWasiInitializationAfterThreadCrash() {
+  const crashError = __getWasiThreadCrashError();
+  void __disposeWasiBindingAfterThreadCrash().catch(() => {});
+  return [crashError];
 }`,
     )
     .replace(
@@ -100,6 +111,73 @@ function __settleWasiDisposalAfterThreadCrash(resolve, reject) {
         __abortWasiDisposalIfThreadCrashed();
       }
     })(),`,
+    )
+    .replace(
+      "function __continueWasiDisposal() {\n  const destroyResult",
+      "function __continueWasiDisposal() {\n  __abortWasiDisposalIfThreadCrashed();\n  const destroyResult",
+    )
+    .replace(
+      "function __drainWasmEnvForWasiDisposal() {\n  const drainResult",
+      "function __drainWasmEnvForWasiDisposal() {\n  __abortWasiDisposalIfThreadCrashed();\n  const drainResult",
+    )
+    .replace(
+      "function __cleanUpWasmEnvForWasiDisposal() {",
+      "function __cleanUpWasmEnvForWasiDisposal() {\n  __abortWasiDisposalIfThreadCrashed();",
+    )
+    .replace(
+      "function __rollbackWasiInitialization() {",
+      "function __runWasiInitializationRollbackSteps() {",
+    )
+    .replace(
+      "  function __rollbackWasmEnvForWasiInitialization() {\n    const cleanupErrors",
+      "  function __rollbackWasmEnvForWasiInitialization() {\n    __abortWasiDisposalIfThreadCrashed();\n    const cleanupErrors",
+    )
+    .replace(
+      "  function __drainWasmEnvForWasiRollback(cleanupErrors) {\n    let drainResult",
+      "  function __drainWasmEnvForWasiRollback(cleanupErrors) {\n    __abortWasiDisposalIfThreadCrashed();\n    let drainResult",
+    )
+    .replace(
+      "\n// A view of the addon's crash flag, one word of the shared wasm memory, for the",
+      `
+function __rollbackWasiInitialization() {
+  if (__hasWasiThreadCrashed()) {
+    return __rollbackWasiInitializationAfterThreadCrash();
+  }
+  __wasiInitializationRollbackActive = true;
+  let result;
+  try {
+    result = __runWasiInitializationRollbackSteps();
+  } catch (error) {
+    __wasiInitializationRollbackActive = false;
+    if (__hasWasiThreadCrashed()) {
+      return __rollbackWasiInitializationAfterThreadCrash();
+    }
+    throw error;
+  }
+  if (!__isThenable(result)) {
+    __wasiInitializationRollbackActive = false;
+    return __hasWasiThreadCrashed()
+      ? __rollbackWasiInitializationAfterThreadCrash()
+      : result;
+  }
+  return Promise.resolve(result).then(
+    (cleanupErrors) => {
+      __wasiInitializationRollbackActive = false;
+      return __hasWasiThreadCrashed()
+        ? __rollbackWasiInitializationAfterThreadCrash()
+        : cleanupErrors;
+    },
+    (error) => {
+      __wasiInitializationRollbackActive = false;
+      if (__hasWasiThreadCrashed()) {
+        return __rollbackWasiInitializationAfterThreadCrash();
+      }
+      throw error;
+    },
+  );
+}
+
+// A view of the addon's crash flag, one word of the shared wasm memory, for the`,
     )
     .replace(
       `  if (__wasiDisposed) {
