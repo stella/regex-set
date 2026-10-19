@@ -3,11 +3,16 @@ const suppressionComment =
 
 /** @param {string} content */
 const normalizeBrowserCrashDisposal = (content) => {
+  if (!content.includes("let __wasiAddonCrashFlag;")) {
+    return content;
+  }
   if (
-    !content.includes("let __wasiAddonCrashFlag;") ||
     content.includes("function __hasWasiThreadCrashed()")
   ) {
-    return content;
+    return content.replace(
+      "  try {\n    live = begin();",
+      "  try {\n    __abortWasiDisposalIfThreadCrashed();\n    live = begin();",
+    );
   }
 
   return content
@@ -132,6 +137,10 @@ function __rollbackWasiInitializationAfterThreadCrash() {
     finishCleanup();
   };
   return (async () => {`,
+    )
+    .replace(
+      "  try {\n    live = begin();",
+      "  try {\n    __abortWasiDisposalIfThreadCrashed();\n    live = begin();",
     )
     .replace(
       "  })().then(finishCleanup, finishCleanup);",

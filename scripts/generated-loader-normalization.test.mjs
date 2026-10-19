@@ -12,157 +12,390 @@ const cleanupFunctionCalls = new Set([
   "__prepareWasmEnvCleanupWithTurns",
 ]);
 
+const crashCheckCalls = new Set([
+  "__abortWasiDisposalIfThreadCrashed",
+  "__hasWasiThreadCrashed",
+]);
+
 const functionTypes = new Set([
   "ArrowFunctionExpression",
   "FunctionDeclaration",
   "FunctionExpression",
 ]);
 
-const findUncheckedContextDestructionBoundaries = (
-  filename,
-  content,
-) => {
-  const source = parse(content, {
+const transparentExpressionTypes = new Set([
+  "ChainExpression",
+  "ParenthesizedExpression",
+  "TSAsExpression",
+  "TSInstantiationExpression",
+  "TSNonNullExpression",
+  "TSSatisfiesExpression",
+  "TSTypeAssertion",
+]);
+
+const unwrapExpression = (node) => {
+  let expression = node;
+  while (
+    expression &&
+    transparentExpressionTypes.has(expression.type)
+  ) {
+    expression = expression.expression;
+  }
+  return expression;
+};
+
+const propertyNameOf = (node) => {
+  const member = unwrapExpression(node);
+  if (member?.type !== "MemberExpression") return undefined;
+  const property = unwrapExpression(member.property);
+  return property?.type === "Identifier"
+    ? property.name
+    : property?.value;
+};
+
+const visit = (node, callback, parent) => {
+  callback(node, parent);
+  for (const value of Object.values(node)) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item?.type) visit(item, callback, node);
+      }
+    } else if (value?.type) {
+      visit(value, callback, node);
+    }
+  }
+};
+
+const parseLoader = (content) =>
+  parse(content, {
     ecmaVersion: "latest",
     sourceType: "module",
     locations: true,
   });
-  const unchecked = [];
-  const cleanupAliases = new Set(["finishParked"]);
 
-  const visit = (node, callback) => {
-    callback(node);
-    for (const value of Object.values(node)) {
-      if (Array.isArray(value)) {
-        for (const item of value) {
-          if (item?.type) visit(item, callback);
-        }
-      } else if (value?.type) {
-        visit(value, callback);
-      }
-    }
-  };
-
-  visit(source, (node) => {
+const findCleanupAliases = (
+  functionNode,
+  inheritedAliases = [],
+) => {
+  const aliases = new Set([
+    "finishParked",
+    ...inheritedAliases,
+  ]);
+  const visitFunctionBody = (node) => {
     if (
-      node.type !== "VariableDeclarator" ||
-      node.id.type !== "Identifier" ||
-      node.init?.type !== "MemberExpression"
+      node !== functionNode &&
+      functionTypes.has(node.type)
     ) {
       return;
     }
-    const property = node.init.property;
-    const propertyName =
-      property.type === "Identifier"
-        ? property.name
-        : property.value;
     if (
-      typeof propertyName === "string" &&
-      propertyName.includes("cleanup")
+      node.type === "VariableDeclarator" &&
+      node.id.type === "Identifier"
     ) {
-      cleanupAliases.add(node.id.name);
-    }
-  });
-
-  const getFunctionName = (node, parent) => {
-    if (node.id?.name) return node.id.name;
-    if (parent?.type === "VariableDeclarator") {
-      return parent.id.name;
-    }
-    if (
-      ["Property", "MethodDefinition"].includes(
-        parent?.type,
-      )
-    ) {
-      return parent.key.name ?? parent.key.value;
-    }
-    return `<callback@${node.loc.start.line}>`;
-  };
-
-  const inspectFunction = (node, parent) => {
-    const crashChecks = [];
-    const boundaries = [];
-    const visitBody = (child) => {
+      const propertyName = propertyNameOf(node.init);
       if (
-        child !== node.body &&
-        functionTypes.has(child.type)
-      ) {
-        return;
-      }
-      if (child.type === "CallExpression") {
-        if (child.callee.type === "Identifier") {
-          if (
-            [
-              "__abortWasiDisposalIfThreadCrashed",
-              "__hasWasiThreadCrashed",
-            ].includes(child.callee.name)
-          ) {
-            crashChecks.push(child.start);
-          } else if (
-            cleanupFunctionCalls.has(child.callee.name) ||
-            cleanupAliases.has(child.callee.name)
-          ) {
-            boundaries.push({
-              name: child.callee.name,
-              position: child.start,
-            });
-          }
-        } else if (
-          child.callee.type === "MemberExpression"
-        ) {
-          const property = child.callee.property;
-          const propertyName =
-            property.type === "Identifier"
-              ? property.name
-              : property.value;
-          if (propertyName === "destroy") {
-            boundaries.push({
-              name: "context.destroy",
-              position: child.start,
-            });
-          }
-        }
-      }
-      for (const value of Object.values(child)) {
-        if (Array.isArray(value)) {
-          for (const item of value) {
-            if (item?.type) visitBody(item);
-          }
-        } else if (value?.type) {
-          visitBody(value);
-        }
-      }
-    };
-    visitBody(node.body);
-    for (const boundary of boundaries) {
-      if (
-        !crashChecks.some(
-          (position) => position < boundary.position,
+        typeof propertyName === "string" &&
+        /^napi_prepare_wasm_env_cleanup(?:_(?:begin|finish))?$/.test(
+          propertyName,
         )
       ) {
-        unchecked.push(
-          `${filename}: ${getFunctionName(node, parent)} -> ${boundary.name}`,
-        );
+        aliases.add(node.id.name);
       }
-    }
-  };
-
-  const visitFunctions = (node, parent) => {
-    if (functionTypes.has(node.type)) {
-      inspectFunction(node, parent);
     }
     for (const value of Object.values(node)) {
       if (Array.isArray(value)) {
         for (const item of value) {
-          if (item?.type) visitFunctions(item, node);
+          if (item?.type) visitFunctionBody(item);
         }
       } else if (value?.type) {
-        visitFunctions(value, node);
+        visitFunctionBody(value);
       }
     }
   };
-  visitFunctions(source);
-  return unchecked;
+  visitFunctionBody(functionNode);
+  return aliases;
+};
+
+const getFunctionName = (node, parent) => {
+  if (node.id?.name) return node.id.name;
+  if (parent?.type === "VariableDeclarator") {
+    return parent.id.name;
+  }
+  if (
+    ["Property", "MethodDefinition"].includes(parent?.type)
+  ) {
+    return parent.key.name ?? parent.key.value;
+  }
+  return `<callback@${node.loc.start.line}>`;
+};
+
+const findCleanupCall = (node, cleanupAliases) => {
+  if (node.type !== "CallExpression") return undefined;
+  const callee = unwrapExpression(node.callee);
+  if (callee.type === "Identifier") {
+    return cleanupFunctionCalls.has(callee.name) ||
+      cleanupAliases.has(callee.name)
+      ? callee.name
+      : undefined;
+  }
+  return propertyNameOf(callee) === "destroy"
+    ? "context.destroy"
+    : undefined;
+};
+
+const analyzeCleanupBoundaries = (filename, content) => {
+  const source = parseLoader(content);
+  const parents = new WeakMap();
+  visit(source, (node, parent) =>
+    parents.set(node, parent),
+  );
+  const moduleCleanupAliases = findCleanupAliases(source);
+  const unchecked = [];
+  const boundaries = [];
+  const usedCrashChecks = new Set();
+
+  const inspectFunction = (node, parent) => {
+    const functionName = getFunctionName(node, parent);
+    const cleanupAliases = findCleanupAliases(
+      node,
+      moduleCleanupAliases,
+    );
+    let ancestor = parents.get(node);
+    while (ancestor) {
+      if (functionTypes.has(ancestor.type)) {
+        for (const alias of findCleanupAliases(ancestor)) {
+          cleanupAliases.add(alias);
+        }
+      }
+      ancestor = parents.get(ancestor);
+    }
+
+    const inspectExpression = (
+      expression,
+      incomingChecks,
+    ) => {
+      if (
+        !expression?.type ||
+        functionTypes.has(expression.type)
+      ) {
+        return incomingChecks;
+      }
+      let checks = incomingChecks;
+      if (expression.type === "CallExpression") {
+        const callee = unwrapExpression(expression.callee);
+        if (
+          callee.type === "Identifier" &&
+          crashCheckCalls.has(callee.name)
+        ) {
+          return new Set([expression.start]);
+        }
+        const boundaryName = findCleanupCall(
+          expression,
+          cleanupAliases,
+        );
+        if (boundaryName !== undefined) {
+          boundaries.push({
+            name: boundaryName,
+            position: expression.start,
+          });
+          if (checks.size === 0) {
+            unchecked.push(
+              `${filename}: ${functionName} -> ${boundaryName}`,
+            );
+          } else {
+            for (const check of checks)
+              usedCrashChecks.add(check);
+          }
+        }
+      }
+      for (const value of Object.values(expression)) {
+        if (Array.isArray(value)) {
+          for (const item of value) {
+            if (item?.type) {
+              checks = inspectExpression(item, checks);
+            }
+          }
+        } else if (value?.type) {
+          checks = inspectExpression(value, checks);
+        }
+      }
+      return checks;
+    };
+
+    const intersectChecks = (left, right) =>
+      new Set(
+        [...left].filter((check) => right.has(check)),
+      );
+
+    const inspectStatement = (
+      statement,
+      incomingChecks,
+    ) => {
+      if (!statement?.type) return incomingChecks;
+      if (statement.type === "BlockStatement") {
+        let checks = incomingChecks;
+        for (const child of statement.body) {
+          checks = inspectStatement(child, checks);
+        }
+        return checks;
+      }
+      if (statement.type === "IfStatement") {
+        const afterTest = inspectExpression(
+          statement.test,
+          incomingChecks,
+        );
+        const consequent = inspectStatement(
+          statement.consequent,
+          afterTest,
+        );
+        const alternate = statement.alternate
+          ? inspectStatement(statement.alternate, afterTest)
+          : afterTest;
+        return intersectChecks(consequent, alternate);
+      }
+      if (
+        [
+          "DoWhileStatement",
+          "ForInStatement",
+          "ForOfStatement",
+          "ForStatement",
+          "WhileStatement",
+        ].includes(statement.type)
+      ) {
+        let afterHeader = incomingChecks;
+        for (const key of [
+          "init",
+          "left",
+          "right",
+          "test",
+        ]) {
+          afterHeader = inspectExpression(
+            statement[key],
+            afterHeader,
+          );
+        }
+        inspectStatement(statement.body, afterHeader);
+        return afterHeader;
+      }
+      if (statement.type === "TryStatement") {
+        const afterBlock = inspectStatement(
+          statement.block,
+          incomingChecks,
+        );
+        if (statement.handler) {
+          inspectStatement(
+            statement.handler.body,
+            incomingChecks,
+          );
+        }
+        if (statement.finalizer) {
+          return inspectStatement(
+            statement.finalizer,
+            intersectChecks(afterBlock, incomingChecks),
+          );
+        }
+        return intersectChecks(afterBlock, incomingChecks);
+      }
+      return inspectExpression(statement, incomingChecks);
+    };
+
+    inspectStatement(node.body, new Set());
+  };
+
+  visit(source, (node, parent) => {
+    if (functionTypes.has(node.type))
+      inspectFunction(node, parent);
+  });
+  return { boundaries, unchecked, usedCrashChecks };
+};
+
+const findUncheckedContextDestructionBoundaries = (
+  filename,
+  content,
+) => analyzeCleanupBoundaries(filename, content).unchecked;
+
+const countCleanupCallsIndependently = (content) => {
+  const source = parseLoader(content);
+  const parents = new WeakMap();
+  visit(source, (node, parent) =>
+    parents.set(node, parent),
+  );
+  let count = 0;
+  const moduleAliases = new Set(["finishParked"]);
+  for (const statement of source.body) {
+    if (statement.type !== "VariableDeclaration") continue;
+    for (const declaration of statement.declarations) {
+      if (
+        declaration.id.type === "Identifier" &&
+        /napi_prepare_wasm_env_cleanup(?:_(?:begin|finish))?$/.test(
+          content.slice(
+            declaration.init?.start,
+            declaration.init?.end,
+          ),
+        )
+      ) {
+        moduleAliases.add(declaration.id.name);
+      }
+    }
+  }
+  visit(source, (functionNode) => {
+    if (!functionTypes.has(functionNode.type)) return;
+    const aliases = new Set(moduleAliases);
+    let ancestor = parents.get(functionNode);
+    while (ancestor) {
+      if (functionTypes.has(ancestor.type)) {
+        for (const alias of findCleanupAliases(ancestor)) {
+          aliases.add(alias);
+        }
+      }
+      ancestor = parents.get(ancestor);
+    }
+    const inspect = (node) => {
+      if (
+        node !== functionNode &&
+        functionTypes.has(node.type)
+      ) {
+        return;
+      }
+      if (
+        node.type === "VariableDeclarator" &&
+        node.id.type === "Identifier" &&
+        /napi_prepare_wasm_env_cleanup(?:_(?:begin|finish))?$/.test(
+          content.slice(node.init?.start, node.init?.end),
+        )
+      ) {
+        aliases.add(node.id.name);
+      }
+      if (node.type === "CallExpression") {
+        const calleeSource = content.slice(
+          node.callee.start,
+          node.callee.end,
+        );
+        const identifierCall = /^[$\w]+$/.test(
+          calleeSource,
+        );
+        if (
+          (identifierCall &&
+            (cleanupFunctionCalls.has(calleeSource) ||
+              aliases.has(calleeSource))) ||
+          /(?:\.|\?\.)destroy$/.test(calleeSource)
+        ) {
+          count += 1;
+        }
+      }
+      for (const value of Object.values(node)) {
+        if (Array.isArray(value)) {
+          for (const item of value) {
+            if (item?.type) inspect(item);
+          }
+        } else if (value?.type) {
+          inspect(value);
+        }
+      }
+    };
+    inspect(functionNode);
+  });
+  return count;
 };
 
 describe("normalizeGeneratedLoader", () => {
@@ -171,19 +404,73 @@ describe("normalizeGeneratedLoader", () => {
       "regex-set.wasi-browser.js",
       "regex-set.wasi.cjs",
     ];
-    const unchecked = filenames.flatMap((filename) =>
-      findUncheckedContextDestructionBoundaries(
-        filename,
-        normalizeGeneratedLoader(
-          readFileSync(
-            new URL(`../${filename}`, import.meta.url),
-            "utf8",
-          ),
+    for (const filename of filenames) {
+      const normalized = normalizeGeneratedLoader(
+        readFileSync(
+          new URL(`../${filename}`, import.meta.url),
+          "utf8",
         ),
-      ),
-    );
+      );
+      const analysis = analyzeCleanupBoundaries(
+        filename,
+        normalized,
+      );
 
-    expect(unchecked).toEqual([]);
+      expect(analysis.unchecked).toEqual([]);
+      expect(analysis.boundaries.length).toBeGreaterThan(0);
+      expect(analysis.boundaries).toHaveLength(
+        countCleanupCallsIndependently(normalized),
+      );
+
+      for (const checkPosition of analysis.usedCrashChecks) {
+        const checkName = [...crashCheckCalls].find(
+          (name) =>
+            normalized.startsWith(name, checkPosition),
+        );
+        expect(checkName).toBeDefined();
+        const mutated =
+          normalized.slice(0, checkPosition) +
+          "__uncheckedCrashBoundary" +
+          normalized.slice(
+            checkPosition + checkName.length,
+          );
+        expect(
+          findUncheckedContextDestructionBoundaries(
+            `${filename}:without-check-at-${checkPosition}`,
+            mutated,
+          ).length,
+        ).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  test("flags an optional-chained cleanup alias without a crash check", () => {
+    const unchecked =
+      findUncheckedContextDestructionBoundaries(
+        "optional-chain.js",
+        `const finish = exports?.napi_prepare_wasm_env_cleanup_finish;
+const unchecked = () => finish();`,
+      );
+
+    expect(unchecked).toEqual([
+      "optional-chain.js: unchecked -> finish",
+    ]);
+  });
+
+  test("does not accept a crash check from an unrelated conditional path", () => {
+    const unchecked =
+      findUncheckedContextDestructionBoundaries(
+        "unrelated-conditional.js",
+        `const finish = exports?.napi_prepare_wasm_env_cleanup_finish;
+const unchecked = (condition) => {
+  if (condition) __abortWasiDisposalIfThreadCrashed();
+  finish();
+};`,
+      );
+
+    expect(unchecked).toEqual([
+      "unrelated-conditional.js: unchecked -> finish",
+    ]);
   });
 
   test("flags an unchecked arrow callback that finishes cleanup", () => {

@@ -761,6 +761,7 @@ function __prepareWasmEnvCleanupWithTurns() {
   __emnapiWasmEnvCleanupPreparing = true;
   let live;
   try {
+    __abortWasiDisposalIfThreadCrashed();
     live = begin();
   } catch (error) {
     __emnapiWasmEnvCleanupPreparing = false;
