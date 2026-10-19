@@ -219,7 +219,14 @@ jobs:
           done
           ls -la -- *.node 2>/dev/null || echo "No .node files"
           ls -la -- *.wasm 2>/dev/null || echo "No .wasm files"
-      - run: bun test
+      # Repository tooling tests run on Linux in CI; other platforms verify
+      # the packaged library against its runtime tests.
+      - name: Test
+        if: runner.os == 'Linux'
+        run: bun test
+      - name: Test package runtime
+        if: runner.os != 'Linux'
+        run: bun test ./__test__
 
   pack:
     name: Pack
@@ -436,6 +443,9 @@ jobs:
       publish-to-npm: >-
         ${{ github.event_name == 'push'
             || (inputs.publish_to_npm && github.ref == 'refs/heads/main') }}
+    secrets:
+      RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
+      RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
     permissions:
       contents: write
       id-token: write
