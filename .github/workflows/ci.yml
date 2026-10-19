@@ -17,6 +17,8 @@ on:
         ready_for_review,
         labeled,
       ]
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 
 concurrency:
@@ -32,7 +34,7 @@ jobs:
           || needs.trust-check.outputs.trusted == 'true')
     runs-on: ubuntu-24.04
     env:
-      BASE_REF: ${{ (github.event_name == 'pull_request' && github.event.pull_request.base.sha) || (github.event_name == 'push' && github.event.before) || 'unavailable-toolchain-base' }}
+      BASE_REF: ${{ (github.event_name == 'pull_request' && github.event.pull_request.base.sha) || (github.event_name == 'merge_group' && github.event.merge_group.base_sha) || (github.event_name == 'push' && github.event.before) || 'unavailable-toolchain-base' }}
     permissions:
       contents: read
       pull-requests: read
@@ -193,6 +195,7 @@ jobs:
       - run: bun run check:toolchain
         if: needs.check-changes.outputs.toolchain-changed == 'true'
       - run: bun test scripts/tooling-adoption.test.ts scripts/shared-policy.test.ts
+      - run: bun test ./scripts/ci-result.test.ts
 
   napi-ci:
     if: ${{ always() && !cancelled() && needs.check-changes.result == 'success' && (github.event_name != 'pull_request' || needs.trust-check.outputs.trusted == 'true') }}
@@ -251,3 +254,50 @@ jobs:
           echo "$install_dir" >> "$GITHUB_PATH"
       - name: Check internal Rust visibility
         run: bun run rust:hawk
+
+  ci-result:
+    if: always()
+    needs: [check-changes, trust-check, changeset, checks, napi-ci, hawk]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Reject untrusted pull requests
+        if: >-
+          github.event_name == 'pull_request'
+          && needs.trust-check.outputs.trusted != 'true'
+        run: exit 1
+      - name: Require every selected validation job
+        if: >-
+          github.event_name != 'pull_request'
+          || needs.trust-check.outputs.trusted == 'true'
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DETECTOR_RESULT: ${{ needs.check-changes.result }}
+          TRUST_RESULT: ${{ needs.trust-check.result }}
+          CHANGESET_RESULT: ${{ needs.changeset.result }}
+          CHECKS_RESULT: ${{ needs.checks.result }}
+          NAPI_RESULT: ${{ needs.napi-ci.result }}
+          HAWK_RESULT: ${{ needs.hawk.result }}
+        run: |
+          test "$DETECTOR_RESULT" = success
+          test "$CHECKS_RESULT" = success
+          test "$NAPI_RESULT" = success
+
+          if [ "$EVENT_NAME" = pull_request ]; then
+            test "$TRUST_RESULT" = success
+            test "$CHANGESET_RESULT" = success
+          else
+            # Trust and changeset validation apply only to pull requests.
+            if [ "$TRUST_RESULT" != success ] && [ "$TRUST_RESULT" != skipped ]; then
+              exit 1
+            fi
+            if [ "$CHANGESET_RESULT" != success ] && [ "$CHANGESET_RESULT" != skipped ]; then
+              exit 1
+            fi
+          fi
+
+          # Hawk is path-filtered to Rust changes.
+          if [ "$HAWK_RESULT" != success ] && [ "$HAWK_RESULT" != skipped ]; then
+            exit 1
+          fi
