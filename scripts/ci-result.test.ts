@@ -36,3 +36,17 @@ test("CI and CLA run for merge queue checks", () => {
     });
   }
 });
+
+test("CI runs the aggregate result policy test", () => {
+  const workflow = readWorkflow("ci");
+  const runsCiResultTest = Object.values(workflow.jobs).some(
+    ({ steps = [] }: { steps?: Array<{ run?: unknown }> }) =>
+      steps.some(
+        ({ run }) =>
+          typeof run === "string" &&
+          run.includes("scripts/ci-result.test.ts"),
+      ),
+  );
+
+  expect(runsCiResultTest).toBe(true);
+});

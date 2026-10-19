@@ -195,6 +195,7 @@ jobs:
       - run: bun run check:toolchain
         if: needs.check-changes.outputs.toolchain-changed == 'true'
       - run: bun test scripts/tooling-adoption.test.ts scripts/shared-policy.test.ts
+      - run: bun test ./scripts/ci-result.test.ts
 
   napi-ci:
     if: ${{ always() && !cancelled() && needs.check-changes.result == 'success' && (github.event_name != 'pull_request' || needs.trust-check.outputs.trusted == 'true') }}
