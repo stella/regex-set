@@ -40,9 +40,9 @@
     "access": "public"
   },
   "dependencies": {
-    "@emnapi/core": "2.0.0-alpha.3",
-    "@emnapi/runtime": "2.0.0-alpha.3",
-    "@napi-rs/wasm-runtime": "1.2.2"
+    "@emnapi/core": "2.0.0-beta.1",
+    "@emnapi/runtime": "2.0.0-beta.1",
+    "@napi-rs/wasm-runtime": "1.2.5"
   },
   "peerDependencies": {
     "vite": ">=5 <10"
