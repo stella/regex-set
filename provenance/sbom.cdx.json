@@ -3164,6 +3164,36 @@
       "version": "1.0.9"
     },
     {
+      "bom-ref": "pkg:cargo/stella-regex-set-wasm-single-thread@1.0.9",
+      "evidence": {
+        "identity": [
+          {
+            "concludedValue": "Cargo.lock",
+            "confidence": 0.6,
+            "field": "purl",
+            "methods": [
+              {
+                "confidence": 0.6,
+                "technique": "manifest-analysis",
+                "value": "Cargo.lock"
+              }
+            ]
+          }
+        ]
+      },
+      "group": "",
+      "name": "stella-regex-set-wasm-single-thread",
+      "properties": [
+        {
+          "name": "SrcFile",
+          "value": "Cargo.lock"
+        }
+      ],
+      "purl": "pkg:cargo/stella-regex-set-wasm-single-thread@1.0.9",
+      "type": "library",
+      "version": "1.0.9"
+    },
+    {
       "bom-ref": "pkg:cargo/stella-regex-set@1.0.9",
       "evidence": {
         "identity": [
@@ -4523,7 +4553,8 @@
     },
     {
       "dependsOn": [
-        "pkg:cargo/serde_core@1.0.229"
+        "pkg:cargo/serde_core@1.0.229",
+        "pkg:cargo/serde_derive@1.0.229"
       ],
       "ref": "pkg:cargo/serde@1.0.229"
     },
@@ -4575,6 +4606,14 @@
         "pkg:cargo/unicode-segmentation@1.13.3"
       ],
       "ref": "pkg:cargo/stella-regex-set-core@1.0.9"
+    },
+    {
+      "dependsOn": [
+        "pkg:cargo/serde@1.0.229",
+        "pkg:cargo/serde_json@1.0.151",
+        "pkg:cargo/stella-regex-set-core@1.0.9"
+      ],
+      "ref": "pkg:cargo/stella-regex-set-wasm-single-thread@1.0.9"
     },
     {
       "dependsOn": [],
@@ -4688,6 +4727,22 @@
           "name": "stella-regex-set",
           "purl": "pkg:cargo/stella-regex-set@1.0.9",
           "type": "application",
+          "version": "1.0.9"
+        },
+        {
+          "bom-ref": "pkg:cargo/stella-regex-set-wasm-single-thread@1.0.9",
+          "group": "",
+          "licenses": [
+            {
+              "license": {
+                "id": "Apache-2.0",
+                "url": "https://opensource.org/licenses/Apache-2.0"
+              }
+            }
+          ],
+          "name": "stella-regex-set-wasm-single-thread",
+          "purl": "pkg:cargo/stella-regex-set-wasm-single-thread@1.0.9",
+          "type": "library",
           "version": "1.0.9"
         },
         {
