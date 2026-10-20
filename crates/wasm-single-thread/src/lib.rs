@@ -10,6 +10,7 @@ thread_local! {
 struct State {
   next: u32,
   sets: HashMap<u32, RegexSet>,
+  inputs: HashMap<usize, Box<[u8]>>,
   output: Vec<u8>,
 }
 
@@ -72,15 +73,31 @@ struct Response<T: Serialize> {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn alloc(length: usize) -> *mut u8 {
-  let mut bytes = Vec::<u8>::with_capacity(length);
-  let pointer = bytes.as_mut_ptr();
-  std::mem::forget(bytes);
+  let mut input = vec![0; length].into_boxed_slice();
+  let pointer = input.as_mut_ptr();
+  STATE.with_borrow_mut(|state| {
+    state.inputs.insert(pointer as usize, input);
+  });
   pointer
 }
 
+/// Dispatches a serialized request from the module's shared memory.
+///
+/// # Safety
+///
+/// `pointer` must be the pointer returned by this module's [`alloc`] for an
+/// allocation of exactly `length` bytes. That allocation must not have been
+/// passed to `dispatch` before, and neither the pointer nor any aliases to its
+/// allocation may be used during or after this call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dispatch(pointer: *mut u8, length: usize) {
-  let input = unsafe { Vec::from_raw_parts(pointer, length, length) };
+  let input = STATE.with_borrow_mut(|state| {
+    state
+      .inputs
+      .remove(&(pointer as usize))
+      .expect("dispatch pointer must come from alloc")
+  });
+  assert_eq!(input.len(), length, "dispatch length must match alloc");
   let result = run(&input);
   STATE.with_borrow_mut(|state| state.output = result);
 }
