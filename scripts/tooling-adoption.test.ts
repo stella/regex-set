@@ -181,7 +181,10 @@ describe("shared tooling adoption", () => {
       expect.arrayContaining([
         expect.objectContaining({ run: "bun run build" }),
         expect.objectContaining({
-          run: "bun run build:package",
+          run: "bun run build:js",
+        }),
+        expect.objectContaining({
+          run: "bun run build:single-thread-package",
         }),
         expect.objectContaining({
           run: "bun run test:single-thread",
@@ -198,7 +201,8 @@ describe("shared tooling adoption", () => {
     );
     expect(singleThreadToolchain.with).toMatchObject({
       toolchain: "1.99.0",
-      targets: "wasm32-unknown-unknown",
+      targets:
+        "wasm32-wasip1-threads, wasm32-unknown-unknown",
     });
     expect(parsedCi.jobs["ci-result"].needs).toContain(
       "single-thread",
@@ -234,8 +238,11 @@ describe("shared tooling adoption", () => {
     expect(scripts["build:js"]).not.toContain(
       "build:package",
     );
-    expect(scripts["build:package"]).toContain(
+    expect(scripts["build:single-thread-package"]).toContain(
       "build-single-thread.mjs",
+    );
+    expect(scripts["build:package"]).toContain(
+      "build:single-thread-package",
     );
     const workflowDirectory = new URL(
       ".github/workflows/",

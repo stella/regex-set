@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
 import nativeBinding from "../index.cjs";
@@ -6,10 +6,42 @@ import { initBinding } from "../src/core";
 import { RegexSet as NativeRegexSet } from "../src/index";
 
 test("single-thread entry imports without initialization side effects", async () => {
-  const entry = await import("../src/single-thread");
-  expect(entry.init).toBeFunction();
-  expect(entry.initSync).toBeFunction();
-  expect(entry.RegexSet).toBeFunction();
+  const fetchSpy = spyOn(globalThis, "fetch");
+  const instantiateSpy = spyOn(
+    WebAssembly,
+    "instantiate",
+  );
+  const instantiateStreamingSpy = spyOn(
+    WebAssembly,
+    "instantiateStreaming",
+  );
+  const compileSpy = spyOn(WebAssembly, "compile");
+
+  try {
+    const entry = await import(
+      `../src/single-thread?import-side-effect=${crypto.randomUUID()}`
+    );
+    const invocationCount = () =>
+      fetchSpy.mock.calls.length +
+      instantiateSpy.mock.calls.length +
+      instantiateStreamingSpy.mock.calls.length +
+      compileSpy.mock.calls.length;
+
+    expect(entry.init).toBeFunction();
+    expect(entry.initSync).toBeFunction();
+    expect(entry.RegexSet).toBeFunction();
+    expect(invocationCount()).toBe(0);
+
+    await entry.init(
+      readFileSync("regex-set.single-thread.wasm"),
+    );
+    expect(invocationCount()).toBeGreaterThan(0);
+  } finally {
+    fetchSpy.mockRestore();
+    instantiateSpy.mockRestore();
+    instantiateStreamingSpy.mockRestore();
+    compileSpy.mockRestore();
+  }
 });
 
 test("single-thread runtime searches and preserves a leading BOM", async () => {

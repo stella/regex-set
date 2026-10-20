@@ -249,7 +249,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
           toolchain: "1.99.0"
-          targets: wasm32-unknown-unknown
+          targets: wasm32-wasip1-threads, wasm32-unknown-unknown
       - run: bun install --frozen-lockfile
       - name: Install SBOM generator
         # This fixed CLI generates release metadata without receiving publish credentials.
