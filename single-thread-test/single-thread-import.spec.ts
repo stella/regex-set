@@ -16,6 +16,28 @@ test("single-thread entry imports without initialization side effects", async ()
     "instantiateStreaming",
   );
   const compileSpy = spyOn(WebAssembly, "compile");
+  const OriginalModule = WebAssembly.Module;
+  const OriginalInstance = WebAssembly.Instance;
+  let moduleCalls = 0;
+  let instanceCalls = 0;
+  Object.defineProperty(WebAssembly, "Module", {
+    configurable: true,
+    value: new Proxy(OriginalModule, {
+      construct(target, argumentsList, newTarget) {
+        moduleCalls++;
+        return Reflect.construct(target, argumentsList, newTarget);
+      },
+    }),
+  });
+  Object.defineProperty(WebAssembly, "Instance", {
+    configurable: true,
+    value: new Proxy(OriginalInstance, {
+      construct(target, argumentsList, newTarget) {
+        instanceCalls++;
+        return Reflect.construct(target, argumentsList, newTarget);
+      },
+    }),
+  });
 
   try {
     const entry = await import(
@@ -25,14 +47,16 @@ test("single-thread entry imports without initialization side effects", async ()
       fetchSpy.mock.calls.length +
       instantiateSpy.mock.calls.length +
       instantiateStreamingSpy.mock.calls.length +
-      compileSpy.mock.calls.length;
+      compileSpy.mock.calls.length +
+      moduleCalls +
+      instanceCalls;
 
     expect(entry.init).toBeFunction();
     expect(entry.initSync).toBeFunction();
     expect(entry.RegexSet).toBeFunction();
     expect(invocationCount()).toBe(0);
 
-    await entry.init(
+    entry.initSync(
       readFileSync("regex-set.single-thread.wasm"),
     );
     expect(invocationCount()).toBeGreaterThan(0);
@@ -41,6 +65,14 @@ test("single-thread entry imports without initialization side effects", async ()
     instantiateSpy.mockRestore();
     instantiateStreamingSpy.mockRestore();
     compileSpy.mockRestore();
+    Object.defineProperty(WebAssembly, "Module", {
+      configurable: true,
+      value: OriginalModule,
+    });
+    Object.defineProperty(WebAssembly, "Instance", {
+      configurable: true,
+      value: OriginalInstance,
+    });
   }
 });
 
@@ -52,6 +84,27 @@ test("single-thread runtime searches and preserves a leading BOM", async () => {
   const set = new entry.RegexSet(["x"]);
   expect(set.isMatch("x")).toBe(true);
   expect(set.replaceAll("\uFEFFx", ["y"])).toBe("\uFEFFy");
+});
+
+test("single-thread runtime recovers after a WebAssembly trap", async () => {
+  const entry = await import("../src/single-thread");
+  entry.initSync(
+    readFileSync("single-thread-test/trap-after-create.wasm"),
+  );
+  const trapped = new entry.RegexSet(["x"]);
+
+  expect(() => trapped.isMatch("x")).toThrow(
+    WebAssembly.RuntimeError,
+  );
+  expect(() => trapped.whichMatch("x")).toThrow(
+    "The single-thread WebAssembly instance trapped; call init() or initSync() again",
+  );
+
+  entry.initSync(
+    readFileSync("regex-set.single-thread.wasm"),
+  );
+  const recovered = new entry.RegexSet(["x"]);
+  expect(recovered.isMatch("x")).toBe(true);
 });
 
 test.each(["\uD800", "\uDC00"])(
