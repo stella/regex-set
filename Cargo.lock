@@ -616,7 +616,7 @@ checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 
 [[package]]
 name = "stella-regex-set"
-version = "1.0.8"
+version = "1.0.9"
 dependencies = [
  "napi",
  "napi-build",
@@ -626,7 +626,7 @@ dependencies = [
 
 [[package]]
 name = "stella-regex-set-core"
-version = "1.0.8"
+version = "1.0.9"
 dependencies = [
  "bon",
  "fancy-regex",
@@ -639,7 +639,7 @@ dependencies = [
 
 [[package]]
 name = "stella-regex-set-wasm-single-thread"
-version = "1.0.8"
+version = "1.0.9"
 dependencies = [
  "serde",
  "serde_json",
