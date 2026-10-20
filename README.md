@@ -37,6 +37,28 @@ Prebuilts are available for:
 | Linux (glibc) | x64, arm64   |
 | WASM          | browser      |
 
+### Single-thread browser and WebView entry
+
+`@stll/regex-set-wasm/single-thread` uses a `wasm32-unknown-unknown` build that
+needs no worker, shared memory, or cross-origin isolation. Importing the entry
+does no I/O or WebAssembly allocation; initialize it explicitly before creating
+a matcher:
+
+```ts
+import {
+  init,
+  RegexSet,
+} from "@stll/regex-set-wasm/single-thread";
+
+await init("/assets/regex-set.single-thread.wasm");
+const matcher = new RegexSet(["foo", "bar"]);
+```
+
+Use `initSync(bytes)` when the bytes are already available. The
+`single-thread/inline` entry embeds the module and provides a zero-argument
+`initSync()` for self-contained bundles. A trapping module is discarded;
+subsequent operations ask the caller to run `init()` or `initSync()` again.
+
 ## Usage
 
 ```typescript

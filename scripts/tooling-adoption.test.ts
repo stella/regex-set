@@ -7,6 +7,7 @@ import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
 import {
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -21,6 +22,57 @@ import config from "../oxlint.config";
 const root = new URL("../", import.meta.url);
 const read = (path: string) =>
   readFileSync(new URL(path, root), "utf8");
+
+const expandPackageScripts = (
+  command: string,
+  scripts: Record<string, string>,
+  resolving = new Set<string>(),
+): string =>
+  command.replace(
+    /\b(?:bun|npm|pnpm|yarn) run ([\w:-]+)/gu,
+    (invocation, name: string) => {
+      const script = scripts[name];
+      if (script === undefined || resolving.has(name)) {
+        return invocation;
+      }
+      return `${invocation} ${expandPackageScripts(
+        script,
+        scripts,
+        new Set([...resolving, name]),
+      )}`;
+    },
+  );
+
+const singleThreadArtifactOrderingViolations = (
+  workflows: Record<string, string>,
+  scripts: Record<string, string>,
+) => {
+  const violations: string[] = [];
+  for (const [path, source] of Object.entries(workflows)) {
+    const jobs = Bun.YAML.parse(source).jobs ?? {};
+    for (const [jobName, job] of Object.entries<{
+      steps?: { run?: unknown }[];
+    }>(jobs)) {
+      let artifactBuilt = false;
+      for (const [index, step] of (job.steps ?? []).entries()) {
+        if (typeof step.run !== "string") continue;
+        const command = expandPackageScripts(step.run, scripts);
+        const consumesArtifact =
+          command.includes("test:single-thread") ||
+          /\b(?:bun|npm|pnpm|yarn)\s+(?:pack|publish)\b/u.test(
+            command,
+          );
+        if (consumesArtifact && !artifactBuilt) {
+          violations.push(`${path}:${jobName}:step ${index + 1}`);
+        }
+        if (command.includes("build-single-thread.mjs")) {
+          artifactBuilt = true;
+        }
+      }
+    }
+  }
+  return violations;
+};
 
 describe("shared tooling adoption", () => {
   test("uses central lint defaults and every portable safety rule", () => {
@@ -121,6 +173,154 @@ describe("shared tooling adoption", () => {
     }
   });
 
+  test("CI and release verify the real single-thread artifact", () => {
+    const ci = read(".github/workflows/ci.yml");
+    const parsedCi = Bun.YAML.parse(ci);
+    const singleThread = parsedCi.jobs["single-thread"];
+    expect(singleThread.steps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ run: "bun run build" }),
+        expect.objectContaining({
+          run: "bun run build:js",
+        }),
+        expect.objectContaining({
+          run: "bun run build:single-thread-package",
+        }),
+        expect.objectContaining({
+          run: "bun run test:single-thread",
+        }),
+      ]),
+    );
+    expect(parsedCi.jobs.checks.steps).toContainEqual({
+      run: "node scripts/build-single-thread.test.mjs",
+    });
+    const singleThreadToolchain = singleThread.steps.find(
+      (step: Record<string, unknown>) =>
+        typeof step.uses === "string" &&
+        step.uses.startsWith("dtolnay/rust-toolchain@"),
+    );
+    expect(singleThreadToolchain.with).toMatchObject({
+      toolchain: "1.99.0",
+      targets:
+        "wasm32-wasip1-threads, wasm32-unknown-unknown",
+    });
+    expect(parsedCi.jobs["ci-result"].needs).toContain(
+      "single-thread",
+    );
+    expect(ci).toContain(
+      'test "$SINGLE_THREAD_RESULT" = success',
+    );
+
+    const release = read(".github/workflows/release.yml");
+    const parsedRelease = Bun.YAML.parse(release);
+    for (const jobName of ["verify", "pack"]) {
+      const toolchain = parsedRelease.jobs[
+        jobName
+      ].steps.find(
+        (step: Record<string, unknown>) =>
+          typeof step.uses === "string" &&
+          step.uses.startsWith("dtolnay/rust-toolchain@"),
+      );
+      expect(toolchain.with.toolchain).toBe("1.99.0");
+      expect(
+        toolchain.with.targets.split(/,\s*/),
+      ).toContain("wasm32-unknown-unknown");
+    }
+    const scripts = Object.fromEntries(
+      Object.entries(
+        JSON.parse(read("package.json")).scripts,
+      ).map(([name, command]) => {
+        expect(typeof command).toBe("string");
+        return [name, String(command)];
+      }),
+    );
+    expect(scripts.build).not.toContain("build:package");
+    expect(scripts["build:js"]).not.toContain(
+      "build:package",
+    );
+    expect(scripts["build:single-thread-package"]).toContain(
+      "build-single-thread.mjs",
+    );
+    expect(scripts["build:package"]).toContain(
+      "build:single-thread-package",
+    );
+    const workflowDirectory = new URL(
+      ".github/workflows/",
+      root,
+    );
+    const workflows = Object.fromEntries(
+      readdirSync(workflowDirectory)
+        .filter((path) => /\.ya?ml$/u.test(path))
+        .map((path) => [
+          path,
+          read(`.github/workflows/${path}`),
+        ]),
+    );
+    expect(
+      singleThreadArtifactOrderingViolations(
+        workflows,
+        scripts,
+      ),
+    ).toEqual([]);
+    expect(
+      singleThreadArtifactOrderingViolations(
+        {
+          "negative.yml": `jobs:\n  unsafe:\n    steps:\n      - run: bun run build:js\n      - run: bun run test:single-thread\n`,
+        },
+        scripts,
+      ),
+    ).toEqual(["negative.yml:unsafe:step 2"]);
+
+    const napiCommands = Object.entries(
+      parsedCi.jobs["napi-ci"].with,
+    )
+      .filter(
+        ([name, value]) =>
+          name.endsWith("-command") &&
+          typeof value === "string",
+      )
+      .map(([, value]) => value as string);
+    const sharedScripts = [
+      "build",
+      "build:js",
+      "test",
+      "test:props",
+      "test:runtime:bun",
+      "test:runtime:node",
+    ];
+    const pending = [
+      ...napiCommands,
+      ...sharedScripts.map((name) => scripts[name]),
+    ];
+    const resolved = new Set<string>();
+    while (pending.length > 0) {
+      const command = pending.pop();
+      if (!command || resolved.has(command)) continue;
+      resolved.add(command);
+      for (const match of command.matchAll(
+        /bun run ([\w:-]+)/g,
+      )) {
+        const dependency = scripts[match[1]];
+        if (typeof dependency === "string") {
+          pending.push(dependency);
+        }
+      }
+    }
+    expect([...resolved].join("\n")).not.toContain(
+      "build-single-thread.mjs",
+    );
+    expect(scripts["test:single-thread"]).toBe(
+      "bun --config=bunfig.single-thread.toml test",
+    );
+    expect(scripts.test).not.toContain("single-thread");
+    expect(read("bunfig.toml")).toContain(
+      'pathIgnorePatterns = ["single-thread-test"]',
+    );
+    expect(read("bunfig.single-thread.toml")).toContain(
+      'root = "./single-thread-test"',
+    );
+  });
+
   test("runtime selectors share policy pins with one bounded Hawk exception", () => {
     const declaration = JSON.parse(
       read("stll-toolchain.json"),
@@ -141,7 +341,7 @@ describe("shared tooling adoption", () => {
     ).toHaveLength(4);
     expect(
       release.match(/toolchain: "1.99.0"/g),
-    ).toHaveLength(3);
+    ).toHaveLength(4);
     expect(release).not.toMatch(/node-version: "22/);
   });
 

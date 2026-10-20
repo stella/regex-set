@@ -8,6 +8,7 @@
     "*.d.cts",
     "src/**/*.ts",
     "tsdown.config.ts",
+    "tsdown.single-thread.config.ts",
     "oxlint.config.ts"
   ],
   "exclude": ["node_modules", "dist", "wasm/dist", "npm"]
