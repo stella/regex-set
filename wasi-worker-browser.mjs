@@ -1,9 +1,9 @@
 import {
+  emnapiAsyncWorkPlugin,
+  emnapiTSFNPlugin,
   instantiateNapiModuleSync,
   MessageHandler,
   WASI,
-  emnapiAsyncWorkPlugin,
-  emnapiTSFNPlugin,
 } from "@napi-rs/wasm-runtime";
 
 const handler = new MessageHandler({
@@ -57,10 +57,7 @@ handler.beforeReportError = function (...args) {
 
 globalThis.onmessage = function (e) {
   const data = e && e.data;
-  if (
-    data &&
-    data.__napiRsAddonCrashFlag instanceof Int32Array
-  ) {
+  if (data && data.__napiRsAddonCrashFlag instanceof Int32Array) {
     __addonCrashFlag = data.__napiRsAddonCrashFlag;
     return;
   }

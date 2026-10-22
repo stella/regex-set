@@ -1,5 +1,4 @@
-const FETCH_NEEDLE =
-  "const __wasmFile = await __wasmResponse.arrayBuffer()";
+const FETCH_NEEDLE = "const __wasmFile = await __wasmResponse.arrayBuffer()";
 
 function buildMissingNeedleWarning(id: string): string {
   return (
@@ -39,10 +38,7 @@ export function injectWasmFetchGuard(
     return null;
   }
 
-  return code.replace(
-    FETCH_NEEDLE,
-    buildReplacement(packageName),
-  );
+  return code.replace(FETCH_NEEDLE, buildReplacement(packageName));
 }
 
 export function wasmFetchGuardPlugin(packageName: string) {

@@ -19,9 +19,7 @@ declare var WebAssembly: {
     initial: number;
     maximum?: number;
   }) => WebAssembly.Memory;
-  Module: new (
-    source: ArrayBuffer | ArrayBufferView,
-  ) => WebAssembly.Module;
+  Module: new (source: ArrayBuffer | ArrayBufferView) => WebAssembly.Module;
   RuntimeError: new (message?: string) => Error;
   instantiate(
     source: ArrayBuffer | ArrayBufferView,

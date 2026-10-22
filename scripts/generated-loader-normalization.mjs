@@ -6,9 +6,7 @@ const normalizeBrowserCrashDisposal = (content) => {
   if (!content.includes("let __wasiAddonCrashFlag;")) {
     return content;
   }
-  if (
-    content.includes("function __hasWasiThreadCrashed()")
-  ) {
+  if (content.includes("function __hasWasiThreadCrashed()")) {
     return content.replace(
       "  try {\n    live = begin();",
       "  try {\n    __abortWasiDisposalIfThreadCrashed();\n    live = begin();",
@@ -306,12 +304,7 @@ const normalizeCleanupCrashChecks = (content) =>
 
 /** @param {string} content */
 export const normalizeGeneratedLoader = (content) =>
-  normalizeCleanupCrashChecks(
-    normalizeBrowserCrashDisposal(content),
-  )
+  normalizeCleanupCrashChecks(normalizeBrowserCrashDisposal(content))
     .replace(suppressionComment, "")
-    .replace(
-      '| "wasm32-wasip1";',
-      '| "wasm32-wasip1"\n  | undefined;',
-    )
+    .replace('| "wasm32-wasip1";', '| "wasm32-wasip1"\n  | undefined;')
     .replace(/[ \t]+$/gm, "");

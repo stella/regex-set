@@ -9,9 +9,7 @@ const patterns = Array.from({ length: 50 }, (_, index) => {
   const serial = index + 1;
   return index % 2 === 0
     ? new RegExp(String.raw`\bčl\.\s*${serial}\b`)
-    : new RegExp(
-        String.raw`\bIČO:\s*[0-9]{8}\b\s+ref-${serial}\b`,
-      );
+    : new RegExp(String.raw`\bIČO:\s*[0-9]{8}\b\s+ref-${serial}\b`);
 });
 const paragraph = patterns
   .map((_, index) => {
@@ -27,15 +25,12 @@ const set = new RegexSet(patterns);
 
 for (const [index, pattern] of patterns.entries()) {
   const single = new RegexSet([pattern]);
-  const [fast = 0, verified = 0, fallback = 0] =
-    single._enginePathCounts();
+  const [fast = 0, verified = 0, fallback = 0] = single._enginePathCounts();
   let path = "JavaScript fallback";
   if (fast > 0) path = "DFA";
   else if (verified > 0) path = "verified DFA";
   else if (fallback > 0) path = "fallback";
-  console.log(
-    `${String(index + 1).padStart(2, "0")}\t${path}`,
-  );
+  console.log(`${String(index + 1).padStart(2, "0")}\t${path}`);
 }
 
 for (let index = 0; index < WARMUP; index++) {

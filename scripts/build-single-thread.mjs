@@ -1,35 +1,20 @@
 import { execFileSync } from "node:child_process";
-import {
-  copyFileSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 
 const wasmTarget = "wasm32-unknown-unknown";
-const activeToolchain = execFileSync(
-  "rustup",
-  ["show", "active-toolchain"],
-  { encoding: "utf8" },
-)
+const activeToolchain = execFileSync("rustup", ["show", "active-toolchain"], {
+  encoding: "utf8",
+})
   .trim()
   .split(/\s+/)
   .at(0);
 if (!activeToolchain) {
-  throw new Error(
-    "rustup did not report an active toolchain",
-  );
+  throw new Error("rustup did not report an active toolchain");
 }
 const installedTargets = execFileSync(
   "rustup",
-  [
-    "target",
-    "list",
-    "--installed",
-    "--toolchain",
-    activeToolchain,
-  ],
+  ["target", "list", "--installed", "--toolchain", activeToolchain],
   { encoding: "utf8" },
 )
   .trim()
@@ -37,13 +22,7 @@ const installedTargets = execFileSync(
 if (!installedTargets.includes(wasmTarget)) {
   execFileSync(
     "rustup",
-    [
-      "target",
-      "add",
-      wasmTarget,
-      "--toolchain",
-      activeToolchain,
-    ],
+    ["target", "add", wasmTarget, "--toolchain", activeToolchain],
     { stdio: "inherit" },
   );
 }

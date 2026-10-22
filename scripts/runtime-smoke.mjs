@@ -1,11 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import {
-  copyFile,
-  mkdtemp,
-  readdir,
-  rm,
-} from "node:fs/promises";
+import { copyFile, mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,12 +27,7 @@ assert.equal(rs.isMatch(haystack), true);
 assert.deepEqual(rs.whichMatch(haystack), [0, 1, 2, 3]);
 assert.deepEqual(
   matches.map((m) => m.text),
-  [
-    "15.03.1990",
-    "+420123456789",
-    "CZ123456",
-    "IČO: 12345678",
-  ],
+  ["15.03.1990", "+420123456789", "CZ123456", "IČO: 12345678"],
 );
 assert.equal(matches[3]?.name, "company-id");
 
@@ -47,17 +37,10 @@ const replaced = rs.replaceAll(haystack, [
   "[ID]",
   "[COMPANY]",
 ]);
-assert.equal(
-  replaced,
-  "Born [DATE], phone [PHONE], ID [ID], [COMPANY]",
-);
+assert.equal(replaced, "Born [DATE], phone [PHONE], ID [ID], [COMPANY]");
 
-const repositoryRoot = fileURLToPath(
-  new URL("../", import.meta.url),
-);
-const isolatedRoot = await mkdtemp(
-  path.join(tmpdir(), "regex-set-loader-"),
-);
+const repositoryRoot = fileURLToPath(new URL("../", import.meta.url));
+const isolatedRoot = await mkdtemp(path.join(tmpdir(), "regex-set-loader-"));
 
 /** @param {{env: NodeJS.ProcessEnv, expectedError?: RegExp}} options */
 function runLoaderProbe({ env, expectedError }) {
@@ -109,8 +92,7 @@ try {
   });
   runLoaderProbe({
     env: { NAPI_RS_WASI_FLAVOR: "wasm32-wasi" },
-    expectedError:
-      /WASI binding for flavor "wasm32-wasi" not found/,
+    expectedError: /WASI binding for flavor "wasm32-wasi" not found/,
   });
 } finally {
   await rm(isolatedRoot, { force: true, recursive: true });

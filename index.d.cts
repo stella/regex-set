@@ -6,10 +6,7 @@
  * can point the loader at a WASI artifact this package does not build itself.
  */
 export declare const __napiBindingTarget:
-  | "native"
-  | "wasm32-wasi"
-  | "wasm32-wasip1"
-  | undefined;
+  "native" | "wasm32-wasi" | "wasm32-wasip1" | undefined;
 
 export declare class RegexSet {
   constructor(
@@ -24,10 +21,7 @@ export declare class RegexSet {
   _findIterPacked(haystack: string): Uint32Array;
   _findIterPackedBuf(haystack: Buffer): Uint32Array;
   whichMatch(haystack: string): Array<number>;
-  replaceAll(
-    haystack: string,
-    replacements: Array<string>,
-  ): string;
+  replaceAll(haystack: string, replacements: Array<string>): string;
 }
 
 export declare function _prepareRegexSet(
@@ -35,9 +29,7 @@ export declare function _prepareRegexSet(
   options?: Options | undefined | null,
 ): Buffer;
 
-export declare function _uax29Boundaries(
-  haystack: Buffer,
-): Array<number>;
+export declare function _uax29Boundaries(haystack: Buffer): Array<number>;
 
 export interface Match {
   pattern: number;

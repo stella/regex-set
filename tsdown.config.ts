@@ -22,10 +22,7 @@ export default defineConfig([
     sourcemap: true,
     hash: false,
     deps: {
-      neverBundle: [
-        /^@emnapi\/runtime$/,
-        /^@napi-rs\/wasm-runtime$/,
-      ],
+      neverBundle: [/^@emnapi\/runtime$/, /^@napi-rs\/wasm-runtime$/],
     },
     copy: [
       {

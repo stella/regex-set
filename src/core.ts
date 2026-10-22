@@ -20,9 +20,7 @@ export type NativeBinding = {
     patterns: string[],
     options?: NativeOptions | null,
   ) => Uint8Array;
-  _uax29Boundaries: (
-    haystack: Buffer | Uint8Array,
-  ) => number[];
+  _uax29Boundaries: (haystack: Buffer | Uint8Array) => number[];
 };
 
 type NativeOptions = {
@@ -36,14 +34,9 @@ type NativeRegexSetInstance = {
   isMatch(haystack: string): boolean;
   _isMatchBuf(haystack: Buffer | Uint8Array): boolean;
   _findIterPacked(haystack: string): Uint32Array;
-  _findIterPackedBuf(
-    haystack: Buffer | Uint8Array,
-  ): Uint32Array;
+  _findIterPackedBuf(haystack: Buffer | Uint8Array): Uint32Array;
   whichMatch(haystack: string): number[];
-  replaceAll(
-    haystack: string,
-    replacements: string[],
-  ): string;
+  replaceAll(haystack: string, replacements: string[]): string;
 };
 
 type JsFallback = {
@@ -159,14 +152,8 @@ function unpack(
     const idx = packed[i];
     const s = packed[i + 1];
     const e = packed[i + 2];
-    if (
-      idx === undefined ||
-      s === undefined ||
-      e === undefined
-    ) {
-      throw new Error(
-        `Corrupt packed match data at offset ${i}`,
-      );
+    if (idx === undefined || s === undefined || e === undefined) {
+      throw new Error(`Corrupt packed match data at offset ${i}`);
     }
     const pattern = indexMap ? indexMap[idx] : idx;
     if (pattern === undefined) {
@@ -178,8 +165,7 @@ function unpack(
       end: e,
       text: haystack.slice(s, e),
     };
-    if (names && names[pattern] !== undefined)
-      m.name = names[pattern];
+    if (names && names[pattern] !== undefined) m.name = names[pattern];
     matches[j] = m;
   }
   return matches;
@@ -279,19 +265,12 @@ const JS_WHITESPACE =
 function javascriptCharacterClasses(re: RegExp): string {
   let result = "";
   let classDepth = 0;
-  const unicodeCase =
-    re.ignoreCase && (re.unicode || re.unicodeSets);
-  const word =
-    "a-zA-Z0-9_" +
-    (unicodeCase ? "\\x{017F}\\x{212A}" : "");
+  const unicodeCase = re.ignoreCase && (re.unicode || re.unicodeSets);
+  const word = "a-zA-Z0-9_" + (unicodeCase ? "\\x{017F}\\x{212A}" : "");
   for (let i = 0; i < re.source.length; i++) {
     const char = re.source.charAt(i);
     if (char !== "\\") {
-      if (
-        char === "[" &&
-        (classDepth === 0 || re.unicodeSets)
-      )
-        classDepth++;
+      if (char === "[" && (classDepth === 0 || re.unicodeSets)) classDepth++;
       if (char === "]" && classDepth > 0) classDepth--;
       result += char;
       continue;
@@ -333,8 +312,7 @@ function javascriptCharacterClasses(re: RegExp): string {
         result += "\\" + escaped;
         continue;
     }
-    const negation =
-      escaped === escaped.toUpperCase() ? "^" : "";
+    const negation = escaped === escaped.toUpperCase() ? "^" : "";
     result += `[${negation}${members}]`;
   }
   return result;
@@ -367,12 +345,10 @@ function legacyLiteralPattern(literal: string): string {
   if (/[a-z]/i.test(literal))
     return `(?-i:[${literal.toLowerCase()}${literal.toUpperCase()}])`;
   const code = literal.codePointAt(0);
-  if (code === undefined)
-    throw new Error("Missing literal");
+  if (code === undefined) throw new Error("Missing literal");
   const canonical = literal.toUpperCase();
   const members =
-    canonical.length === 1 &&
-    canonical.charCodeAt(0) >= 0x80
+    canonical.length === 1 && canonical.charCodeAt(0) >= 0x80
       ? getLegacyUnicodeFolds().get(canonical)
       : undefined;
   return members
@@ -396,18 +372,13 @@ function javascriptLegacyCaseFolding(re: RegExp): string {
         .slice(i)
         .match(/^(?:x[\da-f]{2}|u[\da-f]{4})/i)?.[0];
       if (hex) {
-        const literal = String.fromCharCode(
-          Number.parseInt(hex.slice(1), 16),
-        );
+        const literal = String.fromCharCode(Number.parseInt(hex.slice(1), 16));
         result += legacyLiteralPattern(literal);
         i += hex.length - 1;
         continue;
       }
       // Preserve named backreferences as one token, including the group name.
-      if (
-        escaped === "k" &&
-        re.source.charAt(i + 1) === "<"
-      ) {
+      if (escaped === "k" && re.source.charAt(i + 1) === "<") {
         const end = re.source.indexOf(">", i + 2);
         if (end !== -1) {
           result += re.source.slice(i - 1, end + 1);
@@ -437,9 +408,7 @@ function javascriptLegacyCaseFolding(re: RegExp): string {
         result += legacyLiteralPattern(literal);
         i += literal.length - 1;
       } else {
-        result += /[a-z]/i.test(char)
-          ? legacyLiteralPattern(char)
-          : char;
+        result += /[a-z]/i.test(char) ? legacyLiteralPattern(char) : char;
       }
       continue;
     }
@@ -467,25 +436,14 @@ function javascriptLegacyCaseFolding(re: RegExp): string {
         original.charAt(j + 1) === "\\" &&
         "sSwWdD".includes(original.charAt(j + 2));
       normalized +=
-        member === "-" && (previousShortcut || nextShortcut)
-          ? "\\-"
-          : member;
+        member === "-" && (previousShortcut || nextShortcut) ? "\\-" : member;
       previousShortcut = false;
     }
     const classRegexp = new RegExp(normalized, "i");
     const escapedNonAscii = [
-      ...normalized.matchAll(
-        /\\(?:x([\da-f]{2})|u([\da-f]{4}))/gi,
-      ),
-    ].some(
-      (match) =>
-        Number.parseInt(match[1] ?? match[2] ?? "0", 16) >=
-        128,
-    );
-    const body = original.slice(
-      original.startsWith("[^") ? 2 : 1,
-      -1,
-    );
+      ...normalized.matchAll(/\\(?:x([\da-f]{2})|u([\da-f]{4}))/gi),
+    ].some((match) => Number.parseInt(match[1] ?? match[2] ?? "0", 16) >= 128);
+    const body = original.slice(original.startsWith("[^") ? 2 : 1, -1);
     const positive = new RegExp(`[${body}]`, "i");
     let folds = "";
     // At most 52 construction-only oracle checks preserve ASCII folding.
@@ -494,16 +452,11 @@ function javascriptLegacyCaseFolding(re: RegExp): string {
       if (positive.test(letter)) folds += letter;
     }
     if (hasNonAscii(original) || escapedNonAscii) {
-      for (const [
-        canonical,
-        members,
-      ] of getLegacyUnicodeFolds()) {
-        if (positive.test(canonical))
-          folds += members.join("");
+      for (const [canonical, members] of getLegacyUnicodeFolds()) {
+        if (positive.test(canonical)) folds += members.join("");
       }
     }
-    const translated =
-      javascriptCharacterClasses(classRegexp);
+    const translated = javascriptCharacterClasses(classRegexp);
     result += `(?-i:${translated.slice(0, -1)}${folds}])`;
   }
   return result;
@@ -557,9 +510,7 @@ function hasNonAscii(s: string): boolean {
 function scopeInlineFlags(src: string): string {
   // Handle bare (?i...) at the start: convert to
   // scoped (?i-u:...) with edge \b/\B outside.
-  const leadingBare = src.match(
-    /^\(\?([ims]+)(?:-([imsu]+))?\)/,
-  );
+  const leadingBare = src.match(/^\(\?([ims]+)(?:-([imsu]+))?\)/);
   const enableGroup = leadingBare?.[1];
   if (leadingBare && enableGroup?.includes("i")) {
     const enable = enableGroup;
@@ -598,9 +549,7 @@ function scopeInlineFlags(src: string): string {
     // Only add -u when content uses char class
     // shortcuts (\w, \d, \s) that benefit from it.
     const addU =
-      needsAsciiMode(rest) &&
-      !hasNonAscii(rest) &&
-      !disable.includes("u");
+      needsAsciiMode(rest) && !hasNonAscii(rest) && !disable.includes("u");
     const merged = addU ? disable + "u" : disable;
     const disablePart = merged ? `-${merged}` : "";
     return `${leading}(?${enable}${disablePart}:${inner})${trailing}`;
@@ -626,17 +575,10 @@ function scopeInnerFlags(src: string): string {
     }
     if (src.charAt(i) === "[") inClass = true;
     if (src.charAt(i) === "]") inClass = false;
-    if (
-      !inClass &&
-      src.charAt(i) === "(" &&
-      src.charAt(i + 1) === "?"
-    ) {
+    if (!inClass && src.charAt(i) === "(" && src.charAt(i + 1) === "?") {
       let j = i + 2;
       let enable = "";
-      while (
-        j < src.length &&
-        "ims".includes(src.charAt(j))
-      ) {
+      while (j < src.length && "ims".includes(src.charAt(j))) {
         enable += src.charAt(j);
         j++;
       }
@@ -644,10 +586,7 @@ function scopeInnerFlags(src: string): string {
       let disable = "";
       if (j < src.length && src.charAt(j) === "-") {
         j++; // skip -
-        while (
-          j < src.length &&
-          "imsu".includes(src.charAt(j))
-        ) {
+        while (j < src.length && "imsu".includes(src.charAt(j))) {
           disable += src.charAt(j);
           j++;
         }
@@ -695,10 +634,7 @@ type NormalizedEntry = {
 /**
  * Normalize a pattern entry to { pattern, name }.
  */
-function normalizeEntry(
-  p: unknown,
-  i: number,
-): NormalizedEntry {
+function normalizeEntry(p: unknown, i: number): NormalizedEntry {
   if (typeof p === "string") {
     return {
       pattern: scopeInlineFlags(p),
@@ -711,11 +647,7 @@ function normalizeEntry(
       name: undefined,
     };
   }
-  if (
-    typeof p !== "object" ||
-    p === null ||
-    !("pattern" in p)
-  ) {
+  if (typeof p !== "object" || p === null || !("pattern" in p)) {
     throw new TypeError(
       `Pattern at index ${i} must be a string, ` +
         "RegExp, or { pattern, name }",
@@ -723,21 +655,16 @@ function normalizeEntry(
   }
 
   const pattern = p.pattern;
-  if (
-    typeof pattern !== "string" &&
-    !(pattern instanceof RegExp)
-  ) {
+  if (typeof pattern !== "string" && !(pattern instanceof RegExp)) {
     throw new TypeError(
-      `Pattern at index ${i}: "pattern" ` +
-        "field must be a string or RegExp",
+      `Pattern at index ${i}: "pattern" ` + "field must be a string or RegExp",
     );
   }
 
   const name = "name" in p ? p.name : undefined;
   if (name !== undefined && typeof name !== "string") {
     throw new TypeError(
-      `Pattern at index ${i}: "name" ` +
-        "field must be a string",
+      `Pattern at index ${i}: "name" ` + "field must be a string",
     );
   }
 
@@ -753,23 +680,15 @@ function normalizeEntry(
 function expandLargeAlternation(pattern: string): string[] {
   const group = findLargestChunkableAlternation(pattern);
   if (!group) return [pattern];
-  if (
-    group.branches.length < ALTERNATION_CHUNK_MIN_BRANCHES
-  ) {
+  if (group.branches.length < ALTERNATION_CHUNK_MIN_BRANCHES) {
     return [pattern];
   }
 
   const expanded: string[] = [];
-  for (
-    let i = 0;
-    i < group.branches.length;
-    i += ALTERNATION_CHUNK_SIZE
-  ) {
+  for (let i = 0; i < group.branches.length; i += ALTERNATION_CHUNK_SIZE) {
     expanded.push(
       pattern.slice(0, group.bodyStart) +
-        group.branches
-          .slice(i, i + ALTERNATION_CHUNK_SIZE)
-          .join("|") +
+        group.branches.slice(i, i + ALTERNATION_CHUNK_SIZE).join("|") +
         pattern.slice(group.bodyEnd),
     );
   }
@@ -817,10 +736,7 @@ function findLargestChunkableAlternation(
       branches.length >= ALTERNATION_CHUNK_MIN_BRANCHES &&
       pattern.slice(bodyStart, bodyEnd).includes("(?i:");
 
-    if (
-      shouldChunk &&
-      (!best || branches.length > best.branches.length)
-    ) {
+    if (shouldChunk && (!best || branches.length > best.branches.length)) {
       best = { bodyStart, bodyEnd, branches };
     }
   }
@@ -828,10 +744,7 @@ function findLargestChunkableAlternation(
   return best;
 }
 
-function findGroupEnd(
-  pattern: string,
-  bodyStart: number,
-): number | undefined {
+function findGroupEnd(pattern: string, bodyStart: number): number | undefined {
   let depth = 0;
   let inClass = false;
 
@@ -956,10 +869,7 @@ function buildNativeInput(
     }
     const expanded = expandLargeAlternation(pattern);
     for (const expandedPattern of expanded) {
-      const jsFallback = jsFallbackRegExp(
-        expandedPattern,
-        unicode,
-      );
+      const jsFallback = jsFallbackRegExp(expandedPattern, unicode);
       if (jsFallback) {
         jsFallbacks.push({
           pattern: i,
@@ -998,9 +908,7 @@ function caseInsensitivePattern(p: string): string {
     return p;
   let src = p;
   let flagPrefix = "";
-  const bareFlagMatch = src.match(
-    /^\(\?[ims]+(?:-[imsu]+)?\)/,
-  );
+  const bareFlagMatch = src.match(/^\(\?[ims]+(?:-[imsu]+)?\)/);
   if (bareFlagMatch) {
     flagPrefix = bareFlagMatch[0];
     src = src.slice(flagPrefix.length);
@@ -1029,8 +937,7 @@ function caseInsensitivePattern(p: string): string {
       }
     }
   }
-  const uFlag =
-    needsAsciiMode(src) && !hasNonAscii(src) ? "-u" : "";
+  const uFlag = needsAsciiMode(src) && !hasNonAscii(src) ? "-u" : "";
   return `${flagPrefix}${leading}(?i${uFlag}:${src})${trailing}`;
 }
 
@@ -1089,30 +996,20 @@ export class RegexSet {
       prepared,
     );
     if (this._jsFallbacks.length > 0) {
-      this._nativeSingles = nativeInput.nativePatterns.map(
-        (pattern, i) => {
-          const original = this._nativeIndexMap[i];
-          if (original === undefined) {
-            throw new Error(
-              `Missing native index map ${i}`,
-            );
-          }
-          return {
-            pattern: original,
-            inner: new binding.RegexSet(
-              [pattern],
-              nativeInput.nativeOpts,
-            ),
-          };
-        },
-      );
+      this._nativeSingles = nativeInput.nativePatterns.map((pattern, i) => {
+        const original = this._nativeIndexMap[i];
+        if (original === undefined) {
+          throw new Error(`Missing native index map ${i}`);
+        }
+        return {
+          pattern: original,
+          inner: new binding.RegexSet([pattern], nativeInput.nativeOpts),
+        };
+      });
     }
   }
 
-  static prepare(
-    patterns: PatternEntry[],
-    options?: Options,
-  ): Uint8Array {
+  static prepare(patterns: PatternEntry[], options?: Options): Uint8Array {
     const nativeInput = buildNativeInput(patterns, options);
     return binding._prepareRegexSet(
       nativeInput.nativePatterns,
@@ -1136,8 +1033,7 @@ export class RegexSet {
       return true;
     }
     for (const fb of this._jsFallbacks) {
-      if (this.findFirstJsFallback(haystack, fb))
-        return true;
+      if (this.findFirstJsFallback(haystack, fb)) return true;
     }
     return false;
   }
@@ -1152,9 +1048,7 @@ export class RegexSet {
     }
 
     const native = unpack(
-      this._inner._findIterPackedBuf(
-        encoder.encode(haystack),
-      ),
+      this._inner._findIterPackedBuf(encoder.encode(haystack)),
       haystack,
       this._hasNames ? this._names : null,
       this._nativeIndexMap,
@@ -1165,14 +1059,10 @@ export class RegexSet {
   /** Which pattern indices matched (not where). */
   whichMatch(haystack: string): number[] {
     const seen = new Set<number>();
-    for (const pattern of this._inner.whichMatch(
-      haystack,
-    )) {
+    for (const pattern of this._inner.whichMatch(haystack)) {
       const original = this._nativeIndexMap[pattern];
       if (original === undefined) {
-        throw new Error(
-          `Missing native index map ${pattern}`,
-        );
+        throw new Error(`Missing native index map ${pattern}`);
       }
       seen.add(original);
     }
@@ -1188,10 +1078,7 @@ export class RegexSet {
    * Replace all non-overlapping matches.
    * `replacements[i]` replaces pattern `i`.
    */
-  replaceAll(
-    haystack: string,
-    replacements: string[],
-  ): string {
+  replaceAll(haystack: string, replacements: string[]): string {
     if (
       this._jsFallbacks.length === 0 &&
       this._nativeIndexMap.length === this._patternCount &&
@@ -1214,9 +1101,7 @@ export class RegexSet {
       result += haystack.slice(last, m.start);
       const replacement = replacements[m.pattern];
       if (replacement === undefined) {
-        throw new Error(
-          `Missing replacement for pattern ${m.pattern}`,
-        );
+        throw new Error(`Missing replacement for pattern ${m.pattern}`);
       }
       result += replacement;
       last = m.end;
@@ -1236,9 +1121,7 @@ export class RegexSet {
         const text = m[0];
         const start = m.index;
         const end = start + text.length;
-        if (
-          this.acceptJsFallbackMatch(haystack, start, end)
-        ) {
+        if (this.acceptJsFallbackMatch(haystack, start, end)) {
           const match: Match = {
             pattern: fb.pattern,
             start,
@@ -1249,10 +1132,7 @@ export class RegexSet {
           if (name !== undefined) match.name = name;
           matches.push(match);
           if (text.length === 0) {
-            fb.re.lastIndex = nextRegexStart(
-              haystack,
-              start,
-            );
+            fb.re.lastIndex = nextRegexStart(haystack, start);
           }
         } else {
           fb.re.lastIndex = nextRegexStart(haystack, start);
@@ -1278,10 +1158,7 @@ export class RegexSet {
     return matches;
   }
 
-  private findFirstJsFallback(
-    haystack: string,
-    fb: JsFallback,
-  ): boolean {
+  private findFirstJsFallback(haystack: string, fb: JsFallback): boolean {
     fb.re.lastIndex = 0;
     for (;;) {
       const m = fb.re.exec(haystack);
@@ -1289,9 +1166,7 @@ export class RegexSet {
       const text = m[0];
       const start = m.index;
       const end = start + text.length;
-      if (
-        this.acceptJsFallbackMatch(haystack, start, end)
-      ) {
+      if (this.acceptJsFallbackMatch(haystack, start, end)) {
         return true;
       }
       fb.re.lastIndex = nextRegexStart(haystack, start);
@@ -1310,11 +1185,7 @@ export class RegexSet {
         start,
         this._boundaryOptions.unicodeBoundaries,
       ) &&
-      isWordBoundary(
-        haystack,
-        end,
-        this._boundaryOptions.unicodeBoundaries,
-      )
+      isWordBoundary(haystack, end, this._boundaryOptions.unicodeBoundaries)
     );
   }
 }
@@ -1402,9 +1273,7 @@ function hasRustUnicodeShorthand(pattern: string): boolean {
   return false;
 }
 
-function hasRustClassSetOperation(
-  pattern: string,
-): boolean {
+function hasRustClassSetOperation(pattern: string): boolean {
   let inClass = false;
   for (let i = 0; i < pattern.length; i++) {
     const ch = pattern[i];
@@ -1433,17 +1302,10 @@ function hasRustClassSetOperation(
   return false;
 }
 
-function nextRegexStart(
-  text: string,
-  index: number,
-): number {
+function nextRegexStart(text: string, index: number): number {
   if (index >= text.length) return index + 1;
   const first = text.charCodeAt(index);
-  if (
-    first >= 0xd800 &&
-    first <= 0xdbff &&
-    index + 1 < text.length
-  ) {
+  if (first >= 0xd800 && first <= 0xdbff && index + 1 < text.length) {
     const second = text.charCodeAt(index + 1);
     if (second >= 0xdc00 && second <= 0xdfff) {
       return index + 2;
@@ -1473,42 +1335,24 @@ function selectNonOverlapping(matches: Match[]): Match[] {
   return selected;
 }
 
-function isWordBoundary(
-  text: string,
-  pos: number,
-  unicode: boolean,
-): boolean {
+function isWordBoundary(text: string, pos: number, unicode: boolean): boolean {
   const before = previousCodePoint(text, pos);
   const after = nextCodePoint(text, pos);
-  return (
-    isWordChar(before, unicode) !==
-    isWordChar(after, unicode)
-  );
+  return isWordChar(before, unicode) !== isWordChar(after, unicode);
 }
 
-function previousCodePoint(
-  text: string,
-  pos: number,
-): string | undefined {
+function previousCodePoint(text: string, pos: number): string | undefined {
   if (pos <= 0) return undefined;
   return Array.from(text.slice(0, pos)).at(-1);
 }
 
-function nextCodePoint(
-  text: string,
-  pos: number,
-): string | undefined {
+function nextCodePoint(text: string, pos: number): string | undefined {
   if (pos >= text.length) return undefined;
   const cp = text.codePointAt(pos);
-  return cp === undefined
-    ? undefined
-    : String.fromCodePoint(cp);
+  return cp === undefined ? undefined : String.fromCodePoint(cp);
 }
 
-function isWordChar(
-  ch: string | undefined,
-  unicode: boolean,
-): boolean {
+function isWordChar(ch: string | undefined, unicode: boolean): boolean {
   if (ch === undefined) return false;
   return unicode
     ? /^[\p{Alphabetic}\p{Number}_]$/u.test(ch)

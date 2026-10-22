@@ -7,14 +7,9 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const wasmArtifact = join(
-  root,
-  "regex-set.single-thread.wasm",
-);
+const wasmArtifact = join(root, "regex-set.single-thread.wasm");
 const wasmDist = join(root, "wasm", "dist");
-const packDirectory = mkdtempSync(
-  join(tmpdir(), "regex-set-clean-package-"),
-);
+const packDirectory = mkdtempSync(join(tmpdir(), "regex-set-clean-package-"));
 
 rmSync(wasmArtifact, { force: true });
 rmSync(wasmDist, { force: true, recursive: true });
@@ -26,13 +21,7 @@ try {
   });
   const packResult = execFileSync(
     "npm",
-    [
-      "pack",
-      "--json",
-      "--ignore-scripts",
-      "--pack-destination",
-      packDirectory,
-    ],
+    ["pack", "--json", "--ignore-scripts", "--pack-destination", packDirectory],
     { cwd: join(root, "wasm"), encoding: "utf8" },
   );
   const [{ filename }] = JSON.parse(packResult);
@@ -45,11 +34,9 @@ try {
       .split("\n"),
   );
   const manifest = JSON.parse(
-    execFileSync(
-      "tar",
-      ["-xOf", tarball, "package/package.json"],
-      { encoding: "utf8" },
-    ),
+    execFileSync("tar", ["-xOf", tarball, "package/package.json"], {
+      encoding: "utf8",
+    }),
   );
   const expectedEntries = [
     "package/dist/regex-set.single-thread.wasm",
@@ -69,9 +56,7 @@ try {
     "./single-thread/wasm",
   ]) {
     if (manifest.exports?.[exportName] === undefined) {
-      throw new Error(
-        `Packed WASM package omits export ${exportName}`,
-      );
+      throw new Error(`Packed WASM package omits export ${exportName}`);
     }
   }
   if (readFileSync(wasmArtifact).length === 0) {

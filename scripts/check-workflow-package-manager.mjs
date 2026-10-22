@@ -1,20 +1,16 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-const WORKFLOW_DIRECTORY = new URL(
-  "../.github/workflows/",
-  import.meta.url,
-);
+const WORKFLOW_DIRECTORY = new URL("../.github/workflows/", import.meta.url);
 const DISALLOWED_INSTALL =
   /\b(?:npm\s+(?:ci|i|install)|pnpm\s+(?:i|install)|yarn(?:\s+install)?)\b/;
-const GLOBAL_NPM_INSTALL =
-  /\bnpm\s+(?:i|install)\s+(?:--global|-g)\b/;
+const GLOBAL_NPM_INSTALL = /\bnpm\s+(?:i|install)\s+(?:--global|-g)\b/;
 const BUN_INSTALL = /\bbun\s+install\b/;
 const FROZEN_LOCKFILE = /--frozen-lockfile\b/;
 
-const workflowNames = (
-  await readdir(WORKFLOW_DIRECTORY)
-).filter((name) => /\.ya?ml$/.test(name));
+const workflowNames = (await readdir(WORKFLOW_DIRECTORY)).filter((name) =>
+  /\.ya?ml$/.test(name),
+);
 
 const violations = [];
 
@@ -24,20 +20,13 @@ for (const workflowName of workflowNames) {
     "utf8",
   );
 
-  for (const [index, line] of workflow
-    .split("\n")
-    .entries()) {
+  for (const [index, line] of workflow.split("\n").entries()) {
     const usesAnotherPackageManager =
-      DISALLOWED_INSTALL.test(line) &&
-      !GLOBAL_NPM_INSTALL.test(line);
+      DISALLOWED_INSTALL.test(line) && !GLOBAL_NPM_INSTALL.test(line);
     const usesUnlockedBunInstall =
       BUN_INSTALL.test(line) && !FROZEN_LOCKFILE.test(line);
 
-    if (
-      !usesAnotherPackageManager &&
-      !usesUnlockedBunInstall
-    )
-      continue;
+    if (!usesAnotherPackageManager && !usesUnlockedBunInstall) continue;
 
     violations.push(
       `${join(".github/workflows", workflowName)}:${index + 1}: ${line.trim()}`,

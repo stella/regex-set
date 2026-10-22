@@ -13,12 +13,7 @@ const buildScriptPath = fileURLToPath(
 try {
   await access(wasmPath, constants.F_OK);
   await access(
-    fileURLToPath(
-      new URL(
-        "../regex-set.wasi-browser.js",
-        import.meta.url,
-      ),
-    ),
+    fileURLToPath(new URL("../regex-set.wasi-browser.js", import.meta.url)),
     constants.F_OK,
   );
 } catch (error) {

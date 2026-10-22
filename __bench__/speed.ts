@@ -21,8 +21,7 @@ import { join } from "node:path";
 import { RegexSet } from "../src/index";
 
 const CORPUS = join(__dirname, "corpus");
-const load = (f: string) =>
-  readFileSync(join(CORPUS, f), "utf-8");
+const load = (f: string) => readFileSync(join(CORPUS, f), "utf-8");
 
 let mariomka: string;
 let twain: string;
@@ -45,11 +44,7 @@ try {
 
 // ─── Harness ──────────────────────────────────
 
-const bench = (
-  name: string,
-  fn: () => number,
-  n: number,
-) => {
+const bench = (name: string, fn: () => number, n: number) => {
   for (let i = 0; i < 2; i++) fn();
   const t = performance.now();
   let c = 0;
@@ -99,9 +94,7 @@ const jsRegexSetBench = (
         }
       }
     }
-    all.sort(
-      (a, b) => a[0] - b[0] || b[1] - b[0] - (a[1] - a[0]),
-    );
+    all.sort((a, b) => a[0] - b[0] || b[1] - b[0] - (a[1] - a[0]));
     let count = 0;
     let lastEnd = 0;
     for (const [start, end] of all) {
@@ -115,11 +108,7 @@ const jsRegexSetBench = (
   return bench(name, fn, n);
 };
 
-const reportCountAgreement = (
-  label: string,
-  left: number,
-  right: number,
-) => {
+const reportCountAgreement = (label: string, left: number, right: number) => {
   if (left !== right) {
     console.warn(
       `  WARNING: ${label} count mismatch ` +
@@ -137,8 +126,7 @@ console.log("=".repeat(65));
 // ─── 1. mariomka: Email, URI, IPv4 ───────────
 
 console.log(
-  `\n### mariomka corpus ` +
-    `(${(mariomka.length / 1e6).toFixed(1)} MB)\n`,
+  `\n### mariomka corpus ` + `(${(mariomka.length / 1e6).toFixed(1)} MB)\n`,
 );
 
 // Use explicit ASCII classes here so JS RegExp and
@@ -194,11 +182,7 @@ const twain1Js = jsRegexBench(
   twain,
   N,
 );
-reportCountAgreement(
-  "#1 literal: Twain",
-  twain1Rust.matches,
-  twain1Js.matches,
-);
+reportCountAgreement("#1 literal: Twain", twain1Rust.matches, twain1Js.matches);
 
 // Pattern 3: char class
 const rsTwain3 = new RegexSet(["[a-z]shing"]);
@@ -207,12 +191,7 @@ const twain3Rust = bench(
   () => rsTwain3.findIter(twain).length,
   N,
 );
-const twain3Js = jsRegexBench(
-  "#3 JS: [a-z]shing",
-  [/[a-z]shing/g],
-  twain,
-  N,
-);
+const twain3Js = jsRegexBench("#3 JS: [a-z]shing", [/[a-z]shing/g], twain, N);
 reportCountAgreement(
   "#3 char class: [a-z]shing",
   twain3Rust.matches,
@@ -226,12 +205,7 @@ const twain5Rust = bench(
   () => rsTwain5.findIter(twain).length,
   N,
 );
-const twain5Js = jsRegexBench(
-  "#5 JS: \\b\\w+nn\\b",
-  [/\b\w+nn\b/g],
-  twain,
-  N,
-);
+const twain5Js = jsRegexBench("#5 JS: \\b\\w+nn\\b", [/\b\w+nn\b/g], twain, N);
 reportCountAgreement(
   "#5 word boundary: \\b\\w+nn\\b",
   twain5Rust.matches,
@@ -239,9 +213,7 @@ reportCountAgreement(
 );
 
 // Pattern 7: multi-alternation
-const rsTwain7 = new RegexSet([
-  "Tom|Sawyer|Huckleberry|Finn",
-]);
+const rsTwain7 = new RegexSet(["Tom|Sawyer|Huckleberry|Finn"]);
 const twain7Rust = bench(
   "#7 alternation: Tom|Sawyer|...",
   () => rsTwain7.findIter(twain).length,
@@ -253,11 +225,7 @@ const twain7Js = jsRegexBench(
   twain,
   N,
 );
-reportCountAgreement(
-  "#7 alternation",
-  twain7Rust.matches,
-  twain7Js.matches,
-);
+reportCountAgreement("#7 alternation", twain7Rust.matches, twain7Js.matches);
 
 // Pattern 12: suffix matching
 const rsTwain12 = new RegexSet(["[a-zA-Z]+ing"]);
@@ -305,11 +273,7 @@ const multiJs = jsRegexSetBench(
   bible,
   N,
 );
-reportCountAgreement(
-  "bible multi-pattern",
-  multiRust.matches,
-  multiJs.matches,
-);
+reportCountAgreement("bible multi-pattern", multiRust.matches, multiJs.matches);
 
 // ─── 4. Catastrophic backtracking resistance ─
 
@@ -335,15 +299,12 @@ const t2 = performance.now();
 rsCf.isMatch(cfInput);
 const cfTime = performance.now() - t2;
 console.log(
-  `  .*.*=.* on ${cfInput.length} chars:` +
-    `  Rust ${cfTime.toFixed(2)} ms`,
+  `  .*.*=.* on ${cfInput.length} chars:` + `  Rust ${cfTime.toFixed(2)} ms`,
 );
 
 // ─── 5. Lookaround patterns (prefiltered) ────
 
-console.log(
-  `\n### Lookaround (prefiltered DFA + verify)\n`,
-);
+console.log(`\n### Lookaround (prefiltered DFA + verify)\n`);
 
 const lookPatterns = [
   "[0-9]{2}\\.[0-9]{2}\\.[0-9]{4}",
@@ -367,11 +328,7 @@ const lookJs = jsRegexSetBench(
   bible,
   N,
 );
-reportCountAgreement(
-  "bible lookaround",
-  lookRust.matches,
-  lookJs.matches,
-);
+reportCountAgreement("bible lookaround", lookRust.matches, lookJs.matches);
 
 console.log("\n" + "=".repeat(65));
 console.log(" Done.");
