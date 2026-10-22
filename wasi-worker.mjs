@@ -2,12 +2,7 @@ import fs from "node:fs";
 import { createRequire } from "node:module";
 import { parse } from "node:path";
 import { WASI } from "node:wasi";
-import {
-  parentPort,
-  threadId,
-  Worker,
-  workerData,
-} from "node:worker_threads";
+import { parentPort, threadId, Worker, workerData } from "node:worker_threads";
 
 const require = createRequire(import.meta.url);
 
@@ -36,9 +31,7 @@ try {
     require,
     Worker,
     importScripts: function (f) {
-      (0, eval)(
-        fs.readFileSync(f, "utf8") + "//# sourceURL=" + f,
-      );
+      (0, eval)(fs.readFileSync(f, "utf8") + "//# sourceURL=" + f);
     },
     postMessage: function (msg) {
       if (parentPort) {
@@ -93,10 +86,7 @@ try {
     },
   });
 } catch (error) {
-  if (
-    workerData &&
-    workerData.crashFlag instanceof Int32Array
-  ) {
+  if (workerData && workerData.crashFlag instanceof Int32Array) {
     __raiseWasiThreadCrashFlags(error);
   }
   throw error;
@@ -107,10 +97,7 @@ try {
 // beforeReportError (which runs emnapi_thread_crashed, so the main thread may
 // throw 'unwind' and start exiting) before the 'error' event is even posted.
 // A loader that predates the flag passes none.
-if (
-  workerData &&
-  workerData.crashFlag instanceof Int32Array
-) {
+if (workerData && workerData.crashFlag instanceof Int32Array) {
   const __beforeReportError = handler.beforeReportError;
   handler.beforeReportError = function (...args) {
     if (!__raiseWasiThreadCrashFlags(args[0])) {
@@ -163,10 +150,7 @@ function __raiseWasiThreadCrashFlags(error) {
 }
 
 function __writeCrashReport(report, error) {
-  if (
-    !(report instanceof SharedArrayBuffer) ||
-    report.byteLength <= 12
-  ) {
+  if (!(report instanceof SharedArrayBuffer) || report.byteLength <= 12) {
     return;
   }
   const header = new Int32Array(report, 0, 3);
@@ -178,24 +162,17 @@ function __writeCrashReport(report, error) {
     const body = new Uint8Array(report, 12);
     const isObject =
       error !== null &&
-      (typeof error === "object" ||
-        typeof error === "function");
+      (typeof error === "object" || typeof error === "function");
     const name =
-      isObject && typeof error.name === "string"
-        ? error.name
-        : "Error";
+      isObject && typeof error.name === "string" ? error.name : "Error";
     const message =
       isObject && typeof error.message === "string"
         ? error.message
         : String(error);
     const stack =
-      isObject && typeof error.stack === "string"
-        ? error.stack
-        : undefined;
+      isObject && typeof error.stack === "string" ? error.stack : undefined;
     const encoder = new TextEncoder();
-    let bytes = encoder.encode(
-      JSON.stringify({ name, message, stack }),
-    );
+    let bytes = encoder.encode(JSON.stringify({ name, message, stack }));
     if (bytes.length > body.length) {
       bytes = encoder.encode(
         JSON.stringify({

@@ -16,15 +16,11 @@ import { RegexSet } from "../src/index";
 
 const PARAMS = { numRuns: 200 };
 const perfPropertyTest =
-  process.env.RUN_PERF_PROPERTIES === "1"
-    ? test
-    : test.skip;
+  process.env.RUN_PERF_PROPERTIES === "1" ? test : test.skip;
 
 // Generate valid regex-safe literal patterns
 // (no metacharacters that could create invalid regex)
-const safePattern = fc.stringMatching(
-  /^[a-zA-Z0-9]{1,10}$/,
-);
+const safePattern = fc.stringMatching(/^[a-zA-Z0-9]{1,10}$/);
 const safePatterns = fc.array(safePattern, {
   minLength: 1,
   maxLength: 20,
@@ -66,62 +62,41 @@ const optionCombos = fc.constantFrom(
   { wholeWords: true, unicodeBoundaries: true },
 );
 
-const backslashEdgePattern = fc
-  .integer({ min: 0, max: 6 })
-  .chain((n) => {
-    const bs = "\\".repeat(n);
-    const suffix = `${bs}b`;
-    return safePattern.map((core) => `${core}${suffix}`);
-  });
+const backslashEdgePattern = fc.integer({ min: 0, max: 6 }).chain((n) => {
+  const bs = "\\".repeat(n);
+  const suffix = `${bs}b`;
+  return safePattern.map((core) => `${core}${suffix}`);
+});
 
-const allFlags = fc.constantFrom(
-  "",
-  "i",
-  "m",
-  "s",
-  "im",
-  "is",
-  "ms",
-  "ims",
-);
+const allFlags = fc.constantFrom("", "i", "m", "s", "im", "is", "ms", "ims");
 
 const basePatterns = fc.oneof(
   safePattern,
   ...prefixes.map((pre) =>
     safePattern.chain((p) =>
-      fc
-        .constantFrom(...suffixes)
-        .map((suf) => `${pre}${p}${suf}`),
+      fc.constantFrom(...suffixes).map((suf) => `${pre}${p}${suf}`),
     ),
   ),
   ...cores.flatMap((core) => [
+    fc.constantFrom(...prefixes).map((pre) => `${pre}${core}`),
+    fc.constantFrom(...suffixes).map((suf) => `${core}${suf}`),
     fc
-      .constantFrom(...prefixes)
-      .map((pre) => `${pre}${core}`),
-    fc
-      .constantFrom(...suffixes)
-      .map((suf) => `${core}${suf}`),
-    fc
-      .tuple(
-        fc.constantFrom(...prefixes),
-        fc.constantFrom(...suffixes),
-      )
+      .tuple(fc.constantFrom(...prefixes), fc.constantFrom(...suffixes))
       .map(([pre, suf]) => `${pre}${core}${suf}`),
   ]),
   backslashEdgePattern,
 );
 
-const allPatterns: fc.Arbitrary<string | RegExp> =
-  basePatterns.chain((pat) =>
-    allFlags.map((flags) => {
-      if (!flags) return pat;
-      try {
-        return new RegExp(pat, flags);
-      } catch {
-        return pat; // invalid regex with flags → use as string
-      }
-    }),
-  );
+const allPatterns: fc.Arbitrary<string | RegExp> = basePatterns.chain((pat) =>
+  allFlags.map((flags) => {
+    if (!flags) return pat;
+    try {
+      return new RegExp(pat, flags);
+    } catch {
+      return pat; // invalid regex with flags → use as string
+    }
+  }),
+);
 
 const allHaystacks = fc.oneof(
   hay,
@@ -182,9 +157,7 @@ describe("property: non-overlapping", () => {
         const rs = new RegexSet(pats);
         const matches = rs.findIter(h);
         for (let i = 1; i < matches.length; i++) {
-          expect(matches[i]!.start).toBeGreaterThanOrEqual(
-            matches[i - 1]!.end,
-          );
+          expect(matches[i]!.start).toBeGreaterThanOrEqual(matches[i - 1]!.end);
         }
       }),
       PARAMS,
@@ -201,9 +174,7 @@ describe("property: monotonic offsets", () => {
         const rs = new RegexSet(pats);
         const matches = rs.findIter(h);
         for (let i = 1; i < matches.length; i++) {
-          expect(matches[i]!.start).toBeGreaterThan(
-            matches[i - 1]!.start,
-          );
+          expect(matches[i]!.start).toBeGreaterThan(matches[i - 1]!.start);
         }
       }),
       PARAMS,
@@ -230,9 +201,7 @@ describe("property: isMatch consistency", () => {
     fc.assert(
       fc.property(safePatterns, hay, (pats, h) => {
         const rs = new RegexSet(pats);
-        expect(rs.isMatch(h)).toBe(
-          rs.findIter(h).length > 0,
-        );
+        expect(rs.isMatch(h)).toBe(rs.findIter(h).length > 0);
       }),
       PARAMS,
     );
@@ -305,9 +274,7 @@ describe("property: oracle vs JS RegExp", () => {
 
         // Sort by start, then by pattern index
         all.sort((a, b) =>
-          a.start !== b.start
-            ? a.start - b.start
-            : a.pattern - b.pattern,
+          a.start !== b.start ? a.start - b.start : a.pattern - b.pattern,
         );
 
         // Greedily select non-overlapping
@@ -371,10 +338,7 @@ function isAscii(s: string): boolean {
 
 describe("property: JS oracle on feature patterns", () => {
   test("backtracks a shadowed greedy match before a negative lookahead", () => {
-    const patterns = [
-      String.raw`(?<=\s)\w+(?!\d)`,
-      String.raw`[a-z]+(?!\d)`,
-    ];
+    const patterns = [String.raw`(?<=\s)\w+(?!\d)`, String.raw`[a-z]+(?!\d)`];
     const haystack = "aa0";
     const set = new RegexSet(patterns, {
       unicodeBoundaries: false,
@@ -402,8 +366,7 @@ describe("property: JS oracle on feature patterns", () => {
           if (!isAscii(h)) return;
 
           // Filter: all patterns must compile in JS
-          const jsRegexps: (RegExp | null)[] =
-            pats.map(toJsRegExp);
+          const jsRegexps: (RegExp | null)[] = pats.map(toJsRegExp);
           if (jsRegexps.some((r) => r === null)) return;
 
           // RegexSet with ASCII \b (matches JS)
@@ -547,9 +510,9 @@ describe("exhaustive: options × patterns × haystacks", () => {
 
             // Non-overlapping + monotonic
             for (let i = 1; i < matches.length; i++) {
-              expect(
-                matches[i]!.start,
-              ).toBeGreaterThanOrEqual(matches[i - 1]!.end);
+              expect(matches[i]!.start).toBeGreaterThanOrEqual(
+                matches[i - 1]!.end,
+              );
             }
           } catch {
             // Compile errors for invalid patterns
@@ -573,9 +536,7 @@ describe("property: wholeWords JS oracle", () => {
           wholeWords: true,
         });
         for (const m of rs.findIter(h)) {
-          const re = new RegExp(
-            `\\b${pats[m.pattern]!}\\b`,
-          );
+          const re = new RegExp(`\\b${pats[m.pattern]!}\\b`);
           expect(re.test(m.text)).toBe(true);
         }
       }),
@@ -590,9 +551,7 @@ describe("property: ASCII/Unicode agreement on ASCII text", () => {
       fc.property(safePatterns, hay, (pats, h) => {
         if (!isAscii(h)) return;
 
-        const rsA = new RegexSet(
-          pats.map((p) => `\\b${p}\\b`),
-        );
+        const rsA = new RegexSet(pats.map((p) => `\\b${p}\\b`));
         const rsU = new RegexSet(
           pats.map((p) => `\\b${p}\\b`),
           { unicodeBoundaries: true },
@@ -816,26 +775,21 @@ describe("property: named patterns", () => {
         fc.array(
           fc.tuple(
             safePattern,
-            fc.option(
-              fc.string({ minLength: 1, maxLength: 10 }),
-              { nil: undefined },
-            ),
+            fc.option(fc.string({ minLength: 1, maxLength: 10 }), {
+              nil: undefined,
+            }),
           ),
           { minLength: 1, maxLength: 10 },
         ),
         hay,
         (entries, h) => {
           const patterns = entries.map(([pat, name]) =>
-            name !== undefined
-              ? { pattern: pat, name }
-              : pat,
+            name !== undefined ? { pattern: pat, name } : pat,
           );
           const rs = new RegexSet(patterns);
           for (const m of rs.findIter(h)) {
             const entry = entries[m.pattern]!;
-            const expectedName = Array.isArray(entry)
-              ? entry[1]
-              : undefined;
+            const expectedName = Array.isArray(entry) ? entry[1] : undefined;
             if (expectedName !== undefined) {
               expect(m.name).toBe(expectedName);
             } else {
@@ -858,66 +812,60 @@ describe("property: named patterns", () => {
 // to be meaningful on fast runners.
 
 describe("property: no catastrophic slowdown", () => {
-  perfPropertyTest(
-    "RegexSet within 20x of JS RegExp",
-    () => {
-      fc.assert(
-        fc.property(
-          fc.array(allPatterns, {
-            minLength: 1,
-            maxLength: 5,
-          }),
-          optionCombos,
-          (pats, opts) => {
-            const jsRegs: (RegExp | null)[] =
-              pats.map(toJsRegExp);
-            if (jsRegs.some((r) => r === null)) return;
+  perfPropertyTest("RegexSet within 20x of JS RegExp", () => {
+    fc.assert(
+      fc.property(
+        fc.array(allPatterns, {
+          minLength: 1,
+          maxLength: 5,
+        }),
+        optionCombos,
+        (pats, opts) => {
+          const jsRegs: (RegExp | null)[] = pats.map(toJsRegExp);
+          if (jsRegs.some((r) => r === null)) return;
 
-            let rs;
-            try {
-              rs = new RegexSet(pats, opts);
-            } catch {
-              return;
-            }
+          let rs;
+          try {
+            rs = new RegexSet(pats, opts);
+          } catch {
+            return;
+          }
 
-            const h =
-              "Ing. Jan Novák test 123 foo bar " +
-              "email@test.cz 29.5.2026 850315/0007 ";
-            const text = h.repeat(
-              Math.ceil((10 * 1024) / h.length),
-            );
+          const h =
+            "Ing. Jan Novák test 123 foo bar " +
+            "email@test.cz 29.5.2026 850315/0007 ";
+          const text = h.repeat(Math.ceil((10 * 1024) / h.length));
 
-            const t0 = performance.now();
-            rs.findIter(text);
-            const rsTime = performance.now() - t0;
+          const t0 = performance.now();
+          rs.findIter(text);
+          const rsTime = performance.now() - t0;
 
-            const t1 = performance.now();
-            for (const re of jsRegs) {
-              re!.lastIndex = 0;
-              let m;
-              while ((m = re!.exec(text)) !== null) {
-                if (m[0]!.length === 0) {
-                  re!.lastIndex++;
-                }
+          const t1 = performance.now();
+          for (const re of jsRegs) {
+            re!.lastIndex = 0;
+            let m;
+            while ((m = re!.exec(text)) !== null) {
+              if (m[0]!.length === 0) {
+                re!.lastIndex++;
               }
             }
-            const jsTime = performance.now() - t1;
+          }
+          const jsTime = performance.now() - t1;
 
-            // RS should not be catastrophically slow on
-            // this 10KB workload even when JS is faster
-            // on trivial patterns.
-            expect(rsTime).toBeLessThan(50);
+          // RS should not be catastrophically slow on
+          // this 10KB workload even when JS is faster
+          // on trivial patterns.
+          expect(rsTime).toBeLessThan(50);
 
-            // Relative comparisons are only stable once
-            // the JS baseline is comfortably above timer
-            // noise on fast macOS runners.
-            if (jsTime > 0.5) {
-              expect(rsTime / jsTime).toBeLessThan(20);
-            }
-          },
-        ),
-        { ...PARAMS, numRuns: 100 },
-      );
-    },
-  );
+          // Relative comparisons are only stable once
+          // the JS baseline is comfortably above timer
+          // noise on fast macOS runners.
+          if (jsTime > 0.5) {
+            expect(rsTime / jsTime).toBeLessThan(20);
+          }
+        },
+      ),
+      { ...PARAMS, numRuns: 100 },
+    );
+  });
 });

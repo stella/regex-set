@@ -20,7 +20,7 @@ bun run build:js    # JS/TS entrypoints
 bun test            # run tests
 bun run test:props  # property tests
 bun run lint        # oxlint
-bun run format      # oxfmt + rustfmt
+bun run format      # bun fmt + rustfmt
 cargo clippy --all-targets --all-features -- -Dwarnings
 cargo fmt -- --check
 bun run rust:hawk   # Rust visibility lints

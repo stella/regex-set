@@ -15,9 +15,9 @@ export const isWasmExports = (
   typeof value["output_pointer"] === "function" &&
   typeof value["output_length"] === "function";
 
-export const requireWasmExports = (
-  instance: { exports: Record<string, unknown> },
-): WasmExports => {
+export const requireWasmExports = (instance: {
+  exports: Record<string, unknown>;
+}): WasmExports => {
   if (!isWasmExports(instance.exports)) {
     throw new TypeError(
       "Invalid single-thread WebAssembly exports: expected memory and alloc, dispatch, output_pointer, and output_length functions",

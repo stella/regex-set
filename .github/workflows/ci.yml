@@ -9,14 +9,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    types:
-      [
-        opened,
-        synchronize,
-        reopened,
-        ready_for_review,
-        labeled,
-      ]
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
   merge_group:
     types: [checks_requested]
   workflow_dispatch:
@@ -192,6 +185,7 @@ jobs:
         with:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
+      - run: bun fmt --check
       - run: bun run check:toolchain
         if: needs.check-changes.outputs.toolchain-changed == 'true'
       - run: bun test scripts/tooling-adoption.test.ts scripts/shared-policy.test.ts

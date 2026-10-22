@@ -1,8 +1,8 @@
 import { describe, expect, mock, test } from "bun:test";
 
 import stllRegexSetWasmVite, {
-  WASM_VITE_PACKAGES,
   buildRegexSetWasmViteConfig,
+  WASM_VITE_PACKAGES,
 } from "../src/vite";
 import { injectWasmFetchGuard } from "../src/wasm-fetch-guard";
 
@@ -41,10 +41,7 @@ describe("stllRegexSetWasmVite", () => {
       }),
     ).toEqual({
       optimizeDeps: {
-        exclude: [
-          "existing-package",
-          ...WASM_VITE_PACKAGES,
-        ],
+        exclude: ["existing-package", ...WASM_VITE_PACKAGES],
       },
       ssr: {
         external: [...WASM_VITE_PACKAGES],
@@ -69,12 +66,8 @@ const __wasmFile = await __wasmResponse.arrayBuffer()
     expect(transformed).toContain(
       "const __wasmView = new Uint8Array(__wasmFile)",
     );
-    expect(transformed).toContain(
-      "__wasmView[0] !== 0x00",
-    );
-    expect(transformed).toContain(
-      "@stll/regex-set-wasm/vite",
-    );
+    expect(transformed).toContain("__wasmView[0] !== 0x00");
+    expect(transformed).toContain("@stll/regex-set-wasm/vite");
   });
 
   test("warns when napi-rs loader format changes", () => {

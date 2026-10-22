@@ -5,9 +5,9 @@ import { test } from "node:test";
 
 import {
   parseReleaseManifest,
+  readWasiPackage,
   readWasiRootEntry,
   readWasiWorkflow,
-  readWasiPackage,
 } from "./release-script-inputs.mjs";
 
 void test("release schemas accept the actual package and workflow while preserving unrelated metadata", () => {
@@ -21,10 +21,7 @@ void test("release schemas accept the actual package and workflow while preservi
   const workflow = readWasiWorkflow(
     YAML.parse(
       readFileSync(
-        new URL(
-          "../.github/workflows/release.yml",
-          import.meta.url,
-        ),
+        new URL("../.github/workflows/release.yml", import.meta.url),
         "utf8",
       ),
     ),
@@ -33,25 +30,14 @@ void test("release schemas accept the actual package and workflow while preservi
     workflow.targets
       .map(({ target }) => target)
       .toSorted((left, right) => left.localeCompare(right)),
-    targets.toSorted((left, right) =>
-      left.localeCompare(right),
-    ),
+    targets.toSorted((left, right) => left.localeCompare(right)),
   );
   assert.equal(
-    workflow.uploads.find(
-      ({ name }) => name === "Upload native binding",
-    )?.path,
+    workflow.uploads.find(({ name }) => name === "Upload native binding")?.path,
     "${{ matrix.settings.node_artifact }}",
   );
-  for (const rootEntry of [
-    null,
-    "",
-    "regex-set.wasi-browser.js",
-  ])
-    assert.equal(
-      readWasiRootEntry({ rootEntry }),
-      rootEntry,
-    );
+  for (const rootEntry of [null, "", "regex-set.wasi-browser.js"])
+    assert.equal(readWasiRootEntry({ rootEntry }), rootEntry);
 });
 
 void test("release manifests reject invalid consumed package fields", () => {
@@ -63,10 +49,7 @@ void test("release manifests reject invalid consumed package fields", () => {
     },
     license: "MIT",
   };
-  assert.deepEqual(
-    parseReleaseManifest(JSON.stringify(valid)),
-    valid,
-  );
+  assert.deepEqual(parseReleaseManifest(JSON.stringify(valid)), valid);
   for (const value of [
     null,
     [],
@@ -76,18 +59,12 @@ void test("release manifests reject invalid consumed package fields", () => {
     { ...valid, optionalDependencies: [] },
     { ...valid, optionalDependencies: { broken: null } },
   ])
-    assert.throws(
-      () => parseReleaseManifest(JSON.stringify(value)),
-      TypeError,
-    );
+    assert.throws(() => parseReleaseManifest(JSON.stringify(value)), TypeError);
 });
 
 void test("WASI metadata boundaries reject malformed containers and consumed leaves", () => {
   for (const value of [null, [], {}, { rootEntry: false }])
-    assert.throws(
-      () => readWasiRootEntry(value),
-      TypeError,
-    );
+    assert.throws(() => readWasiRootEntry(value), TypeError);
   for (const value of [
     null,
     {},
@@ -105,9 +82,7 @@ void test("WASI metadata boundaries reject malformed containers and consumed lea
     {
       strategy: {
         matrix: {
-          settings: [
-            { target: "x86_64-unknown-linux-gnu" },
-          ],
+          settings: [{ target: "x86_64-unknown-linux-gnu" }],
         },
       },
       steps: [],
@@ -117,8 +92,5 @@ void test("WASI metadata boundaries reject malformed containers and consumed lea
       steps: [null],
     },
   ])
-    assert.throws(
-      () => readWasiWorkflow({ jobs: { build } }),
-      TypeError,
-    );
+    assert.throws(() => readWasiWorkflow({ jobs: { build } }), TypeError);
 });

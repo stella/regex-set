@@ -42,9 +42,7 @@ const bench = (
   // Median of middle 60%
   const lo = Math.floor(times.length * 0.2);
   const hi = Math.ceil(times.length * 0.8);
-  const median =
-    times.slice(lo, hi).reduce((a, b) => a + b, 0) /
-    (hi - lo);
+  const median = times.slice(lo, hi).reduce((a, b) => a + b, 0) / (hi - lo);
 
   console.log(
     `  ${name.padEnd(50)}` +
@@ -90,29 +88,28 @@ console.log(
 console.log("=".repeat(70));
 console.log();
 
-const r1 =
-  bench("1. Baseline (no lookahead, pure DFA)", () =>
-    rsBaseline.findIter(textNoFallback).length);
+const r1 = bench(
+  "1. Baseline (no lookahead, pure DFA)",
+  () => rsBaseline.findIter(textNoFallback).length,
+);
 
-const r2 =
-  bench("2. With verifier, no fallback triggered", () =>
-    rsLookahead.findIter(textNoFallback).length);
+const r2 = bench(
+  "2. With verifier, no fallback triggered",
+  () => rsLookahead.findIter(textNoFallback).length,
+);
 
-const r3 =
-  bench("3. With verifier, fallback triggers (new path)", () =>
-    rsLookahead.findIter(textFallback).length);
+const r3 = bench(
+  "3. With verifier, fallback triggers (new path)",
+  () => rsLookahead.findIter(textFallback).length,
+);
 
 console.log();
 
 // Overhead calculations
 const overheadVerifier =
-  r2.ms > 0 && r1.ms > 0
-    ? ((r2.ms - r1.ms) / r1.ms) * 100
-    : 0;
+  r2.ms > 0 && r1.ms > 0 ? ((r2.ms - r1.ms) / r1.ms) * 100 : 0;
 const overheadFallback =
-  r3.ms > 0 && r2.ms > 0
-    ? ((r3.ms - r2.ms) / r2.ms) * 100
-    : 0;
+  r3.ms > 0 && r2.ms > 0 ? ((r3.ms - r2.ms) / r2.ms) * 100 : 0;
 
 console.log(
   `  Verifier overhead (no fallback):  ` +
@@ -129,20 +126,17 @@ console.log(
 console.log();
 if (r1.matches !== REPS) {
   console.error(
-    `  ERROR: baseline expected ${REPS} matches,` +
-      ` got ${r1.matches}`,
+    `  ERROR: baseline expected ${REPS} matches,` + ` got ${r1.matches}`,
   );
 }
 if (r2.matches !== REPS) {
   console.error(
-    `  ERROR: verifier expected ${REPS} matches,` +
-      ` got ${r2.matches}`,
+    `  ERROR: verifier expected ${REPS} matches,` + ` got ${r2.matches}`,
   );
 }
 if (r3.matches !== REPS) {
   console.error(
-    `  ERROR: fallback expected ${REPS} matches,` +
-      ` got ${r3.matches}`,
+    `  ERROR: fallback expected ${REPS} matches,` + ` got ${r3.matches}`,
   );
 }
 

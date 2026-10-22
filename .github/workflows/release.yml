@@ -385,8 +385,7 @@ jobs:
 
   core:
     name: Publish Rust core
-    needs:
-      [preflight, verify, test, pack, attest, core-verify]
+    needs: [preflight, verify, test, pack, attest, core-verify]
     if: >-
       github.ref == 'refs/heads/main' && (
         needs.preflight.result == 'success'

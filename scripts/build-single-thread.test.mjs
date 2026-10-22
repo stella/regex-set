@@ -11,9 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 
-const directory = mkdtempSync(
-  join(tmpdir(), "regex-set-single-thread-"),
-);
+const directory = mkdtempSync(join(tmpdir(), "regex-set-single-thread-"));
 try {
   const bin = join(directory, "bin");
   mkdirSync(bin);
@@ -35,10 +33,7 @@ try {
   const toolchain = "test-toolchain";
   const result = spawnSync(
     process.execPath,
-    [
-      new URL("./build-single-thread.mjs", import.meta.url)
-        .pathname,
-    ],
+    [new URL("./build-single-thread.mjs", import.meta.url).pathname],
     {
       cwd: directory,
       encoding: "utf8",
@@ -51,15 +46,12 @@ try {
     },
   );
   assert.equal(result.status, 0, result.stderr);
-  assert.deepEqual(
-    readFileSync(log, "utf8").trim().split("\n"),
-    [
-      "rustup show active-toolchain",
-      `rustup target list --installed --toolchain ${toolchain}`,
-      `rustup target add wasm32-unknown-unknown --toolchain ${toolchain}`,
-      "cargo build -p stella-regex-set-wasm-single-thread --target wasm32-unknown-unknown --release --locked",
-    ],
-  );
+  assert.deepEqual(readFileSync(log, "utf8").trim().split("\n"), [
+    "rustup show active-toolchain",
+    `rustup target list --installed --toolchain ${toolchain}`,
+    `rustup target add wasm32-unknown-unknown --toolchain ${toolchain}`,
+    "cargo build -p stella-regex-set-wasm-single-thread --target wasm32-unknown-unknown --release --locked",
+  ]);
 } finally {
   rmSync(directory, { recursive: true, force: true });
 }

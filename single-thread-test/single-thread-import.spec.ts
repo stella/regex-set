@@ -7,14 +7,8 @@ import { RegexSet as NativeRegexSet } from "../src/index";
 
 test("single-thread entry imports without initialization side effects", async () => {
   const fetchSpy = spyOn(globalThis, "fetch");
-  const instantiateSpy = spyOn(
-    WebAssembly,
-    "instantiate",
-  );
-  const instantiateStreamingSpy = spyOn(
-    WebAssembly,
-    "instantiateStreaming",
-  );
+  const instantiateSpy = spyOn(WebAssembly, "instantiate");
+  const instantiateStreamingSpy = spyOn(WebAssembly, "instantiateStreaming");
   const compileSpy = spyOn(WebAssembly, "compile");
   const OriginalModule = WebAssembly.Module;
   const OriginalInstance = WebAssembly.Instance;
@@ -56,9 +50,7 @@ test("single-thread entry imports without initialization side effects", async ()
     expect(entry.RegexSet).toBeFunction();
     expect(invocationCount()).toBe(0);
 
-    entry.initSync(
-      readFileSync("regex-set.single-thread.wasm"),
-    );
+    entry.initSync(readFileSync("regex-set.single-thread.wasm"));
     expect(invocationCount()).toBeGreaterThan(0);
   } finally {
     fetchSpy.mockRestore();
@@ -78,9 +70,7 @@ test("single-thread entry imports without initialization side effects", async ()
 
 test("single-thread runtime searches and preserves a leading BOM", async () => {
   const entry = await import("../src/single-thread");
-  entry.initSync(
-    readFileSync("regex-set.single-thread.wasm"),
-  );
+  entry.initSync(readFileSync("regex-set.single-thread.wasm"));
   const set = new entry.RegexSet(["x"]);
   expect(set.isMatch("x")).toBe(true);
   expect(set.replaceAll("\uFEFFx", ["y"])).toBe("\uFEFFy");
@@ -88,21 +78,15 @@ test("single-thread runtime searches and preserves a leading BOM", async () => {
 
 test("single-thread runtime recovers after a WebAssembly trap", async () => {
   const entry = await import("../src/single-thread");
-  entry.initSync(
-    readFileSync("single-thread-test/trap-after-create.wasm"),
-  );
+  entry.initSync(readFileSync("single-thread-test/trap-after-create.wasm"));
   const trapped = new entry.RegexSet(["x"]);
 
-  expect(() => trapped.isMatch("x")).toThrow(
-    WebAssembly.RuntimeError,
-  );
+  expect(() => trapped.isMatch("x")).toThrow(WebAssembly.RuntimeError);
   expect(() => trapped.whichMatch("x")).toThrow(
     "The single-thread WebAssembly instance trapped; call init() or initSync() again",
   );
 
-  entry.initSync(
-    readFileSync("regex-set.single-thread.wasm"),
-  );
+  entry.initSync(readFileSync("regex-set.single-thread.wasm"));
   const recovered = new entry.RegexSet(["x"]);
   expect(recovered.isMatch("x")).toBe(true);
 });
@@ -122,21 +106,13 @@ test.each(["\uD800", "\uDC00"])(
     };
 
     const entry = await import("../src/single-thread");
-    entry.initSync(
-      readFileSync("regex-set.single-thread.wasm"),
-    );
+    entry.initSync(readFileSync("regex-set.single-thread.wasm"));
     const singleThread = new entry.RegexSet([pattern]);
-    expect(singleThread.isMatch(haystack)).toBe(
-      expected.isMatch,
+    expect(singleThread.isMatch(haystack)).toBe(expected.isMatch);
+    expect(singleThread.findIter(haystack)).toEqual(expected.matches);
+    expect(singleThread.whichMatch(haystack)).toEqual(expected.which);
+    expect(singleThread.replaceAll(haystack, ["match"])).toBe(
+      expected.replaced,
     );
-    expect(singleThread.findIter(haystack)).toEqual(
-      expected.matches,
-    );
-    expect(singleThread.whichMatch(haystack)).toEqual(
-      expected.which,
-    );
-    expect(
-      singleThread.replaceAll(haystack, ["match"]),
-    ).toBe(expected.replaced);
   },
 );

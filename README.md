@@ -45,10 +45,7 @@ does no I/O or WebAssembly allocation; initialize it explicitly before creating
 a matcher:
 
 ```ts
-import {
-  init,
-  RegexSet,
-} from "@stll/regex-set-wasm/single-thread";
+import { init, RegexSet } from "@stll/regex-set-wasm/single-thread";
 
 await init("/assets/regex-set.single-thread.wasm");
 const matcher = new RegexSet(["foo", "bar"]);
@@ -265,9 +262,7 @@ The benchmark harness covers:
 
 ```typescript
 type PatternEntry =
-  | string
-  | RegExp
-  | { pattern: string | RegExp; name?: string };
+  string | RegExp | { pattern: string | RegExp; name?: string };
 
 type Options = {
   wholeWords?: boolean;

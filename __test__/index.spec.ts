@@ -47,52 +47,27 @@ describe("RegexSet", () => {
     const haystack = "foo 15.03.1990 BAR X123 čfoo";
     const prepared = RegexSet.prepare(patterns, options);
     const normal = new RegexSet(patterns, options);
-    const loaded = new RegexSet(
-      patterns,
-      options,
-      prepared,
-    );
+    const loaded = new RegexSet(patterns, options, prepared);
 
     expect(prepared.byteLength).toBeGreaterThan(0);
-    expect(loaded.findIter(haystack)).toEqual(
-      normal.findIter(haystack),
-    );
-    expect(loaded.whichMatch(haystack)).toEqual(
-      normal.whichMatch(haystack),
-    );
+    expect(loaded.findIter(haystack)).toEqual(normal.findIter(haystack));
+    expect(loaded.whichMatch(haystack)).toEqual(normal.whichMatch(haystack));
     expect(
-      loaded.replaceAll(haystack, [
-        "[WORD]",
-        "[DATE]",
-        "[BAR]",
-        "[CODE]",
-      ]),
+      loaded.replaceAll(haystack, ["[WORD]", "[DATE]", "[BAR]", "[CODE]"]),
     ).toBe(
-      normal.replaceAll(haystack, [
-        "[WORD]",
-        "[DATE]",
-        "[BAR]",
-        "[CODE]",
-      ]),
+      normal.replaceAll(haystack, ["[WORD]", "[DATE]", "[BAR]", "[CODE]"]),
     );
   });
 
   test("prepared artifact rejects malformed bytes", () => {
     expect(
-      () =>
-        new RegexSet(
-          ["foo"],
-          undefined,
-          new Uint8Array([1, 2, 3]),
-        ),
+      () => new RegexSet(["foo"], undefined, new Uint8Array([1, 2, 3])),
     ).toThrow();
   });
 
   test("regex patterns: dates", () => {
     const rs = new RegexSet(["\\d{2}\\.\\d{2}\\.\\d{4}"]);
-    const matches = rs.findIter(
-      "Born 15.03.1990 in Prague",
-    );
+    const matches = rs.findIter("Born 15.03.1990 in Prague");
 
     expect(matches).toHaveLength(1);
     expect(matches[0]!.text).toBe("15.03.1990");
@@ -100,9 +75,7 @@ describe("RegexSet", () => {
 
   test("regex patterns: phone numbers", () => {
     const rs = new RegexSet(["\\+?\\d{9,12}"]);
-    const matches = rs.findIter(
-      "Call +420123456789 or 123456789",
-    );
+    const matches = rs.findIter("Call +420123456789 or 123456789");
 
     expect(matches).toHaveLength(2);
     expect(matches[0]!.text).toBe("+420123456789");
@@ -111,9 +84,7 @@ describe("RegexSet", () => {
 
   test("regex patterns: IDs", () => {
     const rs = new RegexSet(["[A-Z]{2}\\d{6}"]);
-    const matches = rs.findIter(
-      "ID: CZ123456, passport AB654321",
-    );
+    const matches = rs.findIter("ID: CZ123456, passport AB654321");
 
     expect(matches).toHaveLength(2);
     expect(matches[0]!.text).toBe("CZ123456");
@@ -149,14 +120,11 @@ describe("RegexSet", () => {
   });
 
   test("replaceAll", () => {
-    const rs = new RegexSet([
-      "\\d{2}\\.\\d{2}\\.\\d{4}",
-      "\\+?\\d{9,12}",
+    const rs = new RegexSet(["\\d{2}\\.\\d{2}\\.\\d{4}", "\\+?\\d{9,12}"]);
+    const result = rs.replaceAll("Born 15.03.1990, phone +420123456789", [
+      "[DATE]",
+      "[PHONE]",
     ]);
-    const result = rs.replaceAll(
-      "Born 15.03.1990, phone +420123456789",
-      ["[DATE]", "[PHONE]"],
-    );
     expect(result).toBe("Born [DATE], phone [PHONE]");
   });
 
@@ -179,9 +147,7 @@ describe("RegexSet", () => {
   });
 
   test("invalid regex throws", () => {
-    expect(() => new RegexSet(["[invalid"])).toThrow(
-      /Failed to compile/,
-    );
+    expect(() => new RegexSet(["[invalid"])).toThrow(/Failed to compile/);
   });
 
   test("no catastrophic backtracking", () => {
@@ -201,10 +167,7 @@ describe("RegexSet", () => {
       (_, index) => `(?i:currency${index})`,
     ).join("|");
     const rs = new RegexSet([`\\b(?:${terms})\\s+\\d+`]);
-    const nativeIndexMap = Reflect.get(
-      rs,
-      "_nativeIndexMap",
-    );
+    const nativeIndexMap = Reflect.get(rs, "_nativeIndexMap");
 
     expect(rs.patternCount).toBe(1);
     expect(nativeIndexMap.length).toBeGreaterThan(1);
@@ -391,9 +354,7 @@ describe("ascii word boundary", () => {
   test("\\b + lookbehind + lookahead works", () => {
     // Both assertions prevent inline extraction,
     // forcing the fancy-regex fallback path.
-    const rs = new RegexSet([
-      String.raw`\b(?<!\d)\d{3}(?!\d)\b`,
-    ]);
+    const rs = new RegexSet([String.raw`\b(?<!\d)\d{3}(?!\d)\b`]);
     const matches = rs.findIter("abc 123 def 4567");
     expect(matches).toHaveLength(1);
     expect(matches[0]!.text).toBe("123");
@@ -457,9 +418,7 @@ describe("unicodeBoundaries", () => {
       unicodeBoundaries: true,
     });
     expect(rs.findIter("malý čáp letí")).toHaveLength(1);
-    expect(rs.findIter("malý čáp letí")[0]!.text).toBe(
-      "čáp",
-    );
+    expect(rs.findIter("malý čáp letí")[0]!.text).toBe("čáp");
     // Should not match inside another word
     expect(rs.findIter("čápek")).toHaveLength(0);
   });
@@ -611,9 +570,7 @@ describe("named patterns", () => {
   });
 
   test("named pattern with RegExp", () => {
-    const rs = new RegexSet([
-      { pattern: /\d{2}\.\d{2}\.\d{4}/, name: "date" },
-    ]);
+    const rs = new RegexSet([{ pattern: /\d{2}\.\d{2}\.\d{4}/, name: "date" }]);
     const matches = rs.findIter("Born 15.03.1990");
     expect(matches).toHaveLength(1);
     expect(matches[0]!.name).toBe("date");
@@ -649,21 +606,21 @@ describe("named patterns", () => {
   });
 
   test("invalid pattern type in NamedPattern throws", () => {
-    expect(
-      () => new RegexSet([{ pattern: 42, name: "x" }]),
-    ).toThrow(/must be a string or RegExp/);
-    expect(
-      () => new RegexSet([{ pattern: null, name: "x" }]),
-    ).toThrow(/must be a string or RegExp/);
+    expect(() => new RegexSet([{ pattern: 42, name: "x" }])).toThrow(
+      /must be a string or RegExp/,
+    );
+    expect(() => new RegexSet([{ pattern: null, name: "x" }])).toThrow(
+      /must be a string or RegExp/,
+    );
   });
 
   test("invalid name type in NamedPattern throws", () => {
-    expect(
-      () => new RegexSet([{ pattern: "a", name: 42 }]),
-    ).toThrow(/must be a string/);
-    expect(
-      () => new RegexSet([{ pattern: "a", name: ["x"] }]),
-    ).toThrow(/must be a string/);
+    expect(() => new RegexSet([{ pattern: "a", name: 42 }])).toThrow(
+      /must be a string/,
+    );
+    expect(() => new RegexSet([{ pattern: "a", name: ["x"] }])).toThrow(
+      /must be a string/,
+    );
   });
 });
 
@@ -729,10 +686,7 @@ describe("internal \\b DFA explosion", () => {
     "Lic\\.\\s*oec\\.",
     "Lic\\.\\s*phil\\.",
     "Lic\\.\\s*theol\\.",
-    ...Array.from(
-      { length: 32 },
-      (_, i) => `Extra\\.\\s*Title${i}`,
-    ),
+    ...Array.from({ length: 32 }, (_, i) => `Extra\\.\\s*Title${i}`),
   ];
   const titleAlt = TITLES.join("|");
   const bigAltPat =
@@ -745,29 +699,18 @@ describe("internal \\b DFA explosion", () => {
     "[\\dA-Z]{4}\\s?[\\dA-Z]{4}" +
     "\\s?[\\dA-Z]{4}\\s?[\\dA-Z]{4}" +
     "\\s?[\\dA-Z]{0,14}\\b";
-  const internalBPat =
-    "(?:\\bM\\.|Mrs|Ms|Mr)" + "\\.?\\s+[A-Z][a-z]+";
+  const internalBPat = "(?:\\bM\\.|Mrs|Ms|Mr)" + "\\.?\\s+[A-Z][a-z]+";
 
   test("correctness: internal \\b pattern matches", () => {
-    const rs = new RegexSet([
-      bigAltPat,
-      internalBPat,
-      ibanPat,
-    ]);
-    const matches = rs.findIter(
-      "Ing. Smith and M. Jones here",
-    );
+    const rs = new RegexSet([bigAltPat, internalBPat, ibanPat]);
+    const matches = rs.findIter("Ing. Smith and M. Jones here");
     const texts = matches.map((m) => m.text);
     expect(texts).toContain("Ing. Smith");
     expect(texts).toContain("M. Jones");
   });
 
   test("correctness: internal \\b prevents false positive", () => {
-    const rs = new RegexSet([
-      bigAltPat,
-      internalBPat,
-      ibanPat,
-    ]);
+    const rs = new RegexSet([bigAltPat, internalBPat, ibanPat]);
     // IBM. Smith should NOT match — \bM requires word
     // boundary before M, but B is a word character.
     const matches = rs.findIter("IBM. Smith here");
@@ -776,11 +719,7 @@ describe("internal \\b DFA explosion", () => {
   });
 
   test("perf: no DFA explosion with internal \\b", () => {
-    const rs = new RegexSet([
-      bigAltPat,
-      internalBPat,
-      ibanPat,
-    ]);
+    const rs = new RegexSet([bigAltPat, internalBPat, ibanPat]);
 
     // Warm up
     rs.findIter("test");
@@ -862,10 +801,8 @@ describe("greedy quantifier + lookahead across newline", () => {
 
   test("full legal form pattern with \\s* across newline", () => {
     // Simulate the actual legal form detection pattern
-    const UPPER =
-      "A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽÄÖÜÀÂÆÇÈÊËÎÏÔÙÛŸÑ\\u0130";
-    const LOWER =
-      "a-záčďéěíňóřšťúůýžäöüßàâæçèêëîïôùûÿñ\\u0131";
+    const UPPER = "A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽÄÖÜÀÂÆÇÈÊËÎÏÔÙÛŸÑ\\u0130";
+    const LOWER = "a-záčďéěíňóřšťúůýžäöüßàâæçèêëîïôùûÿñ\\u0131";
     const CAP = `(?:[${UPPER}]{2,}|[${UPPER}][${LOWER}${UPPER}]+)`;
     const ANY = `(?:[${UPPER}${LOWER}][${LOWER}${UPPER}]+|[${UPPER}]{2,3})`;
     const CONN = `(?:[\\s&,.-]{1,4}|\\s+(?:a|and|und|et|e|y|i)\\s+)`;
@@ -875,18 +812,10 @@ describe("greedy quantifier + lookahead across newline", () => {
 
     const rs = new RegexSet([pat]);
 
-    expect(
-      rs.isMatch("VINCI Construction CS a.s.\nsídlo"),
-    ).toBe(true);
-    expect(
-      rs.isMatch("VINCI Construction CS a.s.\nse sídlem"),
-    ).toBe(true);
-    expect(rs.isMatch("VINCI Construction CS a.s.\n")).toBe(
-      true,
-    );
-    expect(rs.isMatch("VINCI Construction CS a.s.")).toBe(
-      true,
-    );
+    expect(rs.isMatch("VINCI Construction CS a.s.\nsídlo")).toBe(true);
+    expect(rs.isMatch("VINCI Construction CS a.s.\nse sídlem")).toBe(true);
+    expect(rs.isMatch("VINCI Construction CS a.s.\n")).toBe(true);
+    expect(rs.isMatch("VINCI Construction CS a.s.")).toBe(true);
   });
 });
 
@@ -899,10 +828,8 @@ describe("greedy quantifier + lookahead across newline", () => {
 
 describe("wide trailing lookahead class", () => {
   test("Unicode suffix boundary finds later legal-form matches", () => {
-    const lower =
-      "a-záčďéěíňóřšťúůýžäöüßàâæçèêëîïôùûÿñąćęłńśźż\\u0131";
-    const upper =
-      "A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽÄÖÜÀÂÆÇÈÊËÎÏÔÙÛŸÑĄĆĘŁŃŚŹŻ\\u0130";
+    const lower = "a-záčďéěíňóřšťúůýžäöüßàâæçèêëîïôùûÿñąćęłńśźż\\u0131";
+    const upper = "A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽÄÖÜÀÂÆÇÈÊËÎÏÔÙÛŸÑĄĆĘŁŃŚŹŻ\\u0130";
     const hspace = String.raw`[^\S\n]`;
     const simpleSep = `(?:${hspace}|[&,.-]){1,4}`;
     const capWord = `[${upper}][${lower}${upper}]+`;
@@ -917,27 +844,19 @@ describe("wide trailing lookahead class", () => {
       '(this "Agreement"), is made by and among Twitter, Inc., ' +
       'a Delaware corporation (the "Company"), X Holdings I, Inc.';
 
-    const wide = new RegexSet([wideBoundary])
-      .findIter(text)
-      .map((m) => m.text);
+    const wide = new RegexSet([wideBoundary]).findIter(text).map((m) => m.text);
     const ascii = new RegexSet([asciiBoundary])
       .findIter(text)
       .map((m) => m.text);
 
     expect(wide).toEqual(ascii);
-    expect(wide).toEqual([
-      "Twitter, Inc.",
-      "X Holdings I, Inc.",
-    ]);
+    expect(wide).toEqual(["Twitter, Inc.", "X Holdings I, Inc."]);
   });
 });
 
 describe("large JS-compatible lookaround fallback", () => {
   test("routes large lookaround alternations without losing pattern indices", () => {
-    const suffixes = Array.from(
-      { length: 140 },
-      (_, i) => `ZZ${i}`,
-    );
+    const suffixes = Array.from({ length: 140 }, (_, i) => `ZZ${i}`);
     suffixes[73] = String.raw`Inc\.`;
     const pattern =
       String.raw`[A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+){0,4}` +
@@ -946,23 +865,16 @@ describe("large JS-compatible lookaround fallback", () => {
       String.raw`)(?![A-Za-z0-9])`;
 
     const rs = new RegexSet([String.raw`\d+`, pattern]);
-    const matches = rs.findIter(
-      '42 (this "Agreement"), among Twitter, Inc.',
-    );
+    const matches = rs.findIter('42 (this "Agreement"), among Twitter, Inc.');
 
-    expect(matches.map((m) => [m.pattern, m.text])).toEqual(
-      [
-        [0, "42"],
-        [1, "Twitter, Inc."],
-      ],
-    );
+    expect(matches.map((m) => [m.pattern, m.text])).toEqual([
+      [0, "42"],
+      [1, "Twitter, Inc."],
+    ]);
   });
 
   test("preserves wholeWords for JS-routed patterns", () => {
-    const suffixes = Array.from(
-      { length: 140 },
-      (_, i) => `ZZ${i}`,
-    );
+    const suffixes = Array.from({ length: 140 }, (_, i) => `ZZ${i}`);
     suffixes[73] = "Inc";
     const pattern =
       String.raw`Twitter(?:` +
@@ -976,52 +888,36 @@ describe("large JS-compatible lookaround fallback", () => {
     expect(rs.isMatch("čTwitterInc ")).toBe(false);
     expect(rs.findIter("xTwitterInc ")).toEqual([]);
     expect(rs.whichMatch("xTwitterInc ")).toEqual([]);
-    expect(
-      rs.replaceAll("xTwitterInc TwitterInc ", ["ORG"]),
-    ).toBe("xTwitterInc ORG ");
+    expect(rs.replaceAll("xTwitterInc TwitterInc ", ["ORG"])).toBe(
+      "xTwitterInc ORG ",
+    );
 
     const asciiBoundaries = new RegexSet([pattern], {
       wholeWords: true,
       unicodeBoundaries: false,
     });
-    expect(
-      asciiBoundaries.findIter("čTwitterInc "),
-    ).toHaveLength(1);
+    expect(asciiBoundaries.findIter("čTwitterInc ")).toHaveLength(1);
   });
 
   test("retries rejected wholeWords matches from the next start", () => {
-    const suffixes = Array.from(
-      { length: 140 },
-      (_, i) => `ZZ${i}`,
-    );
+    const suffixes = Array.from({ length: 140 }, (_, i) => `ZZ${i}`);
     suffixes[73] = "bar";
     const pattern =
-      String.raw`(?:foo-(?:` +
-      suffixes.join("|") +
-      String.raw`)|bar)(?=\s)`;
+      String.raw`(?:foo-(?:` + suffixes.join("|") + String.raw`)|bar)(?=\s)`;
     const rs = new RegexSet([pattern], {
       wholeWords: true,
     });
 
     expect(rs.isMatch("xfoo-bar ")).toBe(true);
-    expect(
-      rs.findIter("xfoo-bar ").map((m) => m.text),
-    ).toEqual(["bar"]);
-    expect(rs.replaceAll("xfoo-bar ", ["ORG"])).toBe(
-      "xfoo-ORG ",
-    );
+    expect(rs.findIter("xfoo-bar ").map((m) => m.text)).toEqual(["bar"]);
+    expect(rs.replaceAll("xfoo-bar ", ["ORG"])).toBe("xfoo-ORG ");
   });
 
   test("does not route Rust-only class set syntax through JS", () => {
-    const suffixes = Array.from(
-      { length: 140 },
-      (_, i) => `ZZ${i}`,
-    );
+    const suffixes = Array.from({ length: 140 }, (_, i) => `ZZ${i}`);
     suffixes[73] = "X";
     const pattern =
-      String.raw`[a&&b](?=X)(?:` +
-      suffixes.join("|") +
-      String.raw`)`;
+      String.raw`[a&&b](?=X)(?:` + suffixes.join("|") + String.raw`)`;
     const rs = new RegexSet([pattern]);
 
     expect(new RegExp(pattern, "gu").test("aX")).toBe(true);
@@ -1031,10 +927,7 @@ describe("large JS-compatible lookaround fallback", () => {
   });
 
   test("preserves explicit Unicode word boundaries", () => {
-    const suffixes = Array.from(
-      { length: 140 },
-      (_, i) => `ZZ${i}`,
-    );
+    const suffixes = Array.from({ length: 140 }, (_, i) => `ZZ${i}`);
     suffixes[73] = "Inc";
     const pattern =
       String.raw`\bTwitter(?:` +
@@ -1044,76 +937,48 @@ describe("large JS-compatible lookaround fallback", () => {
       unicodeBoundaries: true,
     });
 
-    expect(
-      new RegExp(pattern, "gu").test("čTwitterInc "),
-    ).toBe(true);
+    expect(new RegExp(pattern, "gu").test("čTwitterInc ")).toBe(true);
     expect(rs.findIter("čTwitterInc ")).toEqual([]);
-    expect(
-      rs.findIter(" TwitterInc ").map((m) => m.text),
-    ).toEqual(["TwitterInc"]);
+    expect(rs.findIter(" TwitterInc ").map((m) => m.text)).toEqual([
+      "TwitterInc",
+    ]);
   });
 
   test("preserves Rust Unicode shorthand classes", () => {
-    const suffixes = Array.from(
-      { length: 140 },
-      (_, i) => `ZZ${i}`,
-    );
+    const suffixes = Array.from({ length: 140 }, (_, i) => `ZZ${i}`);
     suffixes[73] = "X";
-    const pattern =
-      String.raw`\d(?=X)(?:` +
-      suffixes.join("|") +
-      String.raw`)`;
+    const pattern = String.raw`\d(?=X)(?:` + suffixes.join("|") + String.raw`)`;
     const rs = new RegexSet([pattern]);
 
-    expect(new RegExp(pattern, "gu").test("٣X")).toBe(
-      false,
-    );
-    expect(rs.findIter("٣X").map((m) => m.text)).toEqual([
-      "٣X",
-    ]);
+    expect(new RegExp(pattern, "gu").test("٣X")).toBe(false);
+    expect(rs.findIter("٣X").map((m) => m.text)).toEqual(["٣X"]);
   });
 
   test("merges JS fallback matches before native pruning", () => {
-    const suffixes = Array.from(
-      { length: 140 },
-      (_, i) => `ZZ${i}`,
-    );
+    const suffixes = Array.from({ length: 140 }, (_, i) => `ZZ${i}`);
     suffixes[73] = "b";
     const jsPattern =
-      String.raw`a(?:` +
-      suffixes.join("|") +
-      String.raw`)(?=c)`;
+      String.raw`a(?:` + suffixes.join("|") + String.raw`)(?=c)`;
     const rs = new RegexSet([jsPattern, "bc", "cd"]);
 
-    expect(
-      rs.findIter("abcd").map((m) => [m.pattern, m.text]),
-    ).toEqual([
+    expect(rs.findIter("abcd").map((m) => [m.pattern, m.text])).toEqual([
       [0, "ab"],
       [2, "cd"],
     ]);
-    expect(rs.replaceAll("abcd", ["AB", "BC", "CD"])).toBe(
-      "ABCD",
-    );
+    expect(rs.replaceAll("abcd", ["AB", "BC", "CD"])).toBe("ABCD");
   });
 
   test("preserves pattern order for equal-span fallback ties", () => {
-    const suffixes = Array.from(
-      { length: 140 },
-      (_, i) => `ZZ${i}`,
-    );
+    const suffixes = Array.from({ length: 140 }, (_, i) => `ZZ${i}`);
     suffixes[73] = "b";
     const jsPattern =
-      String.raw`a(?:` +
-      suffixes.join("|") +
-      String.raw`)(?=c)`;
+      String.raw`a(?:` + suffixes.join("|") + String.raw`)(?=c)`;
     const rs = new RegexSet([jsPattern, "ab"]);
 
-    expect(
-      rs.findIter("abc").map((m) => [m.pattern, m.text]),
-    ).toEqual([[0, "ab"]]);
-    expect(rs.replaceAll("abc", ["JS", "NATIVE"])).toBe(
-      "JSc",
-    );
+    expect(rs.findIter("abc").map((m) => [m.pattern, m.text])).toEqual([
+      [0, "ab"],
+    ]);
+    expect(rs.replaceAll("abc", ["JS", "NATIVE"])).toBe("JSc");
   });
 });
 
@@ -1185,8 +1050,6 @@ describe("Match type compatibility", () => {
     expect(typeof m.start).toBe("number");
     expect(typeof m.end).toBe("number");
     expect(typeof m.text).toBe("string");
-    expect(m.text).toBe(
-      "abc 123 def".slice(m.start, m.end),
-    );
+    expect(m.text).toBe("abc 123 def".slice(m.start, m.end));
   });
 });

@@ -3995,7 +3995,7 @@
             "location": "wasi-worker-browser.mjs#7"
           },
           {
-            "location": "wasi-worker.mjs#26"
+            "location": "wasi-worker.mjs#21"
           }
         ]
       },

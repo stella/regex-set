@@ -4,10 +4,7 @@
 const __napiBindingTarget = "wasm32-wasi";
 function __napiStampBindingTarget(exportsObject, target) {
   if (
-    Object.prototype.hasOwnProperty.call(
-      exportsObject,
-      "__napiBindingTarget",
-    )
+    Object.prototype.hasOwnProperty.call(exportsObject, "__napiBindingTarget")
   ) {
     if (exportsObject.__napiBindingTarget === target) {
       // Already ours: the root entry aliases the object it loaded, so a WASI
@@ -36,16 +33,12 @@ function __napiStampBindingTarget(exportsObject, target) {
     // chain, so an inherited accessor could swallow the value or throw and
     // fail an otherwise successful load. The descriptor is what a successful
     // assignment would have produced.
-    Object.defineProperty(
-      exportsObject,
-      "__napiBindingTarget",
-      {
-        configurable: true,
-        enumerable: true,
-        value: target,
-        writable: true,
-      },
-    );
+    Object.defineProperty(exportsObject, "__napiBindingTarget", {
+      configurable: true,
+      enumerable: true,
+      value: target,
+      writable: true,
+    });
   } catch {
     // Same rule as the non-extensible skip above: reporting the artifact is
     // metadata, never a reason to fail an otherwise successful load. An exotic
@@ -67,20 +60,13 @@ const {
   emnapiAsyncWorkPlugin: __emnapiAsyncWorkPlugin,
   emnapiTSFNPlugin: __emnapiTSFNPlugin,
   createOnMessage: __wasmCreateOnMessageForFsProxy,
-  instantiateNapiModuleSync:
-    __emnapiInstantiateNapiModuleSync,
+  instantiateNapiModuleSync: __emnapiInstantiateNapiModuleSync,
 } = require("@napi-rs/wasm-runtime");
-const {
-  createContext: __emnapiCreateContext,
-} = require("@emnapi/runtime");
+const { createContext: __emnapiCreateContext } = require("@emnapi/runtime");
 
 function __getWasiWorkerExecArgv() {
   const __workerExecArgv = [];
-  for (
-    let __index = 0;
-    __index < process.execArgv.length;
-    __index += 1
-  ) {
+  for (let __index = 0; __index < process.execArgv.length; __index += 1) {
     const __arg = process.execArgv[__index];
     if (
       __arg === "--input-type" ||
@@ -104,15 +90,10 @@ function __getWasiWorkerExecArgv() {
   return __workerExecArgv;
 }
 
-function __isInvalidWasiWorkerExecArgv(
-  errorMessage,
-  argument,
-) {
+function __isInvalidWasiWorkerExecArgv(errorMessage, argument) {
   const __equalsIndex = argument.indexOf("=");
   const __argumentName =
-    __equalsIndex === -1
-      ? argument
-      : argument.slice(0, __equalsIndex);
+    __equalsIndex === -1 ? argument : argument.slice(0, __equalsIndex);
   return (
     errorMessage.includes(": " + __argumentName + ",") ||
     errorMessage.includes(": " + __argumentName + "=") ||
@@ -123,20 +104,13 @@ function __isInvalidWasiWorkerExecArgv(
   );
 }
 
-function __removeInvalidWasiWorkerExecArgv(
-  execArgv,
-  error,
-) {
+function __removeInvalidWasiWorkerExecArgv(execArgv, error) {
   if (typeof error.message !== "string") {
     return;
   }
   const __workerExecArgv = [];
   let __removed = false;
-  for (
-    let __index = 0;
-    __index < execArgv.length;
-    __index += 1
-  ) {
+  for (let __index = 0; __index < execArgv.length; __index += 1) {
     const __arg = execArgv[__index];
     if (
       __arg.startsWith("-") &&
@@ -173,17 +147,13 @@ function __createWasiWorker(filename) {
         },
       });
     } catch (error) {
-      if (
-        !error ||
-        error.code !== "ERR_WORKER_INVALID_EXEC_ARGV"
-      ) {
+      if (!error || error.code !== "ERR_WORKER_INVALID_EXEC_ARGV") {
         throw error;
       }
-      const __nextWorkerExecArgv =
-        __removeInvalidWasiWorkerExecArgv(
-          __workerExecArgv,
-          error,
-        );
+      const __nextWorkerExecArgv = __removeInvalidWasiWorkerExecArgv(
+        __workerExecArgv,
+        error,
+      );
       if (!__nextWorkerExecArgv) {
         throw error;
       }
@@ -196,9 +166,7 @@ function __createWasiWorker(filename) {
 // its wasm thread died. Shared memory, so this thread reads it synchronously even
 // while the worker's 'error' event is still queued behind the code that is
 // exiting right now.
-const __wasiThreadCrashFlag = new Int32Array(
-  new SharedArrayBuffer(4),
-);
+const __wasiThreadCrashFlag = new Int32Array(new SharedArrayBuffer(4));
 // Written by the first pool worker whose wasm thread dies, before it raises the
 // flag: its error and `threadId` (layout in wasi-worker.mjs). Read without
 // waiting for any event, see `__readWasiThreadCrashReport`.
@@ -222,25 +190,16 @@ let __wasiAddonCrashFlag;
 
 function __captureWasiAddonCrashFlag(instance) {
   try {
-    const getAddress =
-      instance.exports.napi_wasm_thread_crash_flag_address;
+    const getAddress = instance.exports.napi_wasm_thread_crash_flag_address;
     if (typeof getAddress !== "function") {
       return;
     }
     const address = getAddress() >>> 0;
     const buffer = __sharedMemory.buffer;
-    if (
-      address === 0 ||
-      address % 4 !== 0 ||
-      address + 4 > buffer.byteLength
-    ) {
+    if (address === 0 || address % 4 !== 0 || address + 4 > buffer.byteLength) {
       return;
     }
-    __wasiAddonCrashFlag = new Int32Array(
-      buffer,
-      address,
-      1,
-    );
+    __wasiAddonCrashFlag = new Int32Array(buffer, address, 1);
   } catch {}
 }
 
@@ -256,10 +215,7 @@ function __captureWasiAddonCrashFlag(instance) {
  * emnapi's crash check nor a signal can interrupt.
  */
 function __hasWasiThreadCrashed() {
-  if (
-    __wasiThreadCrashed ||
-    Atomics.load(__wasiThreadCrashFlag, 0) !== 0
-  ) {
+  if (__wasiThreadCrashed || Atomics.load(__wasiThreadCrashFlag, 0) !== 0) {
     return true;
   }
   const manager = __getWasiThreadManager();
@@ -301,10 +257,7 @@ function __wasiSetImmediate(callback) {
  * from the loader's own 'error' listener, which runs before emnapi's.
  */
 function __recordWasiThreadCrashError(error, workerId) {
-  if (
-    __wasiThreadCrashWorkerError !== undefined ||
-    error === undefined
-  ) {
+  if (__wasiThreadCrashWorkerError !== undefined || error === undefined) {
     return;
   }
   __wasiThreadCrashWorkerError = error;
@@ -322,11 +275,7 @@ function __readWasiThreadCrashReport() {
     return __wasiThreadCrashReportRead;
   }
   try {
-    const header = new Int32Array(
-      __wasiThreadCrashReport,
-      0,
-      3,
-    );
+    const header = new Int32Array(__wasiThreadCrashReport, 0, 3);
     if (Atomics.load(header, 0) !== 2) {
       return;
     }
@@ -335,14 +284,8 @@ function __readWasiThreadCrashReport() {
     let error;
     if (length > 0) {
       // Copied out of shared memory: TextDecoder does not take a shared view.
-      const bytes = new Uint8Array(
-        __wasiThreadCrashReport,
-        12,
-        length,
-      ).slice();
-      const report = JSON.parse(
-        new TextDecoder().decode(bytes),
-      );
+      const bytes = new Uint8Array(__wasiThreadCrashReport, 12, length).slice();
+      const report = JSON.parse(new TextDecoder().decode(bytes));
       error = new Error(String(report.message));
       if (typeof report.name === "string") {
         error.name = report.name;
@@ -407,10 +350,7 @@ function __fillWasiThreadCrashError() {
       let workerId = __wasiThreadCrashWorkerId;
       if (workerId === undefined) {
         const report = __readWasiThreadCrashReport();
-        workerId =
-          report && report.threadId > 0
-            ? report.threadId
-            : undefined;
+        workerId = report && report.threadId > 0 ? report.threadId : undefined;
       }
       if (workerId !== undefined) {
         crashError.workerThreadId = workerId;
@@ -437,13 +377,9 @@ function __fillWasiThreadCrashError() {
  */
 function __releaseEmnapiWaitingRequestHandle() {
   try {
-    const refCounter =
-      __emnapiContext && __emnapiContext.refCounter;
+    const refCounter = __emnapiContext && __emnapiContext.refCounter;
     const refHandle = refCounter && refCounter.refHandle;
-    if (
-      refHandle &&
-      typeof refHandle.unref === "function"
-    ) {
+    if (refHandle && typeof refHandle.unref === "function") {
       refHandle.unref();
     }
   } catch {}
@@ -477,17 +413,14 @@ function __disposeWasiBindingAfterThreadCrash() {
   }
   // Built at settlement, after the workers stopped: by then the 'error' event
   // has usually delivered the worker's error.
-  __wasiThreadCrashDisposePromise = Promise.resolve(
-    workerResult,
-  ).then(
+  __wasiThreadCrashDisposePromise = Promise.resolve(workerResult).then(
     () => {
       throw __getWasiThreadCrashError();
     },
     (terminateError) => {
-      throw __attachCleanupErrors(
-        __getWasiThreadCrashError(),
-        [terminateError],
-      );
+      throw __attachCleanupErrors(__getWasiThreadCrashError(), [
+        terminateError,
+      ]);
     },
   );
   return __wasiThreadCrashDisposePromise;
@@ -532,17 +465,11 @@ function __abortWasiDisposalIfThreadCrashed() {
  * joined it and every later one hold the same promise. Returns false when no
  * thread died, leaving the ordinary failure handling alone.
  */
-function __settleWasiDisposalAfterThreadCrash(
-  resolve,
-  reject,
-) {
+function __settleWasiDisposalAfterThreadCrash(resolve, reject) {
   if (!__hasWasiThreadCrashed()) {
     return false;
   }
-  __disposeWasiBindingAfterThreadCrash().then(
-    resolve,
-    reject,
-  );
+  __disposeWasiBindingAfterThreadCrash().then(resolve, reject);
   return true;
 }
 
@@ -558,9 +485,7 @@ function __settleWasiDisposalAfterThreadCrash(
 function __rollbackWasiInitializationAfterThreadCrash() {
   const crashError = __getWasiThreadCrashError();
   // Its rejection is `crashError` itself, which the caller reports.
-  void __disposeWasiBindingAfterThreadCrash().catch(
-    () => {},
-  );
+  void __disposeWasiBindingAfterThreadCrash().catch(() => {});
   return [crashError];
 }
 
@@ -625,16 +550,10 @@ function __untrackWasiWorkerOnExit(worker) {
  */
 function __reconcileWasiThreadPool() {
   try {
-    if (
-      __wasiDisposed ||
-      __wasiDisposePromise ||
-      __hasWasiThreadCrashed()
-    ) {
+    if (__wasiDisposed || __wasiDisposePromise || __hasWasiThreadCrashed()) {
       return;
     }
-    const read =
-      __napiInstance?.exports
-        ?.napi_wasm_runtime_pool_workers;
+    const read = __napiInstance?.exports?.napi_wasm_runtime_pool_workers;
     if (typeof read !== "function") {
       return;
     }
@@ -655,10 +574,7 @@ function __reconcileWasiThreadPool() {
       excess > 0;
       excess--
     ) {
-      const worker =
-        manager.unusedWorkers[
-          manager.unusedWorkers.length - 1
-        ];
+      const worker = manager.unusedWorkers[manager.unusedWorkers.length - 1];
       manager.terminateWorker(worker);
       __removeWasiPoolWorker(manager, worker);
       __untrackWasiWorkerOnExit(worker);
@@ -683,9 +599,7 @@ function __reconcileWasiThreadPool() {
         worker = manager.allocateUnusedWorker();
         manager
           .loadWasmModuleToWorker(worker)
-          .then(undefined, () =>
-            __removeWasiPoolWorker(manager, worker),
-          );
+          .then(undefined, () => __removeWasiPoolWorker(manager, worker));
       } catch {
         if (worker !== undefined) {
           __removeWasiPoolWorker(manager, worker);
@@ -701,22 +615,17 @@ function __reconcileWasiThreadPool() {
 }
 
 function __publishWasiThreadPoolReconcile(exports) {
-  Object.defineProperty(
-    exports,
-    __wasiThreadPoolReconcileSymbol,
-    {
-      configurable: false,
-      enumerable: false,
-      value: __reconcileWasiThreadPool,
-      writable: false,
-    },
-  );
+  Object.defineProperty(exports, __wasiThreadPoolReconcileSymbol, {
+    configurable: false,
+    enumerable: false,
+    value: __reconcileWasiThreadPool,
+    writable: false,
+  });
 }
 
 const __cwd = process.cwd();
 const __rootDir = __nodePath.parse(__cwd).root;
-const __hostRoot =
-  process.platform === "android" ? __cwd : __rootDir;
+const __hostRoot = process.platform === "android" ? __cwd : __rootDir;
 
 const __wasi = new __nodeWASI({
   version: "preview1",
@@ -733,10 +642,7 @@ const __sharedMemory = new WebAssembly.Memory({
   shared: true,
 });
 
-let __wasmFilePath = __nodePath.join(
-  __dirname,
-  "regex-set.wasm32-wasi.wasm",
-);
+let __wasmFilePath = __nodePath.join(__dirname, "regex-set.wasm32-wasi.wasm");
 const __wasmDebugFilePath = __nodePath.join(
   __dirname,
   "regex-set.wasm32-wasi.debug.wasm",
@@ -745,8 +651,7 @@ const __wasmDebugFilePath = __nodePath.join(
 if (__nodeFs.existsSync(__wasmDebugFilePath)) {
   __wasmFilePath = __wasmDebugFilePath;
 } else if (!__nodeFs.existsSync(__wasmFilePath)) {
-  const __wasiPackageEntry =
-    require.resolve("@stll/regex-set-wasm32-wasi");
+  const __wasiPackageEntry = require.resolve("@stll/regex-set-wasm32-wasi");
   const __packagedWasmFilePath = __nodePath.join(
     __nodePath.dirname(__wasiPackageEntry),
     "regex-set.wasm32-wasi.wasm",
@@ -762,9 +667,7 @@ if (__nodeFs.existsSync(__wasmDebugFilePath)) {
 const __wasmFile = __nodeFs.readFileSync(__wasmFilePath);
 let __emnapiContext;
 
-const __wasiDisposeSymbol = Symbol.for(
-  "napi.rs.wasi.dispose",
-);
+const __wasiDisposeSymbol = Symbol.for("napi.rs.wasi.dispose");
 const __wasiWorkers = new Set();
 // The thread manager has to be reachable *before* anything that can throw
 // during load or registration. Initialization can fail after the pool has
@@ -790,10 +693,7 @@ function __getWasiThreadManager() {
       : __napiModule
         ? __napiModule.PThread
         : undefined;
-  if (
-    manager &&
-    typeof manager.terminateWorker === "function"
-  ) {
+  if (manager && typeof manager.terminateWorker === "function") {
     return manager;
   }
   return undefined;
@@ -832,8 +732,7 @@ let __retainWasiRollbackForRetry = function () {};
 function __isThenable(value) {
   return (
     value !== null &&
-    (typeof value === "object" ||
-      typeof value === "function") &&
+    (typeof value === "object" || typeof value === "function") &&
     typeof value.then === "function"
   );
 }
@@ -860,11 +759,7 @@ function __attachCleanupErrors(error, cleanupErrors) {
     "WASI binding cleanup failed",
   );
   try {
-    if (
-      error &&
-      (typeof error === "object" ||
-        typeof error === "function")
-    ) {
+    if (error && (typeof error === "object" || typeof error === "function")) {
       if (error.cause === undefined) {
         error.cause = cleanupError;
         if (error.cause === cleanupError) {
@@ -953,8 +848,7 @@ function __prepareWasmEnvCleanup() {
   if (__emnapiWasmEnvCleanupPreparing) {
     return;
   }
-  const prepare =
-    __napiInstance?.exports?.napi_prepare_wasm_env_cleanup;
+  const prepare = __napiInstance?.exports?.napi_prepare_wasm_env_cleanup;
   if (typeof prepare === "function") {
     // The addon settles the promises it cancels synchronously, under a
     // non-reentrant lifecycle mutex: anything a promise hook calls from in
@@ -988,14 +882,10 @@ function __prepareWasmEnvCleanup() {
  * is already unreachable by then.
  */
 function __reportUnreachedWasmEnvSettlements() {
-  if (
-    __emnapiWasmEnvCleanupYielding ||
-    __emnapiWasmEnvSettlementLossReported
-  ) {
+  if (__emnapiWasmEnvCleanupYielding || __emnapiWasmEnvSettlementLossReported) {
     return;
   }
-  const pending =
-    __napiInstance?.exports?.napi_wasm_env_cleanup_pending;
+  const pending = __napiInstance?.exports?.napi_wasm_env_cleanup_pending;
   if (typeof pending !== "function") {
     return;
   }
@@ -1011,10 +901,7 @@ function __reportUnreachedWasmEnvSettlements() {
   __emnapiWasmEnvSettlementLossReported = true;
   try {
     const consoleHost = globalThis.console;
-    if (
-      consoleHost &&
-      typeof consoleHost.error === "function"
-    ) {
+    if (consoleHost && typeof consoleHost.error === "function") {
       consoleHost.error(
         "napi-rs: the wasm environment is being destroyed with " +
           queued +
@@ -1168,16 +1055,14 @@ function __armWasmRuntimePollStallBackup(pace) {
   }
   // Read before arming, so this never claims to be due earlier than the timer
   // actually is: a backup ends a turn only when it is provably due after it.
-  const dueAt =
-    Date.now() + __WASM_RUNTIME_WORK_POLL_BACKUP_MS;
+  const dueAt = Date.now() + __WASM_RUNTIME_WORK_POLL_BACKUP_MS;
   let handle;
   try {
     handle = setTimer(() => {
       const settleTurn = pace.settleTurn;
       if (
         !settleTurn ||
-        pace.turnTimerDueAt >
-          dueAt - __WASM_RUNTIME_WORK_POLL_STALL_MS
+        pace.turnTimerDueAt > dueAt - __WASM_RUNTIME_WORK_POLL_STALL_MS
       ) {
         // No turn is parked, or the parked one's timer came due too close to
         // this backup to call it dropped — it may still arrive, and the turn
@@ -1243,12 +1128,8 @@ function __yieldWasmRuntimePollTurn(pace) {
     }, __WASM_RUNTIME_WORK_POLL_INTERVAL_MS);
     // Read next to the arming it describes; see
     // `__armWasmRuntimePollStallBackup` for what the two due times mean.
-    const turnTimerDueAt =
-      Date.now() + __WASM_RUNTIME_WORK_POLL_INTERVAL_MS;
-    if (
-      pace.arrivals <
-      __WASM_RUNTIME_WORK_POLL_TRUSTED_ARRIVALS
-    ) {
+    const turnTimerDueAt = Date.now() + __WASM_RUNTIME_WORK_POLL_INTERVAL_MS;
+    if (pace.arrivals < __WASM_RUNTIME_WORK_POLL_TRUSTED_ARRIVALS) {
       __scheduleMacrotask(settle);
       return;
     }
@@ -1290,21 +1171,13 @@ function __yieldWasmRuntimePollTurn(pace) {
  * an idle disposal synchronous.
  */
 function __prepareWasmEnvCleanupWithTurns() {
-  if (
-    __emnapiWasmEnvCleanupPrepared ||
-    __emnapiWasmEnvCleanupPreparing
-  ) {
+  if (__emnapiWasmEnvCleanupPrepared || __emnapiWasmEnvCleanupPreparing) {
     return;
   }
   const exports = __napiInstance?.exports;
-  const begin =
-    exports?.napi_prepare_wasm_env_cleanup_begin;
-  const finish =
-    exports?.napi_prepare_wasm_env_cleanup_finish;
-  if (
-    typeof begin !== "function" ||
-    typeof finish !== "function"
-  ) {
+  const begin = exports?.napi_prepare_wasm_env_cleanup_begin;
+  const finish = exports?.napi_prepare_wasm_env_cleanup_finish;
+  if (typeof begin !== "function" || typeof finish !== "function") {
     // No split to use. The settlement drain still follows this, so the queue
     // the single call leaves behind is expected rather than lost.
     __emnapiWasmEnvCleanupYielding = true;
@@ -1315,8 +1188,7 @@ function __prepareWasmEnvCleanupWithTurns() {
     }
     return;
   }
-  const workPending =
-    exports?.napi_wasm_runtime_work_pending;
+  const workPending = exports?.napi_wasm_runtime_work_pending;
   // The in-flight flag stays raised across the turns below, so a `destroy()`
   // from one of the JavaScript handlers they run is the same no-op it is inside
   // the single call: the barrier is up and the runtime is mid-teardown, and
@@ -1381,10 +1253,7 @@ function __prepareWasmEnvCleanupWithTurns() {
         return;
       }
     }
-  })().then(
-    finishCleanupUnlessCrashed,
-    finishCleanupUnlessCrashed,
-  );
+  })().then(finishCleanupUnlessCrashed, finishCleanupUnlessCrashed);
 }
 
 // Turns to wait for while the addon still reports queued settlements. Reaching
@@ -1427,17 +1296,13 @@ const __WASM_ENV_CLEANUP_BLIND_DRAIN_TURNS = 4;
  * flag unset and disposal retryable.
  */
 function __drainWasmEnvCleanup() {
-  if (
-    __emnapiWasmEnvCleanupDrained ||
-    !__emnapiWasmEnvCleanupRan
-  ) {
+  if (__emnapiWasmEnvCleanupDrained || !__emnapiWasmEnvCleanupRan) {
     return;
   }
   if (__emnapiWasmEnvCleanupDrainPromise) {
     return __emnapiWasmEnvCleanupDrainPromise;
   }
-  const pending =
-    __napiInstance?.exports?.napi_wasm_env_cleanup_pending;
+  const pending = __napiInstance?.exports?.napi_wasm_env_cleanup_pending;
   const observable = typeof pending === "function";
   if (observable) {
     let queued;
@@ -1519,10 +1384,7 @@ function __drainWasmEnvCleanup() {
 
 function __destroyEmnapiContext() {
   __abortWasiDisposalIfThreadCrashed();
-  if (
-    __emnapiContextDestroyed ||
-    __emnapiContext === undefined
-  ) {
+  if (__emnapiContextDestroyed || __emnapiContext === undefined) {
     __emnapiContextDestroyed = true;
     return;
   }
@@ -1581,10 +1443,7 @@ function __destroyEmnapiContext() {
 function __keepEventLoopAliveUntil(work) {
   const setTimer = globalThis.setInterval;
   const clearTimer = globalThis.clearInterval;
-  if (
-    typeof setTimer !== "function" ||
-    typeof clearTimer !== "function"
-  ) {
+  if (typeof setTimer !== "function" || typeof clearTimer !== "function") {
     return work;
   }
   let timer;
@@ -1672,12 +1531,8 @@ function __drainWasiAsyncWork() {
   }
   const exports = __napiInstance?.exports;
   const pending = exports?.napi_wasm_async_work_pending;
-  const cancelPending =
-    exports?.napi_wasm_cancel_pending_async_work;
-  if (
-    typeof pending !== "function" ||
-    typeof cancelPending !== "function"
-  ) {
+  const cancelPending = exports?.napi_wasm_cancel_pending_async_work;
+  if (typeof pending !== "function" || typeof cancelPending !== "function") {
     return;
   }
 
@@ -1696,9 +1551,7 @@ function __drainWasiAsyncWork() {
       // Only a trap. Anything else means the export is not what this loader
       // thinks it is, which is a defect worth surfacing rather than disposing
       // over.
-      if (
-        error instanceof globalThis.WebAssembly.RuntimeError
-      ) {
+      if (error instanceof globalThis.WebAssembly.RuntimeError) {
         return 0;
       }
       throw error;
@@ -1722,10 +1575,7 @@ function __drainWasiAsyncWork() {
     (async () => {
       while (readPending()) {
         await new Promise((resolve) => {
-          __scheduleTimer(
-            resolve,
-            __WASI_ASYNC_WORK_POLL_INTERVAL_MS,
-          );
+          __scheduleTimer(resolve, __WASI_ASYNC_WORK_POLL_INTERVAL_MS);
         });
         __abortWasiDisposalIfThreadCrashed();
       }
@@ -1810,18 +1660,14 @@ function __terminateWasiWorkers() {
     }
   };
   return pending.length > 0
-    ? __keepEventLoopAliveUntil(Promise.all(pending)).then(
-        finish,
-      )
+    ? __keepEventLoopAliveUntil(Promise.all(pending)).then(finish)
     : finish();
 }
 
 function __finishWasiDisposal() {
   const workerResult = __terminateWasiWorkers();
   if (__isThenable(workerResult)) {
-    return Promise.resolve(workerResult).then(
-      __completeWasiDisposal,
-    );
+    return Promise.resolve(workerResult).then(__completeWasiDisposal);
   }
   return __completeWasiDisposal();
 }
@@ -1830,9 +1676,7 @@ function __continueWasiDisposal() {
   __abortWasiDisposalIfThreadCrashed();
   const destroyResult = __destroyEmnapiContext();
   if (__isThenable(destroyResult)) {
-    return Promise.resolve(destroyResult).then(
-      __finishWasiDisposal,
-    );
+    return Promise.resolve(destroyResult).then(__finishWasiDisposal);
   }
   return __finishWasiDisposal();
 }
@@ -1841,9 +1685,7 @@ function __drainWasmEnvForWasiDisposal() {
   __abortWasiDisposalIfThreadCrashed();
   const drainResult = __drainWasmEnvCleanup();
   if (__isThenable(drainResult)) {
-    return Promise.resolve(drainResult).then(
-      __continueWasiDisposal,
-    );
+    return Promise.resolve(drainResult).then(__continueWasiDisposal);
   }
   return __continueWasiDisposal();
 }
@@ -1856,9 +1698,7 @@ function __cleanUpWasmEnvForWasiDisposal() {
   // these back to back is what strands them.
   const prepareResult = __prepareWasmEnvCleanupWithTurns();
   if (__isThenable(prepareResult)) {
-    return Promise.resolve(prepareResult).then(
-      __drainWasmEnvForWasiDisposal,
-    );
+    return Promise.resolve(prepareResult).then(__drainWasmEnvForWasiDisposal);
   }
   return __drainWasmEnvForWasiDisposal();
 }
@@ -1907,12 +1747,7 @@ function __disposeWasiBinding() {
   try {
     result = __startWasiDisposal();
   } catch (error) {
-    if (
-      __settleWasiDisposalAfterThreadCrash(
-        resolveDispose,
-        rejectDispose,
-      )
-    ) {
+    if (__settleWasiDisposalAfterThreadCrash(resolveDispose, rejectDispose)) {
       return disposePromise;
     }
     __wasiDisposePromise = undefined;
@@ -1926,12 +1761,7 @@ function __disposeWasiBinding() {
       resolveDispose(value);
     },
     (error) => {
-      if (
-        __settleWasiDisposalAfterThreadCrash(
-          resolveDispose,
-          rejectDispose,
-        )
-      ) {
+      if (__settleWasiDisposalAfterThreadCrash(resolveDispose, rejectDispose)) {
         return;
       }
       __wasiDisposePromise = undefined;
@@ -1975,18 +1805,14 @@ function __destroyContextForWasiRollback(cleanupErrors) {
     destroyResult = __destroyEmnapiContext();
   } catch (cleanupError) {
     cleanupErrors.push(cleanupError);
-    return __finishWasiInitializationRollback(
-      cleanupErrors,
-    );
+    return __finishWasiInitializationRollback(cleanupErrors);
   }
   if (__isThenable(destroyResult)) {
     return Promise.resolve(destroyResult)
       .catch((cleanupError) => {
         cleanupErrors.push(cleanupError);
       })
-      .then(() =>
-        __finishWasiInitializationRollback(cleanupErrors),
-      );
+      .then(() => __finishWasiInitializationRollback(cleanupErrors));
   }
   return __finishWasiInitializationRollback(cleanupErrors);
 }
@@ -2082,8 +1908,7 @@ function __runWasiInitializationRollbackSteps() {
     }
     if (__isThenable(drainResult)) {
       return Promise.resolve(drainResult).then(
-        () =>
-          __destroyContextForWasiRollback(cleanupErrors),
+        () => __destroyContextForWasiRollback(cleanupErrors),
         (cleanupError) => {
           cleanupErrors.push(cleanupError);
           return __retainFailedWasiRollback(cleanupErrors);
@@ -2104,9 +1929,8 @@ function __runWasiInitializationRollbackSteps() {
   // `__rollbackWasmEnvForWasiInitialization` makes for the settlement drain, so
   // the context stays reclaimable by a retry or by this flavor's own
   // last-resort teardown.
-  const __retainAfterAsyncWorkDrainFailure = (
-    cleanupError,
-  ) => __retainFailedWasiRollback([cleanupError]);
+  const __retainAfterAsyncWorkDrainFailure = (cleanupError) =>
+    __retainFailedWasiRollback([cleanupError]);
   let asyncWorkResult;
   try {
     asyncWorkResult = __drainWasiAsyncWork();
@@ -2175,9 +1999,7 @@ const __wasiRollbackRegistrySymbol = Symbol.for(
   "napi.rs.wasi.rollback.registry.v1",
 );
 const __wasiRollbackRegistryKey =
-  typeof __filename === "string"
-    ? __filename
-    : __wasmFilePath;
+  typeof __filename === "string" ? __filename : __wasmFilePath;
 
 function __getWasiRollbackRegistry() {
   const existing = process[__wasiRollbackRegistrySymbol];
@@ -2190,42 +2012,26 @@ function __getWasiRollbackRegistry() {
     return existing;
   }
   const registry = new Map();
-  Object.defineProperty(
-    process,
-    __wasiRollbackRegistrySymbol,
-    {
-      configurable: false,
-      enumerable: false,
-      value: registry,
-      writable: false,
-    },
-  );
+  Object.defineProperty(process, __wasiRollbackRegistrySymbol, {
+    configurable: false,
+    enumerable: false,
+    value: registry,
+    writable: false,
+  });
   return registry;
 }
 
 const __wasiRollbackRegistry = __getWasiRollbackRegistry();
 
-function __completeWasiInitializationRollback(
-  record,
-  cleanupErrors,
-) {
+function __completeWasiInitializationRollback(record, cleanupErrors) {
   try {
     if (cleanupErrors.length === 0) {
-      if (
-        __wasiRollbackRegistry.get(
-          __wasiRollbackRegistryKey,
-        ) === record
-      ) {
-        __wasiRollbackRegistry.delete(
-          __wasiRollbackRegistryKey,
-        );
+      if (__wasiRollbackRegistry.get(__wasiRollbackRegistryKey) === record) {
+        __wasiRollbackRegistry.delete(__wasiRollbackRegistryKey);
       }
       return;
     }
-    record.error = __attachCleanupErrors(
-      record.error,
-      cleanupErrors,
-    );
+    record.error = __attachCleanupErrors(record.error, cleanupErrors);
   } catch (cleanupError) {
     try {
       record.error = __createCleanupError(
@@ -2249,31 +2055,21 @@ function __runWasiInitializationRollback(record) {
   try {
     rollbackResult = record.rollback();
   } catch (cleanupError) {
-    __completeWasiInitializationRollback(record, [
-      cleanupError,
-    ]);
+    __completeWasiInitializationRollback(record, [cleanupError]);
     return;
   }
 
   if (!__isThenable(rollbackResult)) {
-    __completeWasiInitializationRollback(
-      record,
-      rollbackResult,
-    );
+    __completeWasiInitializationRollback(record, rollbackResult);
     return;
   }
 
   record.promise = Promise.resolve(rollbackResult).then(
     (cleanupErrors) => {
-      __completeWasiInitializationRollback(
-        record,
-        cleanupErrors,
-      );
+      __completeWasiInitializationRollback(record, cleanupErrors);
     },
     (cleanupError) => {
-      __completeWasiInitializationRollback(record, [
-        cleanupError,
-      ]);
+      __completeWasiInitializationRollback(record, [cleanupError]);
     },
   );
 }
@@ -2295,10 +2091,7 @@ function __removeWasiExitListener() {
     __wasiExitListenerRegistered &&
     typeof process.removeListener === "function"
   ) {
-    process.removeListener(
-      "exit",
-      __disposeWasiBindingAtExit,
-    );
+    process.removeListener("exit", __disposeWasiBindingAtExit);
   }
   __wasiExitListenerRegistered = false;
 }
@@ -2311,9 +2104,7 @@ function __disposeWasiBindingAtExit() {
     // included, since its JavaScript listener never gets a turn. Stop the
     // workers and leave.
     try {
-      void Promise.resolve(__terminateWasiWorkers()).catch(
-        () => {},
-      );
+      void Promise.resolve(__terminateWasiWorkers()).catch(() => {});
     } catch {}
     return;
   }
@@ -2337,10 +2128,7 @@ function __disposeWasiBindingAtExit() {
 }
 
 function __registerWasiExitListener() {
-  if (
-    !__wasiExitListenerRegistered &&
-    typeof process.once === "function"
-  ) {
+  if (!__wasiExitListenerRegistered && typeof process.once === "function") {
     process.once("exit", __disposeWasiBindingAtExit);
     __wasiExitListenerRegistered = true;
   }
@@ -2364,54 +2152,40 @@ function __captureEmnapiAutoDestroyListener() {
   }
   let __autoDestroyListener;
   const __captureListener = (__event, __listener) => {
-    if (
-      __event === "beforeExit" &&
-      __autoDestroyListener === undefined
-    ) {
+    if (__event === "beforeExit" && __autoDestroyListener === undefined) {
       __autoDestroyListener = __listener;
     }
   };
   try {
     // Run before existing newListener hooks so a hook that registers its own
     // beforeExit listener cannot be mistaken for emnapi's registration.
-    process.prependListener(
-      "newListener",
-      __captureListener,
-    );
+    process.prependListener("newListener", __captureListener);
   } catch {
     return;
   }
   return () => {
     try {
-      process.removeListener(
-        "newListener",
-        __captureListener,
-      );
+      process.removeListener("newListener", __captureListener);
     } catch {}
     if (__autoDestroyListener !== undefined) {
       try {
-        process.removeListener(
-          "beforeExit",
-          __autoDestroyListener,
-        );
+        process.removeListener("beforeExit", __autoDestroyListener);
       } catch {}
     }
   };
 }
 
 try {
-  const __finishAutoDestroyCapture =
-    __captureEmnapiAutoDestroyListener();
+  const __finishAutoDestroyCapture = __captureEmnapiAutoDestroyListener();
   try {
-    __emnapiContext =
-      __wrapEmnapiContextDestroyForSettlement(
-        __emnapiCreateContext({
-          autoDestroy: false,
-          features: { setImmediate: __wasiSetImmediate },
-        }),
-        __prepareWasmEnvCleanup,
-        __isPreparingWasmEnvCleanup,
-      );
+    __emnapiContext = __wrapEmnapiContextDestroyForSettlement(
+      __emnapiCreateContext({
+        autoDestroy: false,
+        features: { setImmediate: __wasiSetImmediate },
+      }),
+      __prepareWasmEnvCleanup,
+      __isPreparingWasmEnvCleanup,
+    );
     // emnapi 2.x still registers an unconditional once-listener for
     // beforeExit that auto-destroys the context, and suppressDestroy() only
     // neutralizes its callback without removing it. This loader owns cleanup
@@ -2456,10 +2230,7 @@ try {
       // Registered before emnapi's own listeners, which rethrow the error.
       worker.on("error", (error) => {
         __wasiThreadCrashed = true;
-        __recordWasiThreadCrashError(
-          error,
-          worker.threadId,
-        );
+        __recordWasiThreadCrashError(error, worker.threadId);
       });
       worker.onmessage = ({ data }) => {
         __wasmCreateOnMessageForFsProxy(__nodeFs)(data);
@@ -2471,16 +2242,16 @@ try {
       // According to https://github.com/nodejs/node/blob/19e0d472728c79d418b74bddff588bea70a403d0/lib/internal/worker.js#L415,
       // a worker is consist of two handles: kPublicPort and kHandle.
       {
-        const kPublicPort = Object.getOwnPropertySymbols(
-          worker,
-        ).find((s) => s.toString().includes("kPublicPort"));
+        const kPublicPort = Object.getOwnPropertySymbols(worker).find((s) =>
+          s.toString().includes("kPublicPort"),
+        );
         if (kPublicPort) {
           worker[kPublicPort].ref = () => {};
         }
 
-        const kHandle = Object.getOwnPropertySymbols(
-          worker,
-        ).find((s) => s.toString().includes("kHandle"));
+        const kHandle = Object.getOwnPropertySymbols(worker).find((s) =>
+          s.toString().includes("kHandle"),
+        );
         if (kHandle) {
           worker[kHandle].ref = () => {};
         }
@@ -2529,11 +2300,10 @@ try {
   //     export detection — reads the static `module.exports.<name> =` either
   //     way, and the later `module.exports = __napiModule.exports` does not
   //     undo that.
-  module.exports.__napiBindingTarget =
-    __napiStampBindingTarget(
-      __napiModule.exports,
-      __napiBindingTarget,
-    );
+  module.exports.__napiBindingTarget = __napiStampBindingTarget(
+    __napiModule.exports,
+    __napiBindingTarget,
+  );
   __registerWasiExitListener();
 } catch (error) {
   const rollback = {
@@ -2542,10 +2312,7 @@ try {
     promise: undefined,
     rollback: __rollbackWasiInitialization,
   };
-  __wasiRollbackRegistry.set(
-    __wasiRollbackRegistryKey,
-    rollback,
-  );
+  __wasiRollbackRegistry.set(__wasiRollbackRegistryKey, rollback);
   __runWasiInitializationRollback(rollback);
   throw rollback.error;
 }
@@ -2556,7 +2323,5 @@ try {
 } catch {}
 module.exports = __napiModule.exports;
 module.exports.RegexSet = __napiModule.exports.RegexSet;
-module.exports._prepareRegexSet =
-  __napiModule.exports._prepareRegexSet;
-module.exports._uax29Boundaries =
-  __napiModule.exports._uax29Boundaries;
+module.exports._prepareRegexSet = __napiModule.exports._prepareRegexSet;
+module.exports._uax29Boundaries = __napiModule.exports._uax29Boundaries;

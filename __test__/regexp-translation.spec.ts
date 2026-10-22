@@ -3,14 +3,8 @@ import fc from "fast-check";
 
 import { RegexSet } from "../src/index";
 
-const assertOracle = (
-  pattern: RegExp,
-  haystack: string,
-) => {
-  for (const options of [
-    undefined,
-    { unicodeBoundaries: false },
-  ]) {
+const assertOracle = (pattern: RegExp, haystack: string) => {
+  for (const options of [undefined, { unicodeBoundaries: false }]) {
     const set = new RegexSet([pattern], options);
     expect(
       set.isMatch(haystack),
@@ -21,10 +15,7 @@ const assertOracle = (
 
 describe("JavaScript RegExp character classes", () => {
   test("keeps plain word boundaries on the DFA path", () => {
-    const set = new RegexSet([
-      /\bčl\.\s*\d+\b/,
-      /\bIČO:\s*[0-9]{8}\b/,
-    ]);
+    const set = new RegexSet([/\bčl\.\s*\d+\b/, /\bIČO:\s*[0-9]{8}\b/]);
 
     expect(set._enginePathCounts()).toEqual([0, 2, 0]);
   });
@@ -33,15 +24,8 @@ describe("JavaScript RegExp character classes", () => {
     for (const char of ["\u212a", "\u017f"]) {
       for (const flags of ["", "iu"]) {
         for (const boundary of ["\\b", "\\B"]) {
-          const pattern = new RegExp(
-            `${boundary}${char}`,
-            flags,
-          );
-          for (const text of [
-            char,
-            `é${char}`,
-            ` ${char}`,
-          ]) {
+          const pattern = new RegExp(`${boundary}${char}`, flags);
+          for (const text of [char, `é${char}`, ` ${char}`]) {
             assertOracle(pattern, text);
           }
         }
@@ -129,13 +113,7 @@ describe("JavaScript RegExp character classes", () => {
   });
 
   test("preserves Unicode word case folding", () => {
-    for (const token of [
-      "\\w",
-      "\\W",
-      "[\\w]",
-      "[^\\w]",
-      "[\\W]",
-    ]) {
+    for (const token of ["\\w", "\\W", "[\\w]", "[^\\w]", "[\\W]"]) {
       for (const char of [
         "K",
         "k",
@@ -180,10 +158,7 @@ describe("JavaScript RegExp character classes", () => {
         `\\x${letter.charCodeAt(0).toString(16)}`,
       ]) {
         for (const flags of ["i", "iu"]) {
-          const pattern = new RegExp(
-            `^(?:${source})$`,
-            flags,
-          );
+          const pattern = new RegExp(`^(?:${source})$`, flags);
           for (const text of [
             letter,
             letter.toUpperCase(),
@@ -345,13 +320,7 @@ describe("JavaScript RegExp character classes", () => {
 
   test("keeps escaped backslashes outside Unicode flag changes", () => {
     const pattern = /(?<!\p{L})\\s(?:e?s)?(?!\p{L})/iu;
-    for (const haystack of [
-      "\\s",
-      "\\ses",
-      "x\\s",
-      "\\sx",
-      " s ",
-    ]) {
+    for (const haystack of ["\\s", "\\ses", "x\\s", "\\sx", " s "]) {
       assertOracle(pattern, haystack);
     }
   });
@@ -385,9 +354,7 @@ describe("JavaScript RegExp character classes", () => {
             flags,
           );
           const witness = entries
-            .map(
-              ({ witness: entryWitness }) => entryWitness,
-            )
+            .map(({ witness: entryWitness }) => entryWitness)
             .join("");
           expect(pattern.test(witness)).toBe(true);
           assertOracle(pattern, witness);
@@ -449,10 +416,7 @@ describe("JavaScript RegExp character classes", () => {
           { maxLength: 12 },
         ),
         (tokens, chars) =>
-          assertOracle(
-            new RegExp(tokens.join(""), "iu"),
-            chars.join(""),
-          ),
+          assertOracle(new RegExp(tokens.join(""), "iu"), chars.join("")),
       ),
       { numRuns: 200 },
     );

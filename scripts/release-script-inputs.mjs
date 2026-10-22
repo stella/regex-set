@@ -2,9 +2,7 @@
  * @returns {value is Record<string, unknown>}
  */
 export const isRecord = (value) =>
-  typeof value === "object" &&
-  value !== null &&
-  !Array.isArray(value);
+  typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** @typedef {Record<string, unknown> & {name: string, version: string, optionalDependencies?: Record<string, string>}} ReleaseManifest */
 
@@ -22,9 +20,7 @@ const isReleaseManifest = (value) => {
   return (
     optional === undefined ||
     (isRecord(optional) &&
-      Object.values(optional).every(
-        (entry) => typeof entry === "string",
-      ))
+      Object.values(optional).every((entry) => typeof entry === "string"))
   );
 };
 
@@ -44,12 +40,9 @@ export const readWasiRootEntry = (value) => {
   if (
     !isRecord(value) ||
     !("rootEntry" in value) ||
-    (value["rootEntry"] !== null &&
-      typeof value["rootEntry"] !== "string")
+    (value["rootEntry"] !== null && typeof value["rootEntry"] !== "string")
   )
-    throw new TypeError(
-      "WASI metadata requires a string or null root entry",
-    );
+    throw new TypeError("WASI metadata requires a string or null root entry");
   return value["rootEntry"];
 };
 
@@ -58,16 +51,12 @@ export const readWasiRootEntry = (value) => {
  */
 export const stringArray = (value) => {
   if (!Array.isArray(value))
-    throw new TypeError(
-      "Release contract requires string arrays",
-    );
+    throw new TypeError("Release contract requires string arrays");
   return Array.from(
     value,
     /** @param {unknown} entry */ (entry) => {
       if (typeof entry !== "string")
-        throw new TypeError(
-          "Release contract requires string arrays",
-        );
+        throw new TypeError("Release contract requires string arrays");
       return entry;
     },
   );
@@ -80,39 +69,24 @@ export const readWasiWorkflow = (value) => {
     !isRecord(value["jobs"]) ||
     !isRecord(value["jobs"]["build"])
   )
-    throw new TypeError(
-      "Release workflow requires a build job",
-    );
+    throw new TypeError("Release workflow requires a build job");
   const build = value["jobs"]["build"];
   const strategy = build["strategy"];
-  const matrix = isRecord(strategy)
-    ? strategy["matrix"]
-    : undefined;
-  const settings = isRecord(matrix)
-    ? matrix["settings"]
-    : undefined;
+  const matrix = isRecord(strategy) ? strategy["matrix"] : undefined;
+  const settings = isRecord(matrix) ? matrix["settings"] : undefined;
   if (!Array.isArray(settings))
-    throw new TypeError(
-      "Release workflow has no build matrix",
-    );
+    throw new TypeError("Release workflow has no build matrix");
   const targets = Array.from(
     settings,
     /** @param {unknown} setting */ (setting) => {
-      if (
-        !isRecord(setting) ||
-        typeof setting["target"] !== "string"
-      )
-        throw new TypeError(
-          "Release build settings require target strings",
-        );
+      if (!isRecord(setting) || typeof setting["target"] !== "string")
+        throw new TypeError("Release build settings require target strings");
       const artifact = setting["node_artifact"];
       if (
         setting["target"] !== "wasm32-wasip1-threads" &&
         typeof artifact !== "string"
       )
-        throw new TypeError(
-          "Native build settings require artifact strings",
-        );
+        throw new TypeError("Native build settings require artifact strings");
       return {
         target: setting["target"],
         node_artifact: artifact,
@@ -121,16 +95,12 @@ export const readWasiWorkflow = (value) => {
   );
   const steps = build["steps"];
   if (!Array.isArray(steps))
-    throw new TypeError(
-      "Release workflow requires build steps",
-    );
+    throw new TypeError("Release workflow requires build steps");
   const uploads = Array.from(
     steps,
     /** @param {unknown} step */ (step) => {
       if (!isRecord(step))
-        throw new TypeError(
-          "Release build steps must be objects",
-        );
+        throw new TypeError("Release build steps must be objects");
       const inputs = step["with"];
       return {
         name: step["name"],

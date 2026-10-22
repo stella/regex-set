@@ -1,22 +1,12 @@
 import { expect, test } from "bun:test";
-import { readFileSync, readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
-const isRecord = (
-  value: unknown,
-): value is Record<string, unknown> =>
-  typeof value === "object" &&
-  value !== null &&
-  !Array.isArray(value);
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
 
 const narrowWorkflow = (value: unknown, name: string) => {
-  if (
-    !isRecord(value) ||
-    !isRecord(value.on) ||
-    !isRecord(value.jobs)
-  ) {
-    throw new Error(
-      `${name}: expected workflow on/jobs mappings`,
-    );
+  if (!isRecord(value) || !isRecord(value.on) || !isRecord(value.jobs)) {
+    throw new Error(`${name}: expected workflow on/jobs mappings`);
   }
   const jobs = value.jobs;
   return {
@@ -24,58 +14,31 @@ const narrowWorkflow = (value: unknown, name: string) => {
     jobNames: Object.keys(jobs),
     job: (id: string) => {
       const job = jobs[id];
-      if (!isRecord(job))
-        throw new Error(`${name}: missing job ${id}`);
-      if (
-        job.uses !== undefined &&
-        typeof job.uses !== "string"
-      ) {
-        throw new Error(
-          `${name}/${id}: expected string uses`,
-        );
+      if (!isRecord(job)) throw new Error(`${name}: missing job ${id}`);
+      if (job.uses !== undefined && typeof job.uses !== "string") {
+        throw new Error(`${name}/${id}: expected string uses`);
       }
       if (job.with !== undefined && !isRecord(job.with)) {
-        throw new Error(
-          `${name}/${id}: expected with mapping`,
-        );
+        throw new Error(`${name}/${id}: expected with mapping`);
       }
       const steps = job.steps;
       if (steps !== undefined && !Array.isArray(steps)) {
-        throw new Error(
-          `${name}/${id}: expected steps array`,
-        );
+        throw new Error(`${name}/${id}: expected steps array`);
       }
       return {
         uses: job.uses,
         with: job.with,
         steps: (steps ?? []).map((step: unknown) => {
           if (!isRecord(step))
-            throw new Error(
-              `${name}/${id}: expected step mapping`,
-            );
-          if (
-            step.run !== undefined &&
-            typeof step.run !== "string"
-          ) {
-            throw new Error(
-              `${name}/${id}: expected string run`,
-            );
+            throw new Error(`${name}/${id}: expected step mapping`);
+          if (step.run !== undefined && typeof step.run !== "string") {
+            throw new Error(`${name}/${id}: expected string run`);
           }
-          if (
-            step.uses !== undefined &&
-            typeof step.uses !== "string"
-          ) {
-            throw new Error(
-              `${name}/${id}: expected string step uses`,
-            );
+          if (step.uses !== undefined && typeof step.uses !== "string") {
+            throw new Error(`${name}/${id}: expected string step uses`);
           }
-          if (
-            step.with !== undefined &&
-            !isRecord(step.with)
-          ) {
-            throw new Error(
-              `${name}/${id}: expected step with mapping`,
-            );
+          if (step.with !== undefined && !isRecord(step.with)) {
+            throw new Error(`${name}/${id}: expected step with mapping`);
           }
           return {
             run: step.run,
@@ -93,10 +56,7 @@ const workflow = (name: string) =>
   narrowWorkflow(
     Bun.YAML.parse(
       readFileSync(
-        new URL(
-          `../.github/workflows/${name}.yml`,
-          import.meta.url,
-        ),
+        new URL(`../.github/workflows/${name}.yml`, import.meta.url),
         "utf8",
       ),
     ),
@@ -106,59 +66,37 @@ const workflow = (name: string) =>
 test("optional proofs run only on demand while shared CI remains enabled", () => {
   const optional = workflow("optional-proofs");
   const ci = workflow("ci");
-  expect(Object.keys(optional.on)).toEqual([
-    "workflow_dispatch",
-  ]);
+  expect(Object.keys(optional.on)).toEqual(["workflow_dispatch"]);
   expect(optional.jobNames.sort()).toEqual([
     "contract-perf",
     "typecheck-parity",
   ]);
   expect(ci.jobNames).not.toContain("contract-perf");
-  expect(ci.job("napi-ci").uses).toContain(
-    "/rust-napi-ci.yml@",
-  );
+  expect(ci.job("napi-ci").uses).toContain("/rust-napi-ci.yml@");
   expect(
-    ci
-      .job("checks")
-      .steps.some(
-        (step) => step.run === "bun run typecheck",
-      ),
+    ci.job("checks").steps.some((step) => step.run === "bun run typecheck"),
   ).toBe(false);
   expect(ci.job("napi-ci").with?.typecheck).toBe(true);
   expect(
     ci
       .job("checks")
-      .steps.some(
-        (step) =>
-          step.run === "bun run check:typecheck-parity",
-      ),
+      .steps.some((step) => step.run === "bun run check:typecheck-parity"),
   ).toBe(false);
   expect(
     optional
       .job("typecheck-parity")
-      .steps.some(
-        (step) =>
-          step.run === "bun run check:typecheck-parity",
-      ),
+      .steps.some((step) => step.run === "bun run check:typecheck-parity"),
   ).toBe(true);
   expect(
     optional
       .job("contract-perf")
-      .steps.some(
-        (step) =>
-          step.run ===
-          "timeout 180s bun run perf:contracts",
-      ),
+      .steps.some((step) => step.run === "timeout 180s bun run perf:contracts"),
   ).toBe(true);
 });
 
 test("workflow checkouts do not persist repository credentials", () => {
-  const files = readdirSync(
-    new URL("../.github/workflows/", import.meta.url),
-  );
-  for (const file of files.filter((name) =>
-    /\.ya?ml$/u.test(name),
-  )) {
+  const files = readdirSync(new URL("../.github/workflows/", import.meta.url));
+  for (const file of files.filter((name) => /\.ya?ml$/u.test(name))) {
     const parsed = workflow(file.replace(/\.ya?ml$/u, ""));
     for (const job of parsed.jobNames) {
       for (const step of parsed.job(job).steps) {
@@ -167,10 +105,9 @@ test("workflow checkouts do not persist repository credentials", () => {
           !step.uses.startsWith("actions/checkout@")
         )
           continue;
-        expect(
-          step.with?.["persist-credentials"],
-          `${file}: ${job}`,
-        ).toBe(false);
+        expect(step.with?.["persist-credentials"], `${file}: ${job}`).toBe(
+          false,
+        );
       }
     }
   }
@@ -198,10 +135,9 @@ test("workflow views reject malformed YAML shapes with a useful location", () =>
     { steps: [{ with: [] }] },
   ]) {
     expect(() =>
-      narrowWorkflow(
-        { on: {}, jobs: { proofs: job } },
-        "fixture",
-      ).job("proofs"),
+      narrowWorkflow({ on: {}, jobs: { proofs: job } }, "fixture").job(
+        "proofs",
+      ),
     ).toThrow("fixture");
   }
   const shared = narrowWorkflow(
@@ -212,7 +148,5 @@ test("workflow views reject malformed YAML shapes with a useful location", () =>
     "fixture",
   );
   expect(shared.job("shared").steps).toEqual([]);
-  expect(() => shared.job("missing")).toThrow(
-    "fixture: missing job missing",
-  );
+  expect(() => shared.job("missing")).toThrow("fixture: missing job missing");
 });

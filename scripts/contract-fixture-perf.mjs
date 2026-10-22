@@ -6,10 +6,7 @@ import { RegexSet } from "../src/index.ts";
 const DEFAULT_MAX_FIND_MS = 5_000;
 
 const fixtureNames = [
-  [
-    "edgar employment agreement",
-    "en/pra-group-employment-agreement.txt",
-  ],
+  ["edgar employment agreement", "en/pra-group-employment-agreement.txt"],
   [
     "czech nakit legal services framework",
     "cs/nakit-legal-services-framework.txt",
@@ -31,9 +28,8 @@ const candidateAnonymizeDirs = [
   resolve(process.cwd(), "../anonymize"),
 ].filter((value) => value !== undefined);
 
-const anonymizeDir = candidateAnonymizeDirs.find(
-  (candidate) =>
-    existsSync(join(candidate, PREPARED_CONFIG_PATH)),
+const anonymizeDir = candidateAnonymizeDirs.find((candidate) =>
+  existsSync(join(candidate, PREPARED_CONFIG_PATH)),
 );
 
 if (!anonymizeDir) {
@@ -43,15 +39,11 @@ if (!anonymizeDir) {
 }
 
 const preparedConfig = JSON.parse(
-  readFileSync(
-    join(anonymizeDir, PREPARED_CONFIG_PATH),
-    "utf8",
-  ),
+  readFileSync(join(anonymizeDir, PREPARED_CONFIG_PATH), "utf8"),
 );
 
 const maxFindMs = Number(
-  process.env.REGEX_SET_CONTRACT_MAX_FIND_MS ??
-    DEFAULT_MAX_FIND_MS,
+  process.env.REGEX_SET_CONTRACT_MAX_FIND_MS ?? DEFAULT_MAX_FIND_MS,
 );
 
 const countAlternations = (pattern) => {
@@ -77,10 +69,7 @@ const countAlternations = (pattern) => {
 };
 
 const candidates = [];
-for (const [
-  index,
-  entry,
-] of preparedConfig.regex_patterns.entries()) {
+for (const [index, entry] of preparedConfig.regex_patterns.entries()) {
   if (entry.kind !== "regex") continue;
 
   const alternations = countAlternations(entry.pattern);
@@ -139,10 +128,7 @@ for (const [fixtureName, relativePath] of fixtureNames) {
         index: candidate.index,
         label: candidate.meta?.label,
         alternations: candidate.alternations,
-        nativePatterns: Reflect.get(
-          regexSet,
-          "_nativeIndexMap",
-        ).length,
+        nativePatterns: Reflect.get(regexSet, "_nativeIndexMap").length,
         findMs,
         matches: matches.length,
       }),

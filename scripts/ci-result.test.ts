@@ -4,10 +4,7 @@ import { readFileSync } from "node:fs";
 const readWorkflow = (name: string) =>
   Bun.YAML.parse(
     readFileSync(
-      new URL(
-        `../.github/workflows/${name}.yml`,
-        import.meta.url,
-      ),
+      new URL(`../.github/workflows/${name}.yml`, import.meta.url),
       "utf8",
     ),
   );
@@ -22,9 +19,7 @@ test("aggregate CI result covers every validation job", () => {
 
   expect(aggregate.if).toBe("always()");
   expect(
-    [...aggregate.needs].sort((left, right) =>
-      left.localeCompare(right),
-    ),
+    [...aggregate.needs].sort((left, right) => left.localeCompare(right)),
   ).toEqual(validationJobs);
 });
 
@@ -43,8 +38,7 @@ test("CI runs the aggregate result policy test", () => {
     ({ steps = [] }: { steps?: Array<{ run?: unknown }> }) =>
       steps.some(
         ({ run }) =>
-          typeof run === "string" &&
-          run.includes("scripts/ci-result.test.ts"),
+          typeof run === "string" && run.includes("scripts/ci-result.test.ts"),
       ),
   );
 

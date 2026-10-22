@@ -35,10 +35,7 @@ const transparentExpressionTypes = new Set([
 
 const unwrapExpression = (node) => {
   let expression = node;
-  while (
-    expression &&
-    transparentExpressionTypes.has(expression.type)
-  ) {
+  while (expression && transparentExpressionTypes.has(expression.type)) {
     expression = expression.expression;
   }
   return expression;
@@ -48,9 +45,7 @@ const propertyNameOf = (node) => {
   const member = unwrapExpression(node);
   if (member?.type !== "MemberExpression") return undefined;
   const property = unwrapExpression(member.property);
-  return property?.type === "Identifier"
-    ? property.name
-    : property?.value;
+  return property?.type === "Identifier" ? property.name : property?.value;
 };
 
 const visit = (node, callback, parent) => {
@@ -73,25 +68,13 @@ const parseLoader = (content) =>
     locations: true,
   });
 
-const findCleanupAliases = (
-  functionNode,
-  inheritedAliases = [],
-) => {
-  const aliases = new Set([
-    "finishParked",
-    ...inheritedAliases,
-  ]);
+const findCleanupAliases = (functionNode, inheritedAliases = []) => {
+  const aliases = new Set(["finishParked", ...inheritedAliases]);
   const visitFunctionBody = (node) => {
-    if (
-      node !== functionNode &&
-      functionTypes.has(node.type)
-    ) {
+    if (node !== functionNode && functionTypes.has(node.type)) {
       return;
     }
-    if (
-      node.type === "VariableDeclarator" &&
-      node.id.type === "Identifier"
-    ) {
+    if (node.type === "VariableDeclarator" && node.id.type === "Identifier") {
       const propertyName = propertyNameOf(node.init);
       if (
         typeof propertyName === "string" &&
@@ -121,9 +104,7 @@ const getFunctionName = (node, parent) => {
   if (parent?.type === "VariableDeclarator") {
     return parent.id.name;
   }
-  if (
-    ["Property", "MethodDefinition"].includes(parent?.type)
-  ) {
+  if (["Property", "MethodDefinition"].includes(parent?.type)) {
     return parent.key.name ?? parent.key.value;
   }
   return `<callback@${node.loc.start.line}>`;
@@ -138,17 +119,13 @@ const findCleanupCall = (node, cleanupAliases) => {
       ? callee.name
       : undefined;
   }
-  return propertyNameOf(callee) === "destroy"
-    ? "context.destroy"
-    : undefined;
+  return propertyNameOf(callee) === "destroy" ? "context.destroy" : undefined;
 };
 
 const analyzeCleanupBoundaries = (filename, content) => {
   const source = parseLoader(content);
   const parents = new WeakMap();
-  visit(source, (node, parent) =>
-    parents.set(node, parent),
-  );
+  visit(source, (node, parent) => parents.set(node, parent));
   const moduleCleanupAliases = findCleanupAliases(source);
   const unchecked = [];
   const boundaries = [];
@@ -156,10 +133,7 @@ const analyzeCleanupBoundaries = (filename, content) => {
 
   const inspectFunction = (node, parent) => {
     const functionName = getFunctionName(node, parent);
-    const cleanupAliases = findCleanupAliases(
-      node,
-      moduleCleanupAliases,
-    );
+    const cleanupAliases = findCleanupAliases(node, moduleCleanupAliases);
     let ancestor = parents.get(node);
     while (ancestor) {
       if (functionTypes.has(ancestor.type)) {
@@ -174,9 +148,7 @@ const analyzeCleanupBoundaries = (filename, content) => {
       let expression;
       const consequent = statement.consequent;
       const exitsFunction =
-        ["ReturnStatement", "ThrowStatement"].includes(
-          consequent?.type,
-        ) ||
+        ["ReturnStatement", "ThrowStatement"].includes(consequent?.type) ||
         (consequent?.type === "BlockStatement" &&
           consequent.body.length > 0 &&
           ["ReturnStatement", "ThrowStatement"].includes(
@@ -195,8 +167,7 @@ const analyzeCleanupBoundaries = (filename, content) => {
         return undefined;
       }
       const callee = unwrapExpression(expression.callee);
-      return callee.type === "Identifier" &&
-        crashCheckCalls.has(callee.name)
+      return callee.type === "Identifier" && crashCheckCalls.has(callee.name)
         ? expression.start
         : undefined;
     };
@@ -206,15 +177,9 @@ const analyzeCleanupBoundaries = (filename, content) => {
       let child = call;
       let current = parents.get(child);
       while (current && current !== node) {
-        if (
-          current.type === "BlockStatement" &&
-          current.body.includes(child)
-        ) {
+        if (current.type === "BlockStatement" && current.body.includes(child)) {
           const childIndex = current.body.indexOf(child);
-          for (const statement of current.body.slice(
-            0,
-            childIndex,
-          )) {
+          for (const statement of current.body.slice(0, childIndex)) {
             const position = crashCheckPosition(statement);
             if (position !== undefined) checks.add(position);
           }
@@ -226,17 +191,11 @@ const analyzeCleanupBoundaries = (filename, content) => {
     };
 
     const inspect = (current) => {
-      if (
-        current !== node &&
-        functionTypes.has(current.type)
-      ) {
+      if (current !== node && functionTypes.has(current.type)) {
         return;
       }
       if (current.type === "CallExpression") {
-        const boundaryName = findCleanupCall(
-          current,
-          cleanupAliases,
-        );
+        const boundaryName = findCleanupCall(current, cleanupAliases);
         if (boundaryName !== undefined) {
           boundaries.push({
             name: boundaryName,
@@ -244,12 +203,9 @@ const analyzeCleanupBoundaries = (filename, content) => {
           });
           const checks = precedingCrashChecks(current);
           if (checks.size === 0) {
-            unchecked.push(
-              `${filename}: ${functionName} -> ${boundaryName}`,
-            );
+            unchecked.push(`${filename}: ${functionName} -> ${boundaryName}`);
           } else {
-            for (const check of checks)
-              usedCrashChecks.add(check);
+            for (const check of checks) usedCrashChecks.add(check);
           }
         }
       }
@@ -268,23 +224,18 @@ const analyzeCleanupBoundaries = (filename, content) => {
   };
 
   visit(source, (node, parent) => {
-    if (functionTypes.has(node.type))
-      inspectFunction(node, parent);
+    if (functionTypes.has(node.type)) inspectFunction(node, parent);
   });
   return { boundaries, unchecked, usedCrashChecks };
 };
 
-const findUncheckedContextDestructionBoundaries = (
-  filename,
-  content,
-) => analyzeCleanupBoundaries(filename, content).unchecked;
+const findUncheckedContextDestructionBoundaries = (filename, content) =>
+  analyzeCleanupBoundaries(filename, content).unchecked;
 
 const countCleanupCallsIndependently = (content) => {
   const source = parseLoader(content);
   const parents = new WeakMap();
-  visit(source, (node, parent) =>
-    parents.set(node, parent),
-  );
+  visit(source, (node, parent) => parents.set(node, parent));
   let count = 0;
   const moduleAliases = new Set(["finishParked"]);
   for (const statement of source.body) {
@@ -293,10 +244,7 @@ const countCleanupCallsIndependently = (content) => {
       if (
         declaration.id.type === "Identifier" &&
         /napi_prepare_wasm_env_cleanup(?:_(?:begin|finish))?$/.test(
-          content.slice(
-            declaration.init?.start,
-            declaration.init?.end,
-          ),
+          content.slice(declaration.init?.start, declaration.init?.end),
         )
       ) {
         moduleAliases.add(declaration.id.name);
@@ -316,10 +264,7 @@ const countCleanupCallsIndependently = (content) => {
       ancestor = parents.get(ancestor);
     }
     const inspect = (node) => {
-      if (
-        node !== functionNode &&
-        functionTypes.has(node.type)
-      ) {
+      if (node !== functionNode && functionTypes.has(node.type)) {
         return;
       }
       if (
@@ -332,13 +277,8 @@ const countCleanupCallsIndependently = (content) => {
         aliases.add(node.id.name);
       }
       if (node.type === "CallExpression") {
-        const calleeSource = content.slice(
-          node.callee.start,
-          node.callee.end,
-        );
-        const identifierCall = /^[$\w]+$/.test(
-          calleeSource,
-        );
+        const calleeSource = content.slice(node.callee.start, node.callee.end);
+        const identifierCall = /^[$\w]+$/.test(calleeSource);
         if (
           (identifierCall &&
             (cleanupFunctionCalls.has(calleeSource) ||
@@ -365,21 +305,12 @@ const countCleanupCallsIndependently = (content) => {
 
 describe("normalizeGeneratedLoader", () => {
   test("checks every context-destroying path in both loaders for a preceding crash check", () => {
-    const filenames = [
-      "regex-set.wasi-browser.js",
-      "regex-set.wasi.cjs",
-    ];
+    const filenames = ["regex-set.wasi-browser.js", "regex-set.wasi.cjs"];
     for (const filename of filenames) {
       const normalized = normalizeGeneratedLoader(
-        readFileSync(
-          new URL(`../${filename}`, import.meta.url),
-          "utf8",
-        ),
+        readFileSync(new URL(`../${filename}`, import.meta.url), "utf8"),
       );
-      const analysis = analyzeCleanupBoundaries(
-        filename,
-        normalized,
-      );
+      const analysis = analyzeCleanupBoundaries(filename, normalized);
 
       expect(analysis.unchecked).toEqual([]);
       expect(analysis.boundaries.length).toBeGreaterThan(0);
@@ -388,17 +319,14 @@ describe("normalizeGeneratedLoader", () => {
       );
 
       for (const checkPosition of analysis.usedCrashChecks) {
-        const checkName = [...crashCheckCalls].find(
-          (name) =>
-            normalized.startsWith(name, checkPosition),
+        const checkName = [...crashCheckCalls].find((name) =>
+          normalized.startsWith(name, checkPosition),
         );
         expect(checkName).toBeDefined();
         const mutated =
           normalized.slice(0, checkPosition) +
           "__uncheckedCrashBoundary" +
-          normalized.slice(
-            checkPosition + checkName.length,
-          );
+          normalized.slice(checkPosition + checkName.length);
         expect(
           findUncheckedContextDestructionBoundaries(
             `${filename}:without-check-at-${checkPosition}`,
@@ -410,28 +338,24 @@ describe("normalizeGeneratedLoader", () => {
   });
 
   test("flags an optional-chained cleanup alias without a crash check", () => {
-    const unchecked =
-      findUncheckedContextDestructionBoundaries(
-        "optional-chain.js",
-        `const finish = exports?.napi_prepare_wasm_env_cleanup_finish;
+    const unchecked = findUncheckedContextDestructionBoundaries(
+      "optional-chain.js",
+      `const finish = exports?.napi_prepare_wasm_env_cleanup_finish;
 const unchecked = () => finish();`,
-      );
+    );
 
-    expect(unchecked).toEqual([
-      "optional-chain.js: unchecked -> finish",
-    ]);
+    expect(unchecked).toEqual(["optional-chain.js: unchecked -> finish"]);
   });
 
   test("does not accept a crash check from an unrelated conditional path", () => {
-    const unchecked =
-      findUncheckedContextDestructionBoundaries(
-        "unrelated-conditional.js",
-        `const finish = exports?.napi_prepare_wasm_env_cleanup_finish;
+    const unchecked = findUncheckedContextDestructionBoundaries(
+      "unrelated-conditional.js",
+      `const finish = exports?.napi_prepare_wasm_env_cleanup_finish;
 const unchecked = (condition) => {
   if (condition) __abortWasiDisposalIfThreadCrashed();
   finish();
 };`,
-      );
+    );
 
     expect(unchecked).toEqual([
       "unrelated-conditional.js: unchecked -> finish",
@@ -447,56 +371,46 @@ const unchecked = (condition) => {
       "conditional-expression.js",
       "condition ? __abortWasiDisposalIfThreadCrashed() : 0;",
     ],
-    [
-      "loop-body.js",
-      "while (condition) __abortWasiDisposalIfThreadCrashed();",
-    ],
+    ["loop-body.js", "while (condition) __abortWasiDisposalIfThreadCrashed();"],
   ])(
     "does not accept a conditional crash check in %s",
     (filename, conditionalCheck) => {
-      const unchecked =
-        findUncheckedContextDestructionBoundaries(
-          filename,
-          `const finish = exports?.napi_prepare_wasm_env_cleanup_finish;
+      const unchecked = findUncheckedContextDestructionBoundaries(
+        filename,
+        `const finish = exports?.napi_prepare_wasm_env_cleanup_finish;
 const unchecked = (condition) => {
   ${conditionalCheck}
   finish();
 };`,
-        );
+      );
 
-      expect(unchecked).toEqual([
-        `${filename}: unchecked -> finish`,
-      ]);
+      expect(unchecked).toEqual([`${filename}: unchecked -> finish`]);
     },
   );
 
   test("accepts an unconditional crash guard in an enclosing block", () => {
-    const unchecked =
-      findUncheckedContextDestructionBoundaries(
-        "enclosing-guard.js",
-        `const finish = exports?.napi_prepare_wasm_env_cleanup_finish;
+    const unchecked = findUncheckedContextDestructionBoundaries(
+      "enclosing-guard.js",
+      `const finish = exports?.napi_prepare_wasm_env_cleanup_finish;
 const checked = (condition) => {
   if (__hasWasiThreadCrashed()) throw new Error("crashed");
   if (condition) {
     finish();
   }
 };`,
-      );
+    );
 
     expect(unchecked).toEqual([]);
   });
 
   test("flags an unchecked arrow callback that finishes cleanup", () => {
-    const unchecked =
-      findUncheckedContextDestructionBoundaries(
-        "unchecked.js",
-        `const finish = exports.napi_prepare_wasm_env_cleanup_finish;
+    const unchecked = findUncheckedContextDestructionBoundaries(
+      "unchecked.js",
+      `const finish = exports.napi_prepare_wasm_env_cleanup_finish;
 const unchecked = () => finish();`,
-      );
+    );
 
-    expect(unchecked).toEqual([
-      "unchecked.js: unchecked -> finish",
-    ]);
+    expect(unchecked).toEqual(["unchecked.js: unchecked -> finish"]);
   });
 
   test("removes generator suppression comments without changing the code", () => {
@@ -508,9 +422,7 @@ const unchecked = () => finish();`,
 const worker = true;${"  "}
 `;
 
-    expect(normalizeGeneratedLoader(generated)).toBe(
-      "const worker = true;\n",
-    );
+    expect(normalizeGeneratedLoader(generated)).toBe("const worker = true;\n");
   });
 
   test("aborts browser disposal after a worker startup error without leaving a poll timer", async () => {
@@ -634,26 +546,18 @@ const runtimePollFixture = (pace) => {
     const disposal = fixture.dispose();
     expect(fixture.timerCount()).toBe(1);
 
-    fixture.failWorkerStartup(
-      new Error("worker failed to load"),
-    );
+    fixture.failWorkerStartup(new Error("worker failed to load"));
     fixture.runPollTimer();
 
     // oxlint-disable-next-line typescript/await-thenable, typescript/no-confusing-void-expression -- The generated fixture's dynamically constructed disposal value is intentionally untyped.
-    await expect(disposal).rejects.toThrow(
-      "worker thread crashed",
-    );
+    await expect(disposal).rejects.toThrow("worker thread crashed");
     expect(fixture.getTerminated()).toBe(1);
     expect(fixture.timerCount()).toBe(0);
     expect(normalized).toContain(
       "await __yieldWasmRuntimePollTurn(pace);\n      __abortWasiDisposalIfThreadCrashed();",
     );
-    expect(normalized).toContain(
-      "finishCleanupUnlessCrashed",
-    );
-    expect(normalizeGeneratedLoader(normalized)).toBe(
-      normalized,
-    );
+    expect(normalized).toContain("finishCleanupUnlessCrashed");
+    expect(normalizeGeneratedLoader(normalized)).toBe(normalized);
   });
 
   test("checks for a crash before destroying the context after settlement draining", async () => {
@@ -695,9 +599,7 @@ function __drainWasmEnvForWasiDisposal() {
     fixture.release();
 
     // oxlint-disable-next-line typescript/await-thenable, typescript/no-confusing-void-expression -- The generated fixture's dynamically constructed disposal value is intentionally untyped.
-    await expect(disposal).rejects.toThrow(
-      "worker thread crashed",
-    );
+    await expect(disposal).rejects.toThrow("worker thread crashed");
     expect(fixture.destroyed()).toBe(0);
   });
 
@@ -760,15 +662,11 @@ function __rollbackWasiInitialization() {
     )();
     const initialization = fixture.failInitialization();
     expect(fixture.timerCount()).toBe(1);
-    fixture.failWorkerStartup(
-      new Error("static import failed"),
-    );
+    fixture.failWorkerStartup(new Error("static import failed"));
     fixture.runPollTimer();
 
     // oxlint-disable-next-line typescript/await-thenable, typescript/no-confusing-void-expression -- The generated fixture's dynamically constructed initialization value is intentionally untyped.
-    await expect(initialization).rejects.toThrow(
-      "initialization failed",
-    );
+    await expect(initialization).rejects.toThrow("initialization failed");
     expect(fixture.terminated()).toBe(1);
     expect(fixture.timerCount()).toBe(0);
   });
@@ -836,9 +734,7 @@ function __rollbackWasiInitialization() {
     fixture.runPollTimer();
 
     // oxlint-disable-next-line typescript/await-thenable, typescript/no-confusing-void-expression -- The generated fixture's dynamically constructed initialization value is intentionally untyped.
-    await expect(initialization).rejects.toThrow(
-      "initialization failed",
-    );
+    await expect(initialization).rejects.toThrow("initialization failed");
     // oxlint-disable-next-line typescript/await-thenable, typescript/no-confusing-void-expression -- The generated fixture's dynamically constructed initialization value is intentionally untyped.
     await expect(initialization).rejects.toHaveProperty(
       "cause.message",

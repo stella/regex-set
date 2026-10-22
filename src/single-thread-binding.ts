@@ -27,31 +27,20 @@ export const createSingleThreadBinding = (
     if (trapped) throw new Error(REINITIALIZE);
     const bytes = encoder.encode(
       JSON.stringify(body, (_key, value: unknown) =>
-        typeof value === "string"
-          ? napiString(value)
-          : value,
+        typeof value === "string" ? napiString(value) : value,
       ),
     );
     try {
       const pointer = wasm.alloc(bytes.length);
-      new Uint8Array(
-        wasm.memory.buffer,
-        pointer,
-        bytes.length,
-      ).set(bytes);
+      new Uint8Array(wasm.memory.buffer, pointer, bytes.length).set(bytes);
       wasm.dispatch(pointer, bytes.length);
       const output = new Uint8Array(
         wasm.memory.buffer,
         wasm.output_pointer(),
         wasm.output_length(),
       );
-      const reply: Reply = JSON.parse(
-        decoder.decode(output),
-      );
-      if (!reply.ok)
-        throw new Error(
-          reply.error ?? "WASM operation failed",
-        );
+      const reply: Reply = JSON.parse(decoder.decode(output));
+      if (!reply.ok) throw new Error(reply.error ?? "WASM operation failed");
       return reply.value;
     } catch (error) {
       if (error instanceof WebAssembly.RuntimeError) {
@@ -63,10 +52,7 @@ export const createSingleThreadBinding = (
   };
 
   const numbers = (value: unknown): number[] => {
-    if (
-      !Array.isArray(value) ||
-      !value.every(Number.isInteger)
-    ) {
+    if (!Array.isArray(value) || !value.every(Number.isInteger)) {
       throw new TypeError(
         "Invalid numeric response from single-thread WebAssembly",
       );
@@ -111,9 +97,7 @@ export const createSingleThreadBinding = (
     }
     _enginePathCounts() {
       return Uint32Array.from(
-        numbers(
-          request({ op: "counts", handle: this.handle }),
-        ),
+        numbers(request({ op: "counts", handle: this.handle })),
       );
     }
     isMatch(haystack: string) {
@@ -180,11 +164,9 @@ export const createSingleThreadBinding = (
     }
   }
 
-  const finalizers = new FinalizationRegistry<number>(
-    (handle) => {
-      if (!trapped) request({ op: "free", handle });
-    },
-  );
+  const finalizers = new FinalizationRegistry<number>((handle) => {
+    if (!trapped) request({ op: "free", handle });
+  });
 
   return {
     RegexSet: WasmRegexSet,

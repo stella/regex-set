@@ -28,16 +28,10 @@ if (result.status !== 0) {
 }
 
 async function normalizeGeneratedFile(fileName) {
-  const fileUrl = new URL(
-    `../${fileName}`,
-    import.meta.url,
-  );
+  const fileUrl = new URL(`../${fileName}`, import.meta.url);
   try {
     let content = await readFile(fileUrl, "utf8");
-    await writeFile(
-      fileUrl,
-      normalizeGeneratedLoader(content),
-    );
+    await writeFile(fileUrl, normalizeGeneratedLoader(content));
   } catch (error) {
     if (error?.code !== "ENOENT") {
       throw error;
@@ -53,14 +47,8 @@ await normalizeGeneratedFile("regex-set.wasi-browser.js");
 await normalizeGeneratedFile("wasi-worker-browser.mjs");
 await normalizeGeneratedFile("wasi-worker.mjs");
 
-const declarationPath = new URL(
-  "../index.d.cts",
-  import.meta.url,
-);
-const declarationSource = await readFile(
-  declarationPath,
-  "utf8",
-);
+const declarationPath = new URL("../index.d.cts", import.meta.url);
+const declarationSource = await readFile(declarationPath, "utf8");
 const defaultExportDeclaration = `
 import type { NativeBinding } from "./src/core";
 
@@ -77,8 +65,7 @@ if (!declarationSource.includes("export default binding")) {
 const formatResult = spawnSync(
   "bun",
   [
-    "x",
-    "oxfmt",
+    "fmt",
     "index.cjs",
     "index.d.cts",
     "regex-set.wasi.cjs",
@@ -97,12 +84,7 @@ if (formatResult.status !== 0) {
 const contractResult = spawnSync(
   "bun",
   [
-    fileURLToPath(
-      new URL(
-        "./wasi-artifact-contract.mjs",
-        import.meta.url,
-      ),
-    ),
+    fileURLToPath(new URL("./wasi-artifact-contract.mjs", import.meta.url)),
     "--generated",
   ],
   { stdio: "inherit" },
@@ -121,12 +103,7 @@ await normalizeGeneratedFile("regex-set.wasi-browser.js");
 
 const finalFormatResult = spawnSync(
   "bun",
-  [
-    "x",
-    "oxfmt",
-    "index.d.cts",
-    "regex-set.wasi-browser.js",
-  ],
+  ["fmt", "index.d.cts", "regex-set.wasi-browser.js"],
   { stdio: "inherit" },
 );
 

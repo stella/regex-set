@@ -8,7 +8,6 @@ __test__/
 __bench__/
 rustfmt.toml
 .oxlintrc.json
-.oxfmtrc.json
 bun.lock
 .turbo/
 .cache/
