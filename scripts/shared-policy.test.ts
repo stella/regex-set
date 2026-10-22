@@ -174,8 +174,14 @@ test("first-party quarantine exemptions use exact supported annotations", () => 
           .trimStart()
           .startsWith(JSON.stringify(name) + ","),
       );
+    const annotation = name.indexOf("@", 1) === -1
+      ? "quarantine-excluded-since"
+      : "quarantine-expires";
     expect(line).toMatch(
-      /^\s*"[^"]+",?\s*#\s*quarantine-excluded-since:\s*\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\s*$/u,
+      new RegExp(
+        `^\\s*"[^"]+",?\\s*#\\s*${annotation}:\\s*\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z\\s*$`,
+        "u",
+      ),
     );
   }
 });

@@ -37,6 +37,7 @@
   "publishConfig": {
     "access": "public"
   },
+  "trustedDependencies": [],
   "scripts": {
     "check:toolchain": "stll-toolchain-check",
     "fix:loader": "node scripts/fix-napi-loader.mjs",
