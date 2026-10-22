@@ -76,7 +76,7 @@ Project: root
 - serde 1.0.229 — Apache-2.0 OR MIT
 - serde_core 1.0.229 — Apache-2.0 OR MIT
 - serde_derive 1.0.229 — Apache-2.0 OR MIT
-- serde_json 1.0.151 — Apache-2.0 OR MIT
+- serde_json 1.0.154 — Apache-2.0 OR MIT
 - slab 0.4.12 — MIT
 - strsim 0.11.1 — MIT
 - syn 2.0.119 — Apache-2.0 OR MIT
