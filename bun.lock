@@ -17,7 +17,7 @@
         "@tybys/wasm-util": "^0.10.4",
         "@types/node": "^26.6.5",
         "bun-types": "1.4.4",
-        "emnapi": "2.0.0-beta.1",
+        "emnapi": "2.0.0-beta.2",
         "fast-check": "^4.10.2",
         "oxlint": "1.87.0",
         "oxlint-tsgolint": "7.0.2003",
@@ -510,7 +510,7 @@
 
     "dts-resolver": ["dts-resolver@3.0.0", "", { "peerDependencies": { "oxc-resolver": ">=11.0.0" }, "optionalPeers": ["oxc-resolver"] }, "sha512-1T1f+z+4tl9XD+m+0HBgWoL/nm0bOIffyWaUuUSBlFg/86IWvfx+wjNaO/ybU0AJzG9/Mi5hBUgGV6zCmWEN7Q=="],
 
-    "emnapi": ["emnapi@2.0.0-beta.1", "", { "peerDependencies": { "node-addon-api": ">= 6.1.0" }, "optionalPeers": ["node-addon-api"] }, "sha512-8dyO4NxiqeCGy8DhqRjp675bsmOWs0Mz2LircSLB6sTfAza84u03/VX2S+imD9J1X6k2QJNpYrToi8gApHhafg=="],
+    "emnapi": ["emnapi@2.0.0-beta.2", "", { "peerDependencies": { "node-addon-api": ">= 6.1.0" }, "optionalPeers": ["node-addon-api"] }, "sha512-ZO2KS7bFQNo8zcDl5nWW55nvZBfC+msrGRezZn6OoJJQKXGOWVp6RYw25wdJkDIIADrAJjf4XEQAbtancmeH7w=="],
 
     "empathic": ["empathic@2.1.0", "", {}, "sha512-AnfC1ATldl49/cvZdLPDjBfrRNwbDO05aibiOtzQu3qtlbJtomNLhF30HEtn/7iBz50dlMECqATo3fG0LrdEgw=="],
 
