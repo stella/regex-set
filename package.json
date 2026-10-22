@@ -85,7 +85,7 @@
     "@changesets/changelog-github": "^1.0.1",
     "@changesets/cli": "^3.0.3",
     "@emnapi/core": "2.0.0-beta.1",
-    "@emnapi/runtime": "2.0.0-beta.1",
+    "@emnapi/runtime": "2.0.0-beta.2",
     "@napi-rs/cli": "3.10.8",
     "@napi-rs/wasm-runtime": "1.2.5",
     "@stll/oxlint-config": "1.7.0",
