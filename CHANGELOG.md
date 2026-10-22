@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.1.0
+
+### Minor Changes
+
+- [#235](https://github.com/stella/regex-set/pull/235) [`6d841a1`](https://github.com/stella/regex-set/commit/6d841a1e07aca2588fcd4ade4b269eb9ac5d7183) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Add a single-thread WebAssembly entry with explicit initialization from bytes or a URL, and an optional inline entry for synchronous initialization without I/O.
+
+### Patch Changes
+
+- [#234](https://github.com/stella/regex-set/pull/234) [`7dbd551`](https://github.com/stella/regex-set/commit/7dbd551d83f2ab368ac74ab88ed5d29de97b452e) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Update the WebAssembly runtime to the latest emnapi 2.0 beta. Browser disposal now aborts cleanup calls and terminates workers when a WASI worker crashes.
+
+- [#235](https://github.com/stella/regex-set/pull/235) [`6d841a1`](https://github.com/stella/regex-set/commit/6d841a1e07aca2588fcd4ade4b269eb9ac5d7183) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Build the single-thread WebAssembly artifact in every package build and release path.
+
 ## 1.0.9
 
 ### Patch Changes
