@@ -48,7 +48,7 @@ const bytes = readFileSync(destination);
 const base64 = bytes.toString("base64");
 writeFileSync(
   "src/single-thread-inline.ts",
-  `import { initSync as initialize, RegexSet } from "./single-thread";\n\nconst wasm = "${base64}";\nexport const initSync = () => initialize(Uint8Array.from(atob(wasm), c => c.charCodeAt(0)));\nexport { RegexSet };\n`,
+  `import { initSync as initialize, RegexSet } from "./single-thread";\n\nconst wasm = "${base64}";\nexport const initSync = (): void => initialize(Uint8Array.from(atob(wasm), c => c.charCodeAt(0)));\nexport { RegexSet };\n`,
 );
 const sizes = {
   wasm: bytes.length,

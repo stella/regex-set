@@ -9,22 +9,12 @@ const workflow = (name: string) =>
     ),
   );
 
-test("CI and nightly share typecheck without duplicate local compiler runs", () => {
+test("CI type checks with bun check in the repository job", () => {
   const ci = workflow("ci");
-  const nightly = workflow("typecheck-nightly");
-  expect(ci.jobs["napi-ci"].with.typecheck).toBe(true);
-  expect(nightly.jobs["napi-ci"].uses).toBe(ci.jobs["napi-ci"].uses);
-  expect(nightly.jobs["napi-ci"].with).toMatchObject({
-    trusted: "true",
-    typecheck: true,
-    "typecheck-only": true,
-    parity: "always",
-  });
-  expect(nightly.on.schedule).toHaveLength(1);
-  expect(nightly.on).toHaveProperty("workflow_dispatch");
+  // The shared workflow's type check job also runs compiler parity.
+  expect(ci.jobs["napi-ci"].with.typecheck).toBeUndefined();
   const local = ci.jobs.checks.steps.map((step: { run?: string }) => step.run);
-  expect(local).not.toContain("bun run typecheck");
-  expect(local).not.toContain("bun run check:typecheck-parity");
+  expect(local).toContain("bun run typecheck");
   expect(local).toContain(
     "bun test scripts/tooling-adoption.test.ts scripts/shared-policy.test.ts",
   );

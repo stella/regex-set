@@ -66,7 +66,7 @@ let binding: NativeBinding;
 
 /** Set the native backend. Must be called once
  *  before any class constructor. */
-export const initBinding = (b: NativeBinding) => {
+export const initBinding = (b: NativeBinding): void => {
   binding = b;
 };
 
