@@ -188,21 +188,6 @@ jobs:
       - run: bun fmt --check
       - run: bun run check:toolchain
         if: needs.check-changes.outputs.toolchain-changed == 'true'
-      - run: bun run typecheck
-      - name: Reject a seeded type error
-        shell: bash
-        run: |
-          probe=$(mktemp src/typecheck-rejection-XXXXXX.ts)
-          trap 'rm -f "$probe"' EXIT
-          printf 'export const typecheckRejectionProbe: string = 123;\n' > "$probe"
-          log="$RUNNER_TEMP/typecheck-rejection.log"
-          if bun run typecheck > "$log" 2>&1; then
-            cat "$log"
-            echo "::error::Typecheck accepted a seeded type error."
-            exit 1
-          fi
-          cat "$log"
-          grep -F "$(basename "$probe")" "$log" | grep -E 'TS2322([^0-9]|$)'
       - run: bun test scripts/tooling-adoption.test.ts scripts/shared-policy.test.ts
       - run: node scripts/build-single-thread.test.mjs
       - run: bun test ./scripts/ci-result.test.ts
@@ -210,8 +195,9 @@ jobs:
   napi-ci:
     if: ${{ always() && !cancelled() && needs.check-changes.result == 'success' && (github.event_name != 'pull_request' || needs.trust-check.outputs.trusted == 'true') }}
     needs: [check-changes, trust-check]
-    uses: stella/.github/.github/workflows/rust-napi-ci.yml@07debc754995bab35e446511859f1d93e1ad127a
+    uses: stella/.github/.github/workflows/rust-napi-ci.yml@04c86bb54f4ae022354d72f8a40400bc7cf7428c
     with:
+      typecheck: true
       node-version: "26.10.0"
       trusted: ${{ (github.event_name != 'pull_request' || needs.trust-check.outputs.trusted == 'true') && 'true' || 'false' }}
       rust-changed: ${{ needs.check-changes.outputs.rust-changed }}
@@ -219,7 +205,6 @@ jobs:
       provenance-changed: ${{ needs.check-changes.outputs.provenance-changed }}
       provenance-version: v0.1.3
       property-test-command: bun run test:props
-      install-command: bun install --frozen-lockfile && bun run check:toolchain
     secrets: inherit
 
   single-thread:

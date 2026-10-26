@@ -132,8 +132,7 @@ describe("shared tooling adoption", () => {
     expect(changes).not.toContain("'rust-toolchain.toml'");
     expect(changes).toContain("'__test__/**'");
     const parsed = Bun.YAML.parse(workflow);
-    // The shared workflow's type check job also runs compiler parity.
-    expect(parsed.jobs["napi-ci"].with.typecheck).toBeUndefined();
+    expect(parsed.jobs["napi-ci"].with.typecheck).toBe(true);
     const steps = checks?.split("      - ") ?? [];
     const toolchainStep = steps.find((step) =>
       step.startsWith("run: bun run check:toolchain\n"),
@@ -141,12 +140,12 @@ describe("shared tooling adoption", () => {
     expect(toolchainStep).toContain(
       "if: needs.check-changes.outputs.toolchain-changed == 'true'",
     );
-    const typecheckStep = steps.find((candidate) =>
-      candidate.startsWith("run: bun run typecheck\n"),
-    );
-    expect(typecheckStep).toBeDefined();
-    expect(typecheckStep).not.toContain("if:");
-    expect(checks).toContain("export const typecheckRejectionProbe: string");
+    for (const command of ["typecheck", "check:typecheck-parity"]) {
+      const step = steps.find((candidate) =>
+        candidate.startsWith(`run: bun run ${command}\n`),
+      );
+      expect(step).toBeUndefined();
+    }
   });
 
   test("CI and release verify the real single-thread artifact", () => {

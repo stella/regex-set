@@ -63,7 +63,7 @@ const workflow = (name: string) =>
     name,
   );
 
-test("optional proofs run only on demand while CI type checks locally", () => {
+test("optional proofs run only on demand while shared CI remains enabled", () => {
   const optional = workflow("optional-proofs");
   const ci = workflow("ci");
   expect(Object.keys(optional.on)).toEqual(["workflow_dispatch"]);
@@ -72,8 +72,13 @@ test("optional proofs run only on demand while CI type checks locally", () => {
   expect(ci.job("napi-ci").uses).toContain("/rust-napi-ci.yml@");
   expect(
     ci.job("checks").steps.some((step) => step.run === "bun run typecheck"),
-  ).toBe(true);
-  expect(ci.job("napi-ci").with?.typecheck).toBeUndefined();
+  ).toBe(false);
+  expect(ci.job("napi-ci").with?.typecheck).toBe(true);
+  expect(
+    ci
+      .job("checks")
+      .steps.some((step) => step.run === "bun run check:typecheck-parity"),
+  ).toBe(false);
   expect(
     optional
       .job("contract-perf")
