@@ -28,11 +28,11 @@ const isResponse = (source: InitSource): source is Response =>
   "ok" in source &&
   "status" in source;
 
-export const initSync = (source: ArrayBuffer | ArrayBufferView) => {
+export const initSync = (source: ArrayBuffer | ArrayBufferView): void => {
   install(new WebAssembly.Instance(new WebAssembly.Module(source), {}));
 };
 
-export const init = async (source: InitSource) => {
+export const init = async (source: InitSource): Promise<void> => {
   let bytes: ArrayBuffer | ArrayBufferView;
   if (isBufferSource(source)) bytes = source;
   else if (isResponse(source)) {

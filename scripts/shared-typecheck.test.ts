@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 const workflow = (name: string) =>
   Bun.YAML.parse(
@@ -9,19 +9,16 @@ const workflow = (name: string) =>
     ),
   );
 
-test("CI and nightly share typecheck without duplicate local compiler runs", () => {
+test("CI shares typecheck without duplicate local compiler runs", () => {
   const ci = workflow("ci");
-  const nightly = workflow("typecheck-nightly");
   expect(ci.jobs["napi-ci"].with.typecheck).toBe(true);
-  expect(nightly.jobs["napi-ci"].uses).toBe(ci.jobs["napi-ci"].uses);
-  expect(nightly.jobs["napi-ci"].with).toMatchObject({
-    trusted: "true",
-    typecheck: true,
-    "typecheck-only": true,
-    parity: "always",
-  });
-  expect(nightly.on.schedule).toHaveLength(1);
-  expect(nightly.on).toHaveProperty("workflow_dispatch");
+  expect(ci.jobs["napi-ci"].with).not.toHaveProperty("typecheck-only");
+  expect(ci.jobs["napi-ci"].with).not.toHaveProperty("parity");
+  expect(
+    existsSync(
+      new URL("../.github/workflows/typecheck-nightly.yml", import.meta.url),
+    ),
+  ).toBe(false);
   const local = ci.jobs.checks.steps.map((step: { run?: string }) => step.run);
   expect(local).not.toContain("bun run typecheck");
   expect(local).not.toContain("bun run check:typecheck-parity");
