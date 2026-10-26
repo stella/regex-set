@@ -8,7 +8,7 @@
         "@changesets/changelog-github": "^1.0.1",
         "@changesets/cli": "^3.0.3",
         "@emnapi/core": "2.0.0-beta.1",
-        "@emnapi/runtime": "2.0.0-beta.1",
+        "@emnapi/runtime": "2.0.0-beta.2",
         "@napi-rs/cli": "3.10.8",
         "@napi-rs/wasm-runtime": "1.2.5",
         "@stll/oxlint-config": "2.0.0",
@@ -68,7 +68,7 @@
 
     "@emnapi/core": ["@emnapi/core@2.0.0-beta.1", "", { "dependencies": { "@emnapi/wasi-threads": "2.2.0", "tslib": "^2.4.0" } }, "sha512-5E4gwO8qdhoubPxgbs8QvihDap+vjrx8oZUHimGulO2+O3smgEQGBY554Pr3MkoGy2PuvZgrzTzLatekbWWCLQ=="],
 
-    "@emnapi/runtime": ["@emnapi/runtime@2.0.0-beta.1", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-u//q85BwNEBaNK0K4PH/RL9UYgYnAoSAUpD/YtxHkAfcfRLvcpfasTUf+p9xnoQ6EKP74+Am3/zi2Kb00AzGYw=="],
+    "@emnapi/runtime": ["@emnapi/runtime@2.0.0-beta.2", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-JcrSPzPvZuNZvJqPTF9Fw25LbOJ8avzFVlaf2grmH4Cku0oGP47tRgqPZadcfj3YoZMHkFVnCYFbQM8I+i5QEw=="],
 
     "@emnapi/wasi-threads": ["@emnapi/wasi-threads@2.2.0", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-JP7OYH38Q7+pyTAe14raZHLQIK7BDKbdwji+Xi3pcd/6QkJYQH3SX4wu6EplGrGJWRepoNzedfm0G3B9Z4e9Rw=="],
 
