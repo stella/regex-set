@@ -1,0 +1,11 @@
+#!/bin/sh
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  printf '%s\n' 'pre-commit: gitleaks is required but was not found on PATH; refusing to commit.' >&2
+  exit 1
+fi
+
+if ! gitleaks git --staged --redact --no-banner --no-color .; then
+  printf '%s\n' 'pre-commit: gitleaks could not complete or found a secret; refusing to commit.' >&2
+  exit 1
+fi
