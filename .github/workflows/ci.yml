@@ -137,7 +137,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: stella/.github/.github/actions/changeset-policy@07debc754995bab35e446511859f1d93e1ad127a
+      - uses: stella/.github/.github/actions/changeset-policy@04c86bb54f4ae022354d72f8a40400bc7cf7428c
         with:
           release-paths: |
             src/**
@@ -221,7 +221,7 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: package.json
-      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           toolchain: "1.99.0"
           targets: wasm32-wasip1-threads, wasm32-unknown-unknown
@@ -251,7 +251,7 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: package.json
-      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           toolchain: "1.97.1"
       - name: Install pinned Hawk

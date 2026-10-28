@@ -40,7 +40,7 @@ jobs:
       github.event_name != 'workflow_dispatch'
       || inputs.publish_to_npm != true
       || github.ref == 'refs/heads/main'
-    uses: stella/.github/.github/workflows/npm-version-preflight.yml@07debc754995bab35e446511859f1d93e1ad127a
+    uses: stella/.github/.github/workflows/npm-version-preflight.yml@04c86bb54f4ae022354d72f8a40400bc7cf7428c
     with:
       package-files: |
         package.json
@@ -77,12 +77,12 @@ jobs:
         with:
           node-version-file: .node-version
       - run: node scripts/version-sync.mjs check
-      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           toolchain: "1.99.0"
           components: clippy, rustfmt
           targets: wasm32-wasip1-threads, wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: release-verify
       - run: bun install --frozen-lockfile
@@ -147,11 +147,11 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
-      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           toolchain: "1.99.0"
           targets: ${{ matrix.settings.target }}
-      - uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: release-build-${{ matrix.settings.target }}
       - run: bun install --frozen-lockfile
@@ -246,7 +246,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
-      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           toolchain: "1.99.0"
           targets: wasm32-wasip1-threads, wasm32-unknown-unknown
@@ -376,7 +376,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
-      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           toolchain: "1.99.0"
       - run: node scripts/version-sync.mjs check
@@ -397,7 +397,7 @@ jobs:
         && needs.core-verify.result == 'success'
         && (github.event_name == 'push'
             || inputs.publish_to_npm))
-    uses: stella/.github/.github/workflows/crates-io-publish.yml@07debc754995bab35e446511859f1d93e1ad127a
+    uses: stella/.github/.github/workflows/crates-io-publish.yml@04c86bb54f4ae022354d72f8a40400bc7cf7428c
     with:
       crate-name: stella-regex-set-core
       manifest-path: crates/core/Cargo.toml
@@ -416,7 +416,7 @@ jobs:
         && needs.core-verify.result == 'success'
         && (github.event_name == 'push'
             || inputs.publish_to_npm))
-    uses: stella/.github/.github/workflows/crates-io-publish.yml@07debc754995bab35e446511859f1d93e1ad127a
+    uses: stella/.github/.github/workflows/crates-io-publish.yml@04c86bb54f4ae022354d72f8a40400bc7cf7428c
     with:
       crate-name: stella-regex-set-core
       manifest-path: crates/core/Cargo.toml
@@ -434,7 +434,7 @@ jobs:
         && needs.core.result == 'success'
         && (github.event_name == 'push'
             || inputs.publish_to_npm))
-    uses: stella/.github/.github/workflows/npm-version-finalize.yml@07debc754995bab35e446511859f1d93e1ad127a
+    uses: stella/.github/.github/workflows/npm-version-finalize.yml@04c86bb54f4ae022354d72f8a40400bc7cf7428c
     with:
       package-files: |
         package.json
