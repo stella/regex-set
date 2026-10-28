@@ -3541,7 +3541,7 @@
       "version": "0.4.12"
     },
     {
-      "bom-ref": "pkg:cargo/stella-regex-set-core@1.0.9",
+      "bom-ref": "pkg:cargo/stella-regex-set-core@1.1.0",
       "evidence": {
         "identity": [
           {
@@ -3566,12 +3566,12 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/stella-regex-set-core@1.0.9",
+      "purl": "pkg:cargo/stella-regex-set-core@1.1.0",
       "type": "library",
-      "version": "1.0.9"
+      "version": "1.1.0"
     },
     {
-      "bom-ref": "pkg:cargo/stella-regex-set-wasm-single-thread@1.0.9",
+      "bom-ref": "pkg:cargo/stella-regex-set-wasm-single-thread@1.1.0",
       "evidence": {
         "identity": [
           {
@@ -3596,12 +3596,12 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/stella-regex-set-wasm-single-thread@1.0.9",
+      "purl": "pkg:cargo/stella-regex-set-wasm-single-thread@1.1.0",
       "type": "library",
-      "version": "1.0.9"
+      "version": "1.1.0"
     },
     {
-      "bom-ref": "pkg:cargo/stella-regex-set@1.0.9",
+      "bom-ref": "pkg:cargo/stella-regex-set@1.1.0",
       "evidence": {
         "identity": [
           {
@@ -3626,9 +3626,9 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/stella-regex-set@1.0.9",
+      "purl": "pkg:cargo/stella-regex-set@1.1.0",
       "type": "library",
-      "version": "1.0.9"
+      "version": "1.1.0"
     },
     {
       "bom-ref": "pkg:cargo/strsim@0.11.1",
@@ -4542,7 +4542,7 @@
   "compositions": [
     {
       "aggregate": "incomplete",
-      "bom-ref": "pkg:npm/@stll/regex-set@1.0.9"
+      "bom-ref": "pkg:npm/@stll/regex-set@1.1.0"
     }
   ],
   "dependencies": [
@@ -5031,9 +5031,9 @@
         "pkg:cargo/napi-build@2.6.0",
         "pkg:cargo/napi-derive@3.6.13",
         "pkg:cargo/napi@3.15.0",
-        "pkg:cargo/stella-regex-set-core@1.0.9"
+        "pkg:cargo/stella-regex-set-core@1.1.0"
       ],
-      "ref": "pkg:cargo/stella-regex-set@1.0.9"
+      "ref": "pkg:cargo/stella-regex-set@1.1.0"
     },
     {
       "dependsOn": [
@@ -5045,15 +5045,15 @@
         "pkg:cargo/regex@1.13.1",
         "pkg:cargo/unicode-segmentation@1.13.3"
       ],
-      "ref": "pkg:cargo/stella-regex-set-core@1.0.9"
+      "ref": "pkg:cargo/stella-regex-set-core@1.1.0"
     },
     {
       "dependsOn": [
         "pkg:cargo/serde@1.0.229",
         "pkg:cargo/serde_json@1.0.154",
-        "pkg:cargo/stella-regex-set-core@1.0.9"
+        "pkg:cargo/stella-regex-set-core@1.1.0"
       ],
-      "ref": "pkg:cargo/stella-regex-set-wasm-single-thread@1.0.9"
+      "ref": "pkg:cargo/stella-regex-set-wasm-single-thread@1.1.0"
     },
     {
       "dependsOn": [],
@@ -5138,7 +5138,7 @@
     },
     {
       "dependsOn": [],
-      "ref": "pkg:npm/@stll/regex-set@1.0.9"
+      "ref": "pkg:npm/@stll/regex-set@1.1.0"
     }
   ],
   "metadata": {
@@ -5148,10 +5148,10 @@
       }
     ],
     "component": {
-      "bom-ref": "pkg:npm/@stll/regex-set@1.0.9",
+      "bom-ref": "pkg:npm/@stll/regex-set@1.1.0",
       "components": [
         {
-          "bom-ref": "pkg:cargo/stella-regex-set@1.0.9",
+          "bom-ref": "pkg:cargo/stella-regex-set@1.1.0",
           "externalReferences": [
             {
               "type": "vcs",
@@ -5168,12 +5168,12 @@
             }
           ],
           "name": "stella-regex-set",
-          "purl": "pkg:cargo/stella-regex-set@1.0.9",
+          "purl": "pkg:cargo/stella-regex-set@1.1.0",
           "type": "application",
-          "version": "1.0.9"
+          "version": "1.1.0"
         },
         {
-          "bom-ref": "pkg:cargo/stella-regex-set-wasm-single-thread@1.0.9",
+          "bom-ref": "pkg:cargo/stella-regex-set-wasm-single-thread@1.1.0",
           "group": "",
           "licenses": [
             {
@@ -5184,12 +5184,12 @@
             }
           ],
           "name": "stella-regex-set-wasm-single-thread",
-          "purl": "pkg:cargo/stella-regex-set-wasm-single-thread@1.0.9",
+          "purl": "pkg:cargo/stella-regex-set-wasm-single-thread@1.1.0",
           "type": "library",
-          "version": "1.0.9"
+          "version": "1.1.0"
         },
         {
-          "bom-ref": "pkg:cargo/stella-regex-set-core@1.0.9",
+          "bom-ref": "pkg:cargo/stella-regex-set-core@1.1.0",
           "externalReferences": [
             {
               "type": "vcs",
@@ -5210,9 +5210,9 @@
             }
           ],
           "name": "stella-regex-set-core",
-          "purl": "pkg:cargo/stella-regex-set-core@1.0.9",
+          "purl": "pkg:cargo/stella-regex-set-core@1.1.0",
           "type": "library",
-          "version": "1.0.9"
+          "version": "1.1.0"
         }
       ],
       "description": "Single-pass multi-pattern regex for Node.js/Bun. Backtracking-immune, Unicode-aware Rust engine via NAPI-RS.",
@@ -5236,9 +5236,9 @@
         }
       ],
       "name": "regex-set",
-      "purl": "pkg:npm/%40stll/regex-set@1.0.9",
+      "purl": "pkg:npm/%40stll/regex-set@1.1.0",
       "type": "application",
-      "version": "1.0.9"
+      "version": "1.1.0"
     },
     "lifecycles": [
       {
