@@ -79,7 +79,7 @@ jobs:
       - run: node scripts/version-sync.mjs check
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
-          toolchain: "1.99.0"
+          toolchain: "1.99.1"
           components: clippy, rustfmt
           targets: wasm32-wasip1-threads, wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
@@ -149,7 +149,7 @@ jobs:
           node-version-file: .node-version
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
-          toolchain: "1.99.0"
+          toolchain: "1.99.1"
           targets: ${{ matrix.settings.target }}
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
@@ -248,7 +248,7 @@ jobs:
           node-version-file: .node-version
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
-          toolchain: "1.99.0"
+          toolchain: "1.99.1"
           targets: wasm32-wasip1-threads, wasm32-unknown-unknown
       - run: bun install --frozen-lockfile
       - name: Install SBOM generator
@@ -378,7 +378,7 @@ jobs:
           node-version-file: .node-version
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
-          toolchain: "1.99.0"
+          toolchain: "1.99.1"
       - run: node scripts/version-sync.mjs check
       - name: Verify publishable core package
         run: cargo publish --dry-run --package stella-regex-set-core --locked
