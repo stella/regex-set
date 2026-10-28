@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.1.0
+
+### Minor Changes
+
+- [#235](https://github.com/stella/regex-set/pull/235) [`6d841a1`](https://github.com/stella/regex-set/commit/6d841a1e07aca2588fcd4ade4b269eb9ac5d7183) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Add a single-thread WebAssembly entry with explicit initialization from bytes or a URL, and an optional inline entry for synchronous initialization without I/O.
+
+### Patch Changes
+
+- [#234](https://github.com/stella/regex-set/pull/234) [`7dbd551`](https://github.com/stella/regex-set/commit/7dbd551d83f2ab368ac74ab88ed5d29de97b452e) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Update the WebAssembly runtime to the latest emnapi 2.0 beta. Browser disposal now aborts cleanup calls and terminates workers when a WASI worker crashes.
+
+- [#235](https://github.com/stella/regex-set/pull/235) [`6d841a1`](https://github.com/stella/regex-set/commit/6d841a1e07aca2588fcd4ade4b269eb9ac5d7183) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Build the single-thread WebAssembly artifact in every package build and release path.
+
+- [#263](https://github.com/stella/regex-set/pull/263) [`fd4f87b`](https://github.com/stella/regex-set/commit/fd4f87be652018dbb06ccce284e405fba61eb3dc) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Refresh Bon to 3.10.3 after its release-age quarantine, adopting the fix for cfg attributes on raw-identifier items.
+
+- [#262](https://github.com/stella/regex-set/pull/262) [`94f89ca`](https://github.com/stella/regex-set/commit/94f89ca10b918f317a59c0e6ffe6004039901105) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Refresh the Rust property-test runtime to Proptest 1.12, adopting synchronized panic-hook initialization and persisted-failure reporting fixes while preserving existing generators and regression seeds.
+
+- [#259](https://github.com/stella/regex-set/pull/259) [`273c0dc`](https://github.com/stella/regex-set/commit/273c0dc428c658e71e9ffbc97824c1e159446309) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Refresh build dependencies and generated development environment configuration.
+
+- [#261](https://github.com/stella/regex-set/pull/261) [`977c943`](https://github.com/stella/regex-set/commit/977c943391b1b179f7fa32a48e8dd3d13cddc1b4) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Update the N-API runtime and macro toolchain with native/WASM buffer ownership and teardown fixes, plus compatible Rust dependency patches.
+
 ## 1.0.9
 
 ### Patch Changes
