@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { library } from "@stll/oxlint-config";
+import toolchainPolicy from "@stll/oxlint-config/toolchain.json" with { type: "json" };
 import {
   portableSafetyPluginSpecifiers,
   portableSafetyRules,
@@ -175,7 +176,7 @@ describe("shared tooling adoption", () => {
         step.uses.startsWith("dtolnay/rust-toolchain@"),
     );
     expect(singleThreadToolchain.with).toMatchObject({
-      toolchain: "1.99.0",
+      toolchain: toolchainPolicy.rust,
       targets: "wasm32-wasip1-threads, wasm32-unknown-unknown",
     });
     expect(parsedCi.jobs["ci-result"].needs).toContain("single-thread");
@@ -189,7 +190,7 @@ describe("shared tooling adoption", () => {
           typeof step.uses === "string" &&
           step.uses.startsWith("dtolnay/rust-toolchain@"),
       );
-      expect(toolchain.with.toolchain).toBe("1.99.0");
+      expect(toolchain.with.toolchain).toBe(toolchainPolicy.rust);
       expect(toolchain.with.targets.split(/,\s*/)).toContain(
         "wasm32-unknown-unknown",
       );
@@ -282,7 +283,9 @@ describe("shared tooling adoption", () => {
     expect(ci).toContain('node-version: "26.10.0"');
     const release = read(".github/workflows/release.yml");
     expect(release.match(/node-version-file: .node-version/g)).toHaveLength(4);
-    expect(release.match(/toolchain: "1.99.0"/g)).toHaveLength(4);
+    expect(release.split(`toolchain: "${toolchainPolicy.rust}"`)).toHaveLength(
+      5,
+    );
     expect(release).not.toMatch(/node-version: "22/);
   });
 
