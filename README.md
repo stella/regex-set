@@ -323,6 +323,13 @@ export default {
 };
 ```
 
+The default browser entry uses shared WebAssembly
+memory and a worker, so pages that load it must be
+cross-origin isolated: serve them with
+`Cross-Origin-Opener-Policy: same-origin` and
+`Cross-Origin-Embedder-Policy: require-corp`. The
+single-thread entry needs neither.
+
 ## Acknowledgements
 
 - [**regex**](https://github.com/rust-lang/regex)
