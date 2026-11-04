@@ -137,7 +137,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: stella/.github/.github/actions/changeset-policy@ba5f7da76aededf6f22814de93c72a49843fcc8e
+      - uses: stella/.github/.github/actions/changeset-policy@3e9057a176377ddfa34d7897025934d1feb7ce9f
         with:
           release-paths: |
             src/**
@@ -188,14 +188,14 @@ jobs:
       - run: bun fmt --check
       - run: bun run check:toolchain
         if: needs.check-changes.outputs.toolchain-changed == 'true'
-      - run: bun test scripts/tooling-adoption.test.ts scripts/shared-policy.test.ts
+      - run: bun test scripts/tooling-adoption.test.ts scripts/shared-policy.test.ts scripts/release-workflow.test.mjs
       - run: node scripts/build-single-thread.test.mjs
       - run: bun test ./scripts/ci-result.test.ts
 
   napi-ci:
     if: ${{ always() && !cancelled() && needs.check-changes.result == 'success' && (github.event_name != 'pull_request' || needs.trust-check.outputs.trusted == 'true') }}
     needs: [check-changes, trust-check]
-    uses: stella/.github/.github/workflows/rust-napi-ci.yml@ba5f7da76aededf6f22814de93c72a49843fcc8e
+    uses: stella/.github/.github/workflows/rust-napi-ci.yml@3e9057a176377ddfa34d7897025934d1feb7ce9f
     with:
       typecheck: true
       node-version: "26.10.0"
