@@ -35,7 +35,7 @@ Project: root
 - darling_macro 0.24.1 — MIT
 - equivalent 1.0.3 — Apache-2.0 OR MIT
 - errno 0.3.14 — Apache-2.0 OR MIT
-- fancy-regex 0.19.2 — MIT
+- fancy-regex 0.20.0 — MIT
 - fastrand 2.5.0 — Apache-2.0 OR MIT
 - fnv 1.0.7 — Apache-2.0 / MIT
 - futures 0.3.34 — Apache-2.0 OR MIT
