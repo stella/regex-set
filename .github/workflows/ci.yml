@@ -188,7 +188,8 @@ jobs:
       - run: bun fmt --check
       - run: bun run check:toolchain
         if: needs.check-changes.outputs.toolchain-changed == 'true'
-      - run: bun test scripts/tooling-adoption.test.ts scripts/shared-policy.test.ts scripts/release-workflow.test.mjs
+      - run: bun test scripts/tooling-adoption.test.ts scripts/shared-policy.test.ts
+      - run: bun test scripts/release-workflow.test.mjs
       - run: node scripts/build-single-thread.test.mjs
       - run: bun test ./scripts/ci-result.test.ts
 
