@@ -1114,7 +1114,7 @@
       "version": "0.3.14"
     },
     {
-      "bom-ref": "pkg:cargo/fancy-regex@0.19.2",
+      "bom-ref": "pkg:cargo/fancy-regex@0.20.0",
       "evidence": {
         "identity": [
           {
@@ -1135,7 +1135,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "d301f5bf187b3c295fce6468d3875037a0bccc5f6b151c63cac2f85babf21912"
+          "content": "20ed7f62ce0ae0da1a8b93c3c7104ab7e0760a74491e097c701fff966e945390"
         }
       ],
       "licenses": [
@@ -1152,9 +1152,9 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/fancy-regex@0.19.2",
+      "purl": "pkg:cargo/fancy-regex@0.20.0",
       "type": "library",
-      "version": "0.19.2"
+      "version": "0.20.0"
     },
     {
       "bom-ref": "pkg:cargo/fastrand@2.5.0",
@@ -4690,7 +4690,7 @@
         "pkg:cargo/regex-automata@0.4.18",
         "pkg:cargo/regex-syntax@0.8.11"
       ],
-      "ref": "pkg:cargo/fancy-regex@0.19.2"
+      "ref": "pkg:cargo/fancy-regex@0.20.0"
     },
     {
       "dependsOn": [],
@@ -5038,7 +5038,7 @@
     {
       "dependsOn": [
         "pkg:cargo/bon@3.10.3",
-        "pkg:cargo/fancy-regex@0.19.2",
+        "pkg:cargo/fancy-regex@0.20.0",
         "pkg:cargo/proptest@1.12.0",
         "pkg:cargo/regex-automata@0.4.18",
         "pkg:cargo/regex-syntax@0.8.11",
