@@ -4,6 +4,16 @@ import { readFileSync } from "node:fs";
 import nativeBinding from "../index.cjs";
 import { initBinding } from "../src/core";
 import { RegexSet as NativeRegexSet } from "../src/index";
+import type * as SingleThreadEntry from "../src/single-thread";
+
+const isSingleThreadEntry = (
+  value: unknown,
+): value is typeof SingleThreadEntry =>
+  typeof value === "object" &&
+  value !== null &&
+  ["init", "initSync", "RegexSet"].every(
+    (name) => typeof Reflect.get(value, name) === "function",
+  );
 
 test("single-thread entry imports without initialization side effects", async () => {
   const fetchSpy = spyOn(globalThis, "fetch");
@@ -17,26 +27,31 @@ test("single-thread entry imports without initialization side effects", async ()
   Object.defineProperty(WebAssembly, "Module", {
     configurable: true,
     value: new Proxy(OriginalModule, {
-      construct(target, argumentsList, newTarget) {
+      construct(target, argumentsList: [BufferSource]) {
         moduleCalls++;
-        return Reflect.construct(target, argumentsList, newTarget);
+        return new target(...argumentsList);
       },
     }),
   });
   Object.defineProperty(WebAssembly, "Instance", {
     configurable: true,
     value: new Proxy(OriginalInstance, {
-      construct(target, argumentsList, newTarget) {
+      construct(
+        target,
+        argumentsList: [WebAssembly.Module, WebAssembly.Imports?],
+      ) {
         instanceCalls++;
-        return Reflect.construct(target, argumentsList, newTarget);
+        return new target(...argumentsList);
       },
     }),
   });
 
   try {
-    const entry = await import(
+    const entry: unknown = await import(
       `../src/single-thread?import-side-effect=${crypto.randomUUID()}`
     );
+    if (!isSingleThreadEntry(entry))
+      throw new Error("single-thread entry lacks its exports");
     const invocationCount = () =>
       fetchSpy.mock.calls.length +
       instantiateSpy.mock.calls.length +

@@ -14,6 +14,30 @@ type Reply = {
   error?: string;
 };
 
+const INVALID_REPLY = "Invalid response from single-thread WebAssembly";
+
+const parseReply = (text: string): Reply => {
+  const reply: unknown = JSON.parse(text);
+  if (
+    typeof reply !== "object" ||
+    reply === null ||
+    !("ok" in reply) ||
+    typeof reply.ok !== "boolean"
+  )
+    throw new TypeError(INVALID_REPLY);
+  const error = "error" in reply ? reply.error : undefined;
+  if (error !== undefined && error !== null && typeof error !== "string")
+    throw new TypeError(INVALID_REPLY);
+  return {
+    ok: reply.ok,
+    value: "value" in reply ? reply.value : undefined,
+    ...(typeof error === "string" ? { error } : {}),
+  };
+};
+
+const isIntegerList = (value: unknown): value is number[] =>
+  Array.isArray(value) && value.every((item) => Number.isInteger(item));
+
 const napiString = (value: string) =>
   value.replaceAll(LONE_SURROGATE, "\uFFFD");
 
@@ -39,7 +63,7 @@ export const createSingleThreadBinding = (
         wasm.output_pointer(),
         wasm.output_length(),
       );
-      const reply: Reply = JSON.parse(decoder.decode(output));
+      const reply = parseReply(decoder.decode(output));
       if (!reply.ok) throw new Error(reply.error ?? "WASM operation failed");
       return reply.value;
     } catch (error) {
@@ -52,7 +76,7 @@ export const createSingleThreadBinding = (
   };
 
   const numbers = (value: unknown): number[] => {
-    if (!Array.isArray(value) || !value.every(Number.isInteger)) {
+    if (!isIntegerList(value)) {
       throw new TypeError(
         "Invalid numeric response from single-thread WebAssembly",
       );

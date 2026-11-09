@@ -1,6 +1,7 @@
 import { parse } from "acorn";
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { compileFunction } from "node:vm";
 
 import { normalizeGeneratedLoader } from "./generated-loader-normalization.mjs";
 
@@ -528,8 +529,7 @@ const runtimePollFixture = (pace) => {
 };
 `;
     const normalized = normalizeGeneratedLoader(generated);
-    // oxlint-disable-next-line typescript/no-implied-eval -- The generated loader fixture must execute to prove its disposal behavior.
-    const loadFixture = new Function(
+    const loadFixture = compileFunction(
       `${normalized}\nreturn {
         failWorkerStartup(error) { startupListeners.error({ error }); },
         dispose: __disposeWasiBinding,
@@ -585,8 +585,7 @@ function __drainWasmEnvForWasiDisposal() {
 }
 `;
     const normalized = normalizeGeneratedLoader(generated);
-    // oxlint-disable-next-line typescript/no-implied-eval -- The generated loader fixture must execute to prove its disposal behavior.
-    const fixture = new Function(
+    const fixture = compileFunction(
       `${normalized}\nreturn {
         begin() { __wasiDisposePromise = __drainWasmEnvForWasiDisposal(); return __wasiDisposePromise; },
         crash() { threadManager._fatalError = new Error("worker import failed"); },
@@ -650,8 +649,7 @@ function __rollbackWasiInitialization() {
 // A view of the addon's crash flag, one word of the shared wasm memory, for the fixture.
 `;
     const normalized = normalizeGeneratedLoader(generated);
-    // oxlint-disable-next-line typescript/no-implied-eval -- The generated loader fixture must execute to prove its rollback behavior.
-    const fixture = new Function(
+    const fixture = compileFunction(
       `${normalized}\nreturn {
         failInitialization: async () => { const error = new Error("initialization failed"); const cleanupErrors = await __rollbackWasiInitialization(); if (cleanupErrors.length) error.cause = cleanupErrors[0]; throw error; },
         failWorkerStartup(error) { startupListeners.error({ error }); },
@@ -717,8 +715,7 @@ function __rollbackWasiInitialization() {
 // A view of the addon's crash flag, one word of the shared wasm memory, for the fixture.
 `;
     const normalized = normalizeGeneratedLoader(generated);
-    // oxlint-disable-next-line typescript/no-implied-eval -- The generated loader fixture must execute to prove its rollback behavior.
-    const fixture = new Function(
+    const fixture = compileFunction(
       `${normalized}\nreturn {
         failInitialization: async () => { const error = new Error("initialization failed"); const cleanupErrors = await __rollbackWasiInitialization(); if (cleanupErrors.length) error.cause = cleanupErrors[0]; throw error; },
         crash() { __wasiAddonCrashFlag = new Int32Array(new SharedArrayBuffer(4)); Atomics.store(__wasiAddonCrashFlag, 0, 1); },

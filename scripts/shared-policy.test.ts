@@ -3,6 +3,8 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 
+import { at, list, mapping, parseJson, text } from "./structured";
+
 const root = new URL("../", import.meta.url);
 const read = (path: string) => readFileSync(new URL(path, root), "utf8");
 
@@ -16,17 +18,20 @@ test("repository workflows satisfy the installed shared toolchain guard", () => 
   const workflow = read(".github/workflows/ci.yml");
   expect(workflow).toContain('HAWK_RUST_TOOLCHAIN: "1.97.1"');
   expect(workflow).toContain('toolchain: "1.97.1"');
-  const manifest = JSON.parse(read("package.json"));
-  expect(manifest.scripts["rust:hawk"]).toContain("cargo +1.97.1 hawk");
+  const manifest = parseJson(read("package.json"));
+  expect(
+    text(at(manifest, "scripts", "rust:hawk"), "scripts.rust:hawk"),
+  ).toContain("cargo +1.97.1 hawk");
 }, 30_000);
 
 test("change detection follows trust and the CI dependency graph stays acyclic", () => {
   const workflow = Bun.YAML.parse(read(".github/workflows/ci.yml"));
-  const jobs = workflow.jobs;
-  const detector = jobs["check-changes"];
-  expect(detector.needs).toEqual(["trust-check"]);
-  expect(jobs["trust-check"].needs).toBeUndefined();
-  const condition = detector.if.trim().replace(/\s+/gu, " ");
+  const jobs = mapping(at(workflow, "jobs"), "jobs");
+  expect(at(jobs, "check-changes", "needs")).toEqual(["trust-check"]);
+  expect(at(jobs, "trust-check", "needs")).toBeUndefined();
+  const condition = text(at(jobs, "check-changes", "if"), "check-changes.if")
+    .trim()
+    .replace(/\s+/gu, " ");
   expect(condition).toBe(
     "always() && !cancelled() && (github.event_name != 'pull_request' || needs.trust-check.outputs.trusted == 'true')",
   );
@@ -68,7 +73,7 @@ test("change detection follows trust and the CI dependency graph stays acyclic",
       expected: false,
     },
   ]) {
-    const result = runInNewContext(
+    const result: unknown = runInNewContext(
       condition.replaceAll("needs.trust-check.", 'needs["trust-check"].'),
       {
         always: () => true,
@@ -151,27 +156,29 @@ test("native Node loads the single explicitly extended build-config import", () 
   expect(result.status, `${result.error ?? ""}\n${result.stderr}`).toBe(0);
   const config = read("tsdown.config.ts");
   expect(config.match(/from "\.\/[^"]+\.ts"/gu)).toHaveLength(1);
-  expect(JSON.parse(read("tsconfig.json")).compilerOptions).toEqual({
+  expect(at(parseJson(read("tsconfig.json")), "compilerOptions")).toEqual({
     allowImportingTsExtensions: true,
   });
 }, 30_000);
 
 test("first-party quarantine exemptions use exact supported annotations", () => {
-  const text = read("bunfig.toml");
-  const configuration = Bun.TOML.parse(text);
-  for (const name of configuration.install.minimumReleaseAgeExcludes) {
+  const bunfig = read("bunfig.toml");
+  const configuration = Bun.TOML.parse(bunfig);
+  for (const name of list(
+    at(configuration, "install", "minimumReleaseAgeExcludes"),
+    "install.minimumReleaseAgeExcludes",
+  ).map((item) => text(item, "install.minimumReleaseAgeExcludes"))) {
     expect(name).not.toContain("*");
-    const line = text
+    const line = bunfig
       .split("\n")
       .find((entry) =>
         entry.trimStart().startsWith(JSON.stringify(name) + ","),
       );
     // First-party exemptions are permanent; a third-party exclusion names
     // the instant the normal quarantine admits it.
-    const marker =
-      typeof name === "string" && name.startsWith("@stll/")
-        ? "quarantine-excluded-since"
-        : "quarantine-expires";
+    const marker = name.startsWith("@stll/")
+      ? "quarantine-excluded-since"
+      : "quarantine-expires";
     expect(line).toMatch(
       new RegExp(
         `^\\s*"[^"]+",?\\s*#\\s*${marker}:\\s*\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z\\s*$`,

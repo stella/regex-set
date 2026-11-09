@@ -167,7 +167,9 @@ describe("RegexSet", () => {
       (_, index) => `(?i:currency${index})`,
     ).join("|");
     const rs = new RegexSet([`\\b(?:${terms})\\s+\\d+`]);
-    const nativeIndexMap = Reflect.get(rs, "_nativeIndexMap");
+    const nativeIndexMap: unknown = Reflect.get(rs, "_nativeIndexMap");
+    if (!Array.isArray(nativeIndexMap))
+      throw new TypeError("_nativeIndexMap must be an array");
 
     expect(rs.patternCount).toBe(1);
     expect(nativeIndexMap.length).toBeGreaterThan(1);
@@ -699,7 +701,7 @@ describe("internal \\b DFA explosion", () => {
     "[\\dA-Z]{4}\\s?[\\dA-Z]{4}" +
     "\\s?[\\dA-Z]{4}\\s?[\\dA-Z]{4}" +
     "\\s?[\\dA-Z]{0,14}\\b";
-  const internalBPat = "(?:\\bM\\.|Mrs|Ms|Mr)" + "\\.?\\s+[A-Z][a-z]+";
+  const internalBPat = "(?:\\bM\\.|Mrs|Ms|Mr)\\.?\\s+[A-Z][a-z]+";
 
   test("correctness: internal \\b pattern matches", () => {
     const rs = new RegexSet([bigAltPat, internalBPat, ibanPat]);
