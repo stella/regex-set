@@ -20,6 +20,7 @@ import {
 } from "@stll/oxlint-plugin";
 
 import config from "../oxlint.config";
+import { at, list, mapping, parseJson, text } from "./structured";
 
 const root = new URL("../", import.meta.url);
 const read = (path: string) => readFileSync(new URL(path, root), "utf8");
@@ -84,9 +85,9 @@ describe("shared tooling adoption", () => {
         rules: { ...portableSafetyRules },
       }),
     );
-    const tsconfig = JSON.parse(read("tsconfig.json"));
-    expect(tsconfig.extends).toBe("@stll/typescript-config/node.json");
-    expect(tsconfig.compilerOptions).toEqual({
+    const tsconfig = parseJson(read("tsconfig.json"));
+    expect(at(tsconfig, "extends")).toBe("@stll/typescript-config/node.json");
+    expect(at(tsconfig, "compilerOptions")).toEqual({
       allowImportingTsExtensions: true,
     });
   });
@@ -133,7 +134,7 @@ describe("shared tooling adoption", () => {
     expect(changes).not.toContain("'rust-toolchain.toml'");
     expect(changes).toContain("'__test__/**'");
     const parsed = Bun.YAML.parse(workflow);
-    expect(parsed.jobs["napi-ci"].with.typecheck).toBe(true);
+    expect(at(parsed, "jobs", "napi-ci", "with", "typecheck")).toBe(true);
     const steps = checks?.split("      - ") ?? [];
     const toolchainStep = steps.find((step) =>
       step.startsWith("run: bun run check:toolchain\n"),
@@ -152,8 +153,11 @@ describe("shared tooling adoption", () => {
   test("CI and release verify the real single-thread artifact", () => {
     const ci = read(".github/workflows/ci.yml");
     const parsedCi = Bun.YAML.parse(ci);
-    const singleThread = parsedCi.jobs["single-thread"];
-    expect(singleThread.steps).toEqual(
+    const singleThreadSteps = list(
+      at(parsedCi, "jobs", "single-thread", "steps"),
+      "jobs.single-thread.steps",
+    );
+    expect(singleThreadSteps).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ run: "bun run build" }),
         expect.objectContaining({
@@ -167,41 +171,46 @@ describe("shared tooling adoption", () => {
         }),
       ]),
     );
-    expect(parsedCi.jobs.checks.steps).toContainEqual({
+    expect(
+      list(at(parsedCi, "jobs", "checks", "steps"), "jobs.checks.steps"),
+    ).toContainEqual({
       run: "node scripts/build-single-thread.test.mjs",
     });
-    const singleThreadToolchain = singleThread.steps.find(
-      (step: Record<string, unknown>) =>
-        typeof step.uses === "string" &&
-        step.uses.startsWith("dtolnay/rust-toolchain@"),
-    );
-    expect(singleThreadToolchain.with).toMatchObject({
+    const usesRustToolchain = (step: unknown) => {
+      const uses = at(step, "uses");
+      return (
+        typeof uses === "string" && uses.startsWith("dtolnay/rust-toolchain@")
+      );
+    };
+    const singleThreadToolchain = singleThreadSteps.find(usesRustToolchain);
+    expect(at(singleThreadToolchain, "with")).toMatchObject({
       toolchain: toolchainPolicy.rust,
       targets: "wasm32-wasip1-threads, wasm32-unknown-unknown",
     });
-    expect(parsedCi.jobs["ci-result"].needs).toContain("single-thread");
+    expect(
+      list(at(parsedCi, "jobs", "ci-result", "needs"), "jobs.ci-result.needs"),
+    ).toContain("single-thread");
     expect(ci).toContain('test "$SINGLE_THREAD_RESULT" = success');
 
     const release = read(".github/workflows/release.yml");
     const parsedRelease = Bun.YAML.parse(release);
     for (const jobName of ["verify", "pack"]) {
-      const toolchain = parsedRelease.jobs[jobName].steps.find(
-        (step: Record<string, unknown>) =>
-          typeof step.uses === "string" &&
-          step.uses.startsWith("dtolnay/rust-toolchain@"),
-      );
-      expect(toolchain.with.toolchain).toBe(toolchainPolicy.rust);
-      expect(toolchain.with.targets.split(/,\s*/)).toContain(
-        "wasm32-unknown-unknown",
-      );
+      const toolchain = list(
+        at(parsedRelease, "jobs", jobName, "steps"),
+        `jobs.${jobName}.steps`,
+      ).find(usesRustToolchain);
+      expect(at(toolchain, "with", "toolchain")).toBe(toolchainPolicy.rust);
+      expect(
+        text(at(toolchain, "with", "targets"), "with.targets").split(/,\s*/),
+      ).toContain("wasm32-unknown-unknown");
     }
     const scripts = Object.fromEntries(
-      Object.entries(JSON.parse(read("package.json")).scripts).map(
-        ([name, command]) => {
-          expect(typeof command).toBe("string");
-          return [name, String(command)];
-        },
-      ),
+      Object.entries(
+        mapping(at(parseJson(read("package.json")), "scripts"), "scripts"),
+      ).map(([name, command]) => {
+        expect(typeof command).toBe("string");
+        return [name, String(command)];
+      }),
     );
     expect(scripts.build).not.toContain("build:package");
     expect(scripts["build:js"]).not.toContain("build:package");
@@ -227,12 +236,11 @@ describe("shared tooling adoption", () => {
       ),
     ).toEqual(["negative.yml:unsafe:step 2"]);
 
-    const napiCommands = Object.entries(parsedCi.jobs["napi-ci"].with)
-      .filter(
-        ([name, value]) =>
-          name.endsWith("-command") && typeof value === "string",
-      )
-      .map(([, value]) => value as string);
+    const napiCommands = Object.entries(
+      mapping(at(parsedCi, "jobs", "napi-ci", "with"), "jobs.napi-ci.with"),
+    ).flatMap(([name, value]) =>
+      name.endsWith("-command") && typeof value === "string" ? [value] : [],
+    );
     const sharedScripts = [
       "build",
       "build:js",
@@ -271,9 +279,13 @@ describe("shared tooling adoption", () => {
   });
 
   test("runtime selectors share policy pins with one bounded Hawk exception", () => {
-    const declaration = JSON.parse(read("stll-toolchain.json"));
-    expect(declaration.rustExceptions).toHaveLength(1);
-    expect(declaration.rustExceptions.at(0)).toMatchObject({
+    const declaration = parseJson(read("stll-toolchain.json"));
+    const rustExceptions = list(
+      at(declaration, "rustExceptions"),
+      "rustExceptions",
+    );
+    expect(rustExceptions).toHaveLength(1);
+    expect(rustExceptions.at(0)).toMatchObject({
       pin: "1.97.1",
       tracking: "https://github.com/stella/tooling/issues/99",
       expires: "2026-11-11",
@@ -296,8 +308,8 @@ describe("shared tooling adoption", () => {
         cwd: directory,
         encoding: "utf8",
       }).trim();
-    const detect = (since: string) =>
-      JSON.parse(
+    const detect = (since: string): unknown =>
+      parseJson(
         execFileSync(
           "node",
           [
@@ -335,14 +347,14 @@ describe("shared tooling adoption", () => {
       writeFileSync(join(directory, "README.md"), "Prose only\n");
       git("add", "README.md");
       git("commit", "--quiet", "-m", "prose");
-      expect(detect(base).changed).toBe(false);
+      expect(at(detect(base), "changed")).toBe(false);
       writeFileSync(
         join(directory, "package.json"),
         JSON.stringify({ packageManager: "bun@1.4.4" }),
       );
       git("add", "package.json");
       git("commit", "--quiet", "-m", "runtime");
-      expect(detect(base).changed).toBe(true);
+      expect(at(detect(base), "changed")).toBe(true);
       expect(detect("unavailable-toolchain-base")).toMatchObject({
         status: "unreadable",
         changed: true,
