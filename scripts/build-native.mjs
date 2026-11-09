@@ -30,7 +30,7 @@ if (result.status !== 0) {
 async function normalizeGeneratedFile(fileName) {
   const fileUrl = new URL(`../${fileName}`, import.meta.url);
   try {
-    let content = await readFile(fileUrl, "utf8");
+    const content = await readFile(fileUrl, "utf8");
     await writeFile(fileUrl, normalizeGeneratedLoader(content));
   } catch (error) {
     if (error?.code !== "ENOENT") {

@@ -657,15 +657,13 @@ function normalizeEntry(p: unknown, i: number): NormalizedEntry {
   const pattern = p.pattern;
   if (typeof pattern !== "string" && !(pattern instanceof RegExp)) {
     throw new TypeError(
-      `Pattern at index ${i}: "pattern" ` + "field must be a string or RegExp",
+      `Pattern at index ${i}: "pattern" field must be a string or RegExp`,
     );
   }
 
   const name = "name" in p ? p.name : undefined;
   if (name !== undefined && typeof name !== "string") {
-    throw new TypeError(
-      `Pattern at index ${i}: "name" ` + "field must be a string",
-    );
+    throw new TypeError(`Pattern at index ${i}: "name" field must be a string`);
   }
 
   return {

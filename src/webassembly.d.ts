@@ -10,7 +10,7 @@ declare namespace WebAssembly {
   type Module = object;
 }
 
-declare var WebAssembly: {
+declare const WebAssembly: {
   Instance: new (
     module: WebAssembly.Module,
     imports?: Record<string, Record<string, unknown>>,

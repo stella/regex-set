@@ -397,10 +397,10 @@ describe("property: JS oracle on feature patterns", () => {
               all.push({
                 pattern: i,
                 start: m.index,
-                end: m.index + m[0]!.length,
-                text: m[0]!,
+                end: m.index + m[0].length,
+                text: m[0],
               });
-              if (m[0]!.length === 0) {
+              if (m[0].length === 0) {
                 re.lastIndex++;
               }
             }
@@ -845,7 +845,7 @@ describe("property: no catastrophic slowdown", () => {
             re!.lastIndex = 0;
             let m;
             while ((m = re!.exec(text)) !== null) {
-              if (m[0]!.length === 0) {
+              if (m[0].length === 0) {
                 re!.lastIndex++;
               }
             }

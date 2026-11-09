@@ -126,7 +126,7 @@ console.log("=".repeat(65));
 // ─── 1. mariomka: Email, URI, IPv4 ───────────
 
 console.log(
-  `\n### mariomka corpus ` + `(${(mariomka.length / 1e6).toFixed(1)} MB)\n`,
+  `\n### mariomka corpus (${(mariomka.length / 1e6).toFixed(1)} MB)\n`,
 );
 
 // Use explicit ASCII classes here so JS RegExp and
@@ -299,7 +299,7 @@ const t2 = performance.now();
 rsCf.isMatch(cfInput);
 const cfTime = performance.now() - t2;
 console.log(
-  `  .*.*=.* on ${cfInput.length} chars:` + `  Rust ${cfTime.toFixed(2)} ms`,
+  `  .*.*=.* on ${cfInput.length} chars:  Rust ${cfTime.toFixed(2)} ms`,
 );
 
 // ─── 5. Lookaround patterns (prefiltered) ────

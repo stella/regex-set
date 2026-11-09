@@ -112,31 +112,27 @@ const overheadFallback =
   r3.ms > 0 && r2.ms > 0 ? ((r3.ms - r2.ms) / r2.ms) * 100 : 0;
 
 console.log(
-  `  Verifier overhead (no fallback):  ` +
-    `${overheadVerifier > 0 ? "+" : ""}` +
-    `${overheadVerifier.toFixed(1)}%`,
+  `  Verifier overhead (no fallback):  ${overheadVerifier > 0 ? "+" : ""}${overheadVerifier.toFixed(1)}%`,
 );
 console.log(
-  `  Fallback overhead (vs verifier):  ` +
-    `${overheadFallback > 0 ? "+" : ""}` +
-    `${overheadFallback.toFixed(1)}%`,
+  `  Fallback overhead (vs verifier):  ${overheadFallback > 0 ? "+" : ""}${overheadFallback.toFixed(1)}%`,
 );
 
 // Sanity: verify match counts
 console.log();
 if (r1.matches !== REPS) {
   console.error(
-    `  ERROR: baseline expected ${REPS} matches,` + ` got ${r1.matches}`,
+    `  ERROR: baseline expected ${REPS} matches, got ${r1.matches}`,
   );
 }
 if (r2.matches !== REPS) {
   console.error(
-    `  ERROR: verifier expected ${REPS} matches,` + ` got ${r2.matches}`,
+    `  ERROR: verifier expected ${REPS} matches, got ${r2.matches}`,
   );
 }
 if (r3.matches !== REPS) {
   console.error(
-    `  ERROR: fallback expected ${REPS} matches,` + ` got ${r3.matches}`,
+    `  ERROR: fallback expected ${REPS} matches, got ${r3.matches}`,
   );
 }
 
