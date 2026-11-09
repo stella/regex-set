@@ -2851,7 +2851,7 @@ mod tests {
 
     assert_eq!(fallback.find_iter_packed("aé")?, vec![0, 1, 2]);
     assert_eq!(direct.find_iter_packed("aé")?, vec![0, 1, 2]);
-    assert!(fallback.find_iter_packed("a\u{FF}")?.is_empty());
+    assert_eq!(fallback.find_iter_packed("a\u{FF}")?, Vec::<u32>::new());
     Ok(())
   }
 
@@ -2866,7 +2866,7 @@ mod tests {
     assert_eq!(set.engine_path_counts()[2], 1);
     assert_eq!(set.find_iter_packed("xŸ")?, vec![0, 1, 2]);
     assert_eq!(set.find_iter_packed("xÀ")?, vec![0, 1, 2]);
-    assert!(set.find_iter_packed("xA")?.is_empty());
+    assert_eq!(set.find_iter_packed("xA")?, Vec::<u32>::new());
     Ok(())
   }
 
