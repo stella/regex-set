@@ -2840,18 +2840,19 @@ mod tests {
 
   #[test]
   fn fancy_fallback_matches_high_hex_escapes_as_code_points() -> Result<()> {
-    // The lookbehind routes the pattern through the fancy-regex fallback;
-    // `\xE9` must match `é` there, as it does on the regex-crate paths.
+    // The backreference keeps the pattern out of the regex crate, so it runs
+    // on the fancy-regex fallback; `\xE9` must match `é` there, as it does on
+    // the regex-crate paths.
     let fallback =
-      RegexSet::new(vec![String::from(r"(?<=a)\xE9")], Options::default())?;
+      RegexSet::new(vec![String::from(r"(a)\1\xE9")], Options::default())?;
     assert_eq!(fallback.engine_path_counts()[2], 1);
     let direct =
       RegexSet::new(vec![String::from(r"\xE9")], Options::default())?;
     assert_eq!(direct.engine_path_counts()[2], 0);
 
-    assert_eq!(fallback.find_iter_packed("aé")?, vec![0, 1, 2]);
+    assert_eq!(fallback.find_iter_packed("aaé")?, vec![0, 0, 3]);
     assert_eq!(direct.find_iter_packed("aé")?, vec![0, 1, 2]);
-    assert_eq!(fallback.find_iter_packed("a\u{FF}")?, Vec::<u32>::new());
+    assert_eq!(fallback.find_iter_packed("aa\u{FF}")?, Vec::<u32>::new());
     Ok(())
   }
 
