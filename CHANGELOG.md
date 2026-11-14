@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.1.1
+
+### Patch Changes
+
+- [#277](https://github.com/stella/regex-set/pull/277) [`1effe8f`](https://github.com/stella/regex-set/commit/1effe8f3558a11189df46823dd8370afa1b55759) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Move the WebAssembly packages to `@emnapi/core` and `@emnapi/runtime` 2.0.0-beta.3 with `@napi-rs/wasm-runtime` 1.2.7.
+
+- [#276](https://github.com/stella/regex-set/pull/276) [`c71325b`](https://github.com/stella/regex-set/commit/c71325b46553d0cbe330cf8a3515e9b834abf63c) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Build the native binding with napi 3.16 and napi-derive 3.7.
+
+- [#276](https://github.com/stella/regex-set/pull/276) [`c71325b`](https://github.com/stella/regex-set/commit/c71325b46553d0cbe330cf8a3515e9b834abf63c) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Update fancy-regex to 0.20 for patterns that need lookaround or backreferences. In Unicode mode, `\xHH` escapes above `0x7F` now match the code point, as they already did for the other patterns; case-insensitive prefilters no longer miss candidates for non-ASCII class ranges.
+
+- [#279](https://github.com/stella/regex-set/pull/279) [`b535407`](https://github.com/stella/regex-set/commit/b5354078b98635a75aa26ca624f905326ce52e66) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Validate single-thread WebAssembly replies before use.
+
 ## 1.1.0
 
 ### Minor Changes
