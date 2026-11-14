@@ -1867,7 +1867,7 @@
       "version": "2.14.2"
     },
     {
-      "bom-ref": "pkg:cargo/itoa@1.0.18",
+      "bom-ref": "pkg:cargo/itoa@1.0.19",
       "evidence": {
         "identity": [
           {
@@ -1888,7 +1888,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
+          "content": "3bd1574e617a9a6c1f8f8181bd7e841e1f20e4277607ef28945765188d6284d4"
         }
       ],
       "licenses": [
@@ -1910,9 +1910,9 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/itoa@1.0.18",
+      "purl": "pkg:cargo/itoa@1.0.19",
       "type": "library",
-      "version": "1.0.18"
+      "version": "1.0.19"
     },
     {
       "bom-ref": "pkg:cargo/libc@0.2.191",
@@ -3674,7 +3674,7 @@
       "version": "0.11.1"
     },
     {
-      "bom-ref": "pkg:cargo/syn@3.0.9",
+      "bom-ref": "pkg:cargo/syn@3.0.10",
       "evidence": {
         "identity": [
           {
@@ -3695,7 +3695,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "d78c8dee4c7bf0e14673097256fed6142ce9d3b85a408189d07482442145823b"
+          "content": "4ae9ccbea3a7b0b09443036490c8f34a8b1b760fd345e5c0dae0aac718faea79"
         }
       ],
       "licenses": [
@@ -3717,9 +3717,9 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/syn@3.0.9",
+      "purl": "pkg:cargo/syn@3.0.10",
       "type": "library",
-      "version": "3.0.9"
+      "version": "3.0.10"
     },
     {
       "bom-ref": "pkg:cargo/tempfile@3.27.0",
@@ -3770,7 +3770,7 @@
       "version": "3.27.0"
     },
     {
-      "bom-ref": "pkg:cargo/toml_datetime@1.1.2+spec-1.1.0",
+      "bom-ref": "pkg:cargo/toml_datetime@1.1.3+spec-1.1.0",
       "evidence": {
         "identity": [
           {
@@ -3791,7 +3791,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "2b86d767906c6c42421dcba507eb9d203e779497710a47782a224bb871653053"
+          "content": "173f25c883cd2176a2d8212155638c0a60d484a9d84546d270866f40f56b6e49"
         }
       ],
       "name": "toml_datetime",
@@ -3801,12 +3801,12 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/toml_datetime@1.1.2%2Bspec-1.1.0",
+      "purl": "pkg:cargo/toml_datetime@1.1.3%2Bspec-1.1.0",
       "type": "library",
-      "version": "1.1.2+spec-1.1.0"
+      "version": "1.1.3+spec-1.1.0"
     },
     {
-      "bom-ref": "pkg:cargo/toml_edit@0.25.18+spec-1.1.0",
+      "bom-ref": "pkg:cargo/toml_edit@0.25.19+spec-1.1.0",
       "evidence": {
         "identity": [
           {
@@ -3827,7 +3827,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "1ec6e78bd70db9420d8d212fa9dc97f116448a1ceff5d00eabb991d407e21396"
+          "content": "dd43688c4858d7264ae1cf9a9f874a67c3feb74a883b1cd7bebd6a4ea8307218"
         }
       ],
       "name": "toml_edit",
@@ -3837,9 +3837,9 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/toml_edit@0.25.18%2Bspec-1.1.0",
+      "purl": "pkg:cargo/toml_edit@0.25.19%2Bspec-1.1.0",
       "type": "library",
-      "version": "0.25.18+spec-1.1.0"
+      "version": "0.25.19+spec-1.1.0"
     },
     {
       "bom-ref": "pkg:cargo/toml_parser@1.1.5+spec-1.1.0",
@@ -4157,7 +4157,7 @@
       "version": "0.61.2"
     },
     {
-      "bom-ref": "pkg:cargo/winnow@1.0.4",
+      "bom-ref": "pkg:cargo/winnow@1.0.5",
       "evidence": {
         "identity": [
           {
@@ -4178,7 +4178,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
+          "content": "8c3b93199df0ab874cdf0c6a94f0a0dc3423fe41f1cafb62b8bd7b1deb277aef"
         }
       ],
       "licenses": [
@@ -4195,9 +4195,9 @@
           "value": "Cargo.lock"
         }
       ],
-      "purl": "pkg:cargo/winnow@1.0.4",
+      "purl": "pkg:cargo/winnow@1.0.5",
       "type": "library",
-      "version": "1.0.4"
+      "version": "1.0.5"
     },
     {
       "bom-ref": "pkg:cargo/zmij@1.0.23",
@@ -4586,7 +4586,7 @@
         "pkg:cargo/prettyplease@0.3.0",
         "pkg:cargo/proc-macro2@1.0.107",
         "pkg:cargo/quote@1.0.47",
-        "pkg:cargo/syn@3.0.9"
+        "pkg:cargo/syn@3.0.10"
       ],
       "ref": "pkg:cargo/bon-macros@3.10.3"
     },
@@ -4604,7 +4604,7 @@
         "pkg:cargo/proc-macro-crate@3.5.0",
         "pkg:cargo/proc-macro2@1.0.107",
         "pkg:cargo/quote@1.0.47",
-        "pkg:cargo/syn@3.0.9"
+        "pkg:cargo/syn@3.0.10"
       ],
       "ref": "pkg:cargo/borsh-derive@1.8.1"
     },
@@ -4661,7 +4661,7 @@
         "pkg:cargo/proc-macro2@1.0.107",
         "pkg:cargo/quote@1.0.47",
         "pkg:cargo/strsim@0.11.1",
-        "pkg:cargo/syn@3.0.9"
+        "pkg:cargo/syn@3.0.10"
       ],
       "ref": "pkg:cargo/darling_core@0.24.1"
     },
@@ -4669,7 +4669,7 @@
       "dependsOn": [
         "pkg:cargo/darling_core@0.24.1",
         "pkg:cargo/quote@1.0.47",
-        "pkg:cargo/syn@3.0.9"
+        "pkg:cargo/syn@3.0.10"
       ],
       "ref": "pkg:cargo/darling_macro@0.24.1"
     },
@@ -4739,7 +4739,7 @@
       "dependsOn": [
         "pkg:cargo/proc-macro2@1.0.107",
         "pkg:cargo/quote@1.0.47",
-        "pkg:cargo/syn@3.0.9"
+        "pkg:cargo/syn@3.0.10"
       ],
       "ref": "pkg:cargo/futures-macro@0.3.34"
     },
@@ -4791,7 +4791,7 @@
     },
     {
       "dependsOn": [],
-      "ref": "pkg:cargo/itoa@1.0.18"
+      "ref": "pkg:cargo/itoa@1.0.19"
     },
     {
       "dependsOn": [],
@@ -4838,7 +4838,7 @@
         "pkg:cargo/napi-derive-backend@7.0.0",
         "pkg:cargo/proc-macro2@1.0.107",
         "pkg:cargo/quote@1.0.47",
-        "pkg:cargo/syn@3.0.9"
+        "pkg:cargo/syn@3.0.10"
       ],
       "ref": "pkg:cargo/napi-derive@3.7.0"
     },
@@ -4848,7 +4848,7 @@
         "pkg:cargo/proc-macro2@1.0.107",
         "pkg:cargo/quote@1.0.47",
         "pkg:cargo/semver@1.0.28",
-        "pkg:cargo/syn@3.0.9"
+        "pkg:cargo/syn@3.0.10"
       ],
       "ref": "pkg:cargo/napi-derive-backend@7.0.0"
     },
@@ -4879,13 +4879,13 @@
     {
       "dependsOn": [
         "pkg:cargo/proc-macro2@1.0.107",
-        "pkg:cargo/syn@3.0.9"
+        "pkg:cargo/syn@3.0.10"
       ],
       "ref": "pkg:cargo/prettyplease@0.3.0"
     },
     {
       "dependsOn": [
-        "pkg:cargo/toml_edit@0.25.18+spec-1.1.0"
+        "pkg:cargo/toml_edit@0.25.19+spec-1.1.0"
       ],
       "ref": "pkg:cargo/proc-macro-crate@3.5.0"
     },
@@ -5008,13 +5008,13 @@
       "dependsOn": [
         "pkg:cargo/proc-macro2@1.0.107",
         "pkg:cargo/quote@1.0.47",
-        "pkg:cargo/syn@3.0.9"
+        "pkg:cargo/syn@3.0.10"
       ],
       "ref": "pkg:cargo/serde_derive@1.0.229"
     },
     {
       "dependsOn": [
-        "pkg:cargo/itoa@1.0.18",
+        "pkg:cargo/itoa@1.0.19",
         "pkg:cargo/memchr@2.8.3",
         "pkg:cargo/serde@1.0.229",
         "pkg:cargo/serde_core@1.0.229",
@@ -5065,7 +5065,7 @@
         "pkg:cargo/quote@1.0.47",
         "pkg:cargo/unicode-ident@1.0.27"
       ],
-      "ref": "pkg:cargo/syn@3.0.9"
+      "ref": "pkg:cargo/syn@3.0.10"
     },
     {
       "dependsOn": [
@@ -5081,20 +5081,20 @@
       "dependsOn": [
         "pkg:cargo/serde_core@1.0.229"
       ],
-      "ref": "pkg:cargo/toml_datetime@1.1.2+spec-1.1.0"
+      "ref": "pkg:cargo/toml_datetime@1.1.3+spec-1.1.0"
     },
     {
       "dependsOn": [
         "pkg:cargo/indexmap@2.14.2",
-        "pkg:cargo/toml_datetime@1.1.2+spec-1.1.0",
+        "pkg:cargo/toml_datetime@1.1.3+spec-1.1.0",
         "pkg:cargo/toml_parser@1.1.5+spec-1.1.0",
-        "pkg:cargo/winnow@1.0.4"
+        "pkg:cargo/winnow@1.0.5"
       ],
-      "ref": "pkg:cargo/toml_edit@0.25.18+spec-1.1.0"
+      "ref": "pkg:cargo/toml_edit@0.25.19+spec-1.1.0"
     },
     {
       "dependsOn": [
-        "pkg:cargo/winnow@1.0.4"
+        "pkg:cargo/winnow@1.0.5"
       ],
       "ref": "pkg:cargo/toml_parser@1.1.5+spec-1.1.0"
     },
@@ -5130,7 +5130,7 @@
       "dependsOn": [
         "pkg:cargo/memchr@2.8.3"
       ],
-      "ref": "pkg:cargo/winnow@1.0.4"
+      "ref": "pkg:cargo/winnow@1.0.5"
     },
     {
       "dependsOn": [],
