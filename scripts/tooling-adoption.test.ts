@@ -278,18 +278,9 @@ describe("shared tooling adoption", () => {
     );
   });
 
-  test("runtime selectors share policy pins with one bounded Hawk exception", () => {
+  test("runtime selectors share policy pins without a Hawk exception", () => {
     const declaration = parseJson(read("stll-toolchain.json"));
-    const rustExceptions = list(
-      at(declaration, "rustExceptions"),
-      "rustExceptions",
-    );
-    expect(rustExceptions).toHaveLength(1);
-    expect(rustExceptions.at(0)).toMatchObject({
-      pin: "1.97.1",
-      tracking: "https://github.com/stella/tooling/issues/99",
-      expires: "2026-11-11",
-    });
+    expect(at(declaration, "rustExceptions")).toBeUndefined();
     expect(read(".node-version").trim()).toBe("26.10.0");
     const ci = read(".github/workflows/ci.yml");
     expect(ci).toContain('node-version: "26.10.0"');
