@@ -105,7 +105,7 @@ test("release builds and tests bindings through the shared native workflow", () 
   );
   expect(build).toContain("needs: [preflight, verify]");
   expect(build).toContain(
-    "if: needs.preflight.outputs.already-released != 'true'",
+    "\n    if: needs.preflight.outputs.already-released != 'true'\n",
   );
   expect(build).toMatch(/permissions:\n      contents: read\n/u);
   expect(build).not.toMatch(/secrets:/u);
