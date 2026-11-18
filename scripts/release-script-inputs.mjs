@@ -62,53 +62,43 @@ export const stringArray = (value) => {
   );
 };
 
+// The shared release workflow builds exactly these targets; keep this list in
+// step with stella/.github/.github/workflows/rust-napi-release.yml.
+export const SHARED_RELEASE_TARGETS = Object.freeze([
+  "x86_64-apple-darwin",
+  "aarch64-apple-darwin",
+  "x86_64-unknown-linux-gnu",
+  "aarch64-unknown-linux-gnu",
+  "x86_64-pc-windows-msvc",
+  "wasm32-wasip1-threads",
+]);
+
+const SHARED_RELEASE_USE =
+  /^stella\/\.github\/\.github\/workflows\/rust-napi-release\.yml@[0-9a-f]{40}$/u;
+
 /** @param {unknown} value */
 export const readWasiWorkflow = (value) => {
   if (
     !isRecord(value) ||
     !isRecord(value["jobs"]) ||
-    !isRecord(value["jobs"]["build"])
+    !isRecord(value["jobs"]["test"])
   )
-    throw new TypeError("Release workflow requires a build job");
-  const build = value["jobs"]["build"];
-  const strategy = build["strategy"];
-  const matrix = isRecord(strategy) ? strategy["matrix"] : undefined;
-  const settings = isRecord(matrix) ? matrix["settings"] : undefined;
-  if (!Array.isArray(settings))
-    throw new TypeError("Release workflow has no build matrix");
-  const targets = Array.from(
-    settings,
-    /** @param {unknown} setting */ (setting) => {
-      if (!isRecord(setting) || typeof setting["target"] !== "string")
-        throw new TypeError("Release build settings require target strings");
-      const artifact = setting["node_artifact"];
-      if (
-        setting["target"] !== "wasm32-wasip1-threads" &&
-        typeof artifact !== "string"
-      )
-        throw new TypeError("Native build settings require artifact strings");
-      return {
-        target: setting["target"],
-        node_artifact: artifact,
-      };
-    },
-  );
-  const steps = build["steps"];
-  if (!Array.isArray(steps))
-    throw new TypeError("Release workflow requires build steps");
-  const uploads = Array.from(
-    steps,
-    /** @param {unknown} step */ (step) => {
-      if (!isRecord(step))
-        throw new TypeError("Release build steps must be objects");
-      const inputs = step["with"];
-      return {
-        name: step["name"],
-        path: isRecord(inputs) ? inputs["path"] : undefined,
-      };
-    },
-  );
-  return { targets, uploads };
+    throw new TypeError("Release workflow requires a test job");
+  const job = value["jobs"]["test"];
+  if (typeof job["uses"] !== "string" || !SHARED_RELEASE_USE.test(job["uses"]))
+    throw new TypeError(
+      "Release test job must call the pinned shared native release workflow",
+    );
+  const inputs = job["with"];
+  const wasmPaths = isRecord(inputs)
+    ? inputs["wasm-artifact-paths"]
+    : undefined;
+  if (typeof wasmPaths !== "string")
+    throw new TypeError("Release workflow has no WASM upload manifest");
+  return {
+    targets: [...SHARED_RELEASE_TARGETS],
+    wasmPaths: wasmPaths.trim().split(/\s+/u),
+  };
 };
 
 /** @param {unknown} value */
