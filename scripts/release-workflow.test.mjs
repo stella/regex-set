@@ -97,3 +97,18 @@ test("the release reconciler checks the packages the release publishes", () => {
     releaseAppSecrets(readJob("finalize")),
   );
 });
+
+test("release builds and tests bindings through the shared native workflow", () => {
+  const build = readJob("test");
+  expect(build).toMatch(
+    /uses: stella\/\.github\/\.github\/workflows\/rust-napi-release\.yml@[0-9a-f]{40}\n/u,
+  );
+  expect(build).toContain("needs: [preflight, verify]");
+  expect(build).toContain(
+    "\n    if: needs.preflight.outputs.already-released != 'true'\n",
+  );
+  expect(build).toMatch(/permissions:\n      contents: read\n/u);
+  expect(build).not.toMatch(/secrets:/u);
+  expect(workflow).not.toMatch(/^  build:\n/mu);
+  expect(readJob("pack")).toContain("needs: [preflight, verify, test]");
+});

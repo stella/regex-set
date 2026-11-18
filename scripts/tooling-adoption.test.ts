@@ -285,9 +285,9 @@ describe("shared tooling adoption", () => {
     const ci = read(".github/workflows/ci.yml");
     expect(ci).toContain('node-version: "26.10.0"');
     const release = read(".github/workflows/release.yml");
-    expect(release.match(/node-version-file: .node-version/g)).toHaveLength(4);
+    expect(release.match(/node-version-file: .node-version/g)).toHaveLength(3);
     expect(release.split(`toolchain: "${toolchainPolicy.rust}"`)).toHaveLength(
-      5,
+      4,
     );
     expect(release).not.toMatch(/node-version: "22/);
   });

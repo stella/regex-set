@@ -27,15 +27,10 @@ void test("release schemas accept the actual package and workflow while preservi
     ),
   );
   assert.deepEqual(
-    workflow.targets
-      .map(({ target }) => target)
-      .toSorted((left, right) => left.localeCompare(right)),
+    workflow.targets.toSorted((left, right) => left.localeCompare(right)),
     targets.toSorted((left, right) => left.localeCompare(right)),
   );
-  assert.equal(
-    workflow.uploads.find(({ name }) => name === "Upload native binding")?.path,
-    "${{ matrix.settings.node_artifact }}",
-  );
+  assert.ok(workflow.wasmPaths.includes("*.wasm"));
   for (const rootEntry of [null, "", "regex-set.wasi-browser.js"])
     assert.equal(readWasiRootEntry({ rootEntry }), rootEntry);
 });
@@ -72,25 +67,31 @@ void test("WASI metadata boundaries reject malformed containers and consumed lea
     { napi: { targets: [1] }, scripts: {} },
   ])
     assert.throws(() => readWasiPackage(value), TypeError);
-  for (const build of [
+  const sharedUse = `stella/.github/.github/workflows/rust-napi-release.yml@${"a".repeat(40)}`;
+  for (const job of [
     null,
     {},
     {
-      strategy: { matrix: { settings: [null] } },
-      steps: [],
+      uses: "stella/.github/.github/workflows/rust-napi-release.yml@main",
+      with: { "wasm-artifact-paths": "*.wasm" },
     },
     {
-      strategy: {
-        matrix: {
-          settings: [{ target: "x86_64-unknown-linux-gnu" }],
+      uses: `stella/.github/.github/workflows/other.yml@${"a".repeat(40)}`,
+      with: { "wasm-artifact-paths": "*.wasm" },
+    },
+    { uses: sharedUse },
+    { uses: sharedUse, with: { "wasm-artifact-paths": ["*.wasm"] } },
+  ])
+    assert.throws(() => readWasiWorkflow({ jobs: { test: job } }), TypeError);
+  assert.deepEqual(
+    readWasiWorkflow({
+      jobs: {
+        test: {
+          uses: sharedUse,
+          with: { "wasm-artifact-paths": "*.wasm\n!*.debug.wasm\n" },
         },
       },
-      steps: [],
-    },
-    {
-      strategy: { matrix: { settings: [] } },
-      steps: [null],
-    },
-  ])
-    assert.throws(() => readWasiWorkflow({ jobs: { build } }), TypeError);
+    }).wasmPaths,
+    ["*.wasm", "!*.debug.wasm"],
+  );
 });

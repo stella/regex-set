@@ -36,7 +36,7 @@ const workflowContract = async () => {
   const workflow = YAML.parse(
     await Bun.file(new URL(".github/workflows/release.yml", root)).text(),
   );
-  const { targets: settings, uploads } = readWasiWorkflow(workflow);
+  const { targets: workflowTargets, wasmPaths } = readWasiWorkflow(workflow);
   /** @type {unknown} */
   const manifest = await Bun.file(new URL("package.json", root)).json();
   const { targets: napiTargets, scripts } = readWasiPackage(manifest);
@@ -58,7 +58,6 @@ const workflowContract = async () => {
   ) {
     throw new Error("build must build only the native binding");
   }
-  const workflowTargets = settings.map(({ target }) => target);
   if (
     workflowTargets.length !== napiTargets.length ||
     workflowTargets.some((target) => !napiTargets.includes(target))
@@ -66,35 +65,7 @@ const workflowContract = async () => {
     throw new Error("Release build matrix differs from NAPI targets");
   }
 
-  const nativeUpload = uploads.find(
-    (step) => step.name === "Upload native binding",
-  );
-  if (nativeUpload?.path !== "${{ matrix.settings.node_artifact }}") {
-    throw new Error("Native uploads must select the matrix artifact");
-  }
-
-  const nativeArtifacts = settings
-    .filter(({ target }) => target !== "wasm32-wasip1-threads")
-    .map(({ node_artifact }) => node_artifact);
-  if (
-    nativeArtifacts.some(
-      (artifact) =>
-        typeof artifact !== "string" ||
-        !artifact.endsWith(".node") ||
-        artifact.includes("*"),
-    ) ||
-    new Set(nativeArtifacts).size !== nativeArtifacts.length
-  ) {
-    throw new Error("Each native target must upload one unique binary");
-  }
-
-  const wasmUpload = uploads.find(
-    (step) => step.name === "Upload WASM bindings",
-  );
-  if (typeof wasmUpload?.path !== "string") {
-    throw new Error("Release workflow has no WASM upload manifest");
-  }
-  return wasmUpload.path.trim().split(/\s+/u);
+  return wasmPaths;
 };
 
 /** @param {string[]} patterns
