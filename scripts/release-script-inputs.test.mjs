@@ -68,7 +68,7 @@ void test("WASI metadata boundaries reject malformed containers and consumed lea
   ])
     assert.throws(() => readWasiPackage(value), TypeError);
   const sharedUse = `stella/.github/.github/workflows/rust-napi-release.yml@${"a".repeat(40)}`;
-  for (const test of [
+  for (const job of [
     null,
     {},
     {
@@ -82,7 +82,7 @@ void test("WASI metadata boundaries reject malformed containers and consumed lea
     { uses: sharedUse },
     { uses: sharedUse, with: { "wasm-artifact-paths": ["*.wasm"] } },
   ])
-    assert.throws(() => readWasiWorkflow({ jobs: { test } }), TypeError);
+    assert.throws(() => readWasiWorkflow({ jobs: { test: job } }), TypeError);
   assert.deepEqual(
     readWasiWorkflow({
       jobs: {
