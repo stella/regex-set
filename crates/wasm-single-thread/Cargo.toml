@@ -2,7 +2,7 @@
 name = "stella-regex-set-wasm-single-thread"
 version = "1.1.0"
 edition = "2024"
-rust-version = "1.87"
+rust-version = "1.100"
 license = "Apache-2.0"
 publish = false
 
@@ -16,3 +16,6 @@ stella-regex-set-core = { version = "1.1.0", path = "../core" }
 
 [lints.rust]
 unsafe_code = "allow"
+
+[lints.cargo]
+unused_dependencies = "deny"
