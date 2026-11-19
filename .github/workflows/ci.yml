@@ -1,8 +1,8 @@
 name: CI
 
 env:
-  HAWK_RUST_TOOLCHAIN: "1.99.1"
-  HAWK_VERSION: "0.1.17"
+  HAWK_RUST_TOOLCHAIN: "1.100.0"
+  HAWK_VERSION: "0.1.18"
 
 on:
   push:
@@ -195,7 +195,7 @@ jobs:
   napi-ci:
     if: ${{ always() && !cancelled() && needs.check-changes.result == 'success' && (github.event_name != 'pull_request' || needs.trust-check.outputs.trusted == 'true') }}
     needs: [check-changes, trust-check]
-    uses: stella/.github/.github/workflows/rust-napi-ci.yml@ba1d8b5e67dd5b252f6d3edd0c9fa047c5d386fc
+    uses: stella/.github/.github/workflows/rust-napi-ci.yml@964e75f409643716a2c8ff29c26235f18d2e34a0
     with:
       # Pull requests run one Ubuntu job; the merge queue runs every platform.
       scope: ${{ github.event_name == 'pull_request' && 'pr' || 'full' }}
@@ -225,7 +225,7 @@ jobs:
           bun-version-file: package.json
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
-          toolchain: "1.99.1"
+          toolchain: "1.100.0"
           targets: wasm32-wasip1-threads, wasm32-unknown-unknown
       - run: bun install --frozen-lockfile
       - run: bun run build
@@ -263,7 +263,7 @@ jobs:
           bun-version-file: package.json
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
-          toolchain: "1.99.1"
+          toolchain: "1.100.0"
       - name: Install pinned Hawk
         shell: bash
         run: |
@@ -271,8 +271,8 @@ jobs:
           expected_hawk_script="cargo +${HAWK_RUST_TOOLCHAIN} hawk check --target-dir target/hawk -D warnings -A hawk::dead_public -A hawk::unnecessary_public"
           jq -e --arg expected "$expected_hawk_script" \
             '.scripts["rust:hawk"] == $expected' package.json >/dev/null
-          rustup component add rustc-dev --toolchain 1.99.1
-          RUSTC_BOOTSTRAP=1 cargo +1.99.1 install cargo-hawk \
+          rustup component add rustc-dev --toolchain 1.100.0
+          RUSTC_BOOTSTRAP=1 cargo +1.100.0 install cargo-hawk \
             --version "${HAWK_VERSION}" --locked --root "$RUNNER_TEMP/hawk"
           echo "$RUNNER_TEMP/hawk/bin" >> "$GITHUB_PATH"
       - name: Check internal Rust visibility
