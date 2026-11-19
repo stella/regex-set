@@ -16,12 +16,12 @@ test("repository workflows satisfy the installed shared toolchain guard", () => 
   });
   expect(result.status, result.stderr).toBe(0);
   const workflow = read(".github/workflows/ci.yml");
-  expect(workflow).toContain('HAWK_RUST_TOOLCHAIN: "1.99.1"');
-  expect(workflow).toContain('toolchain: "1.99.1"');
+  expect(workflow).toContain('HAWK_RUST_TOOLCHAIN: "1.100.0"');
+  expect(workflow).toContain('toolchain: "1.100.0"');
   const manifest = parseJson(read("package.json"));
   expect(
     text(at(manifest, "scripts", "rust:hawk"), "scripts.rust:hawk"),
-  ).toContain("cargo +1.99.1 hawk");
+  ).toContain("cargo +1.100.0 hawk");
 }, 30_000);
 
 test("change detection follows trust and the CI dependency graph stays acyclic", () => {
