@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.1.1
+
+### Patch Changes
+
+- [#277](https://github.com/stella/regex-set/pull/277) [`1effe8f`](https://github.com/stella/regex-set/commit/1effe8f3558a11189df46823dd8370afa1b55759) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Move the WebAssembly packages to `@emnapi/core` and `@emnapi/runtime` 2.0.0-beta.3 with `@napi-rs/wasm-runtime` 1.2.7.
+
+- [#276](https://github.com/stella/regex-set/pull/276) [`c71325b`](https://github.com/stella/regex-set/commit/c71325b46553d0cbe330cf8a3515e9b834abf63c) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Build the native binding with napi 3.16 and napi-derive 3.7.
+
+- [#276](https://github.com/stella/regex-set/pull/276) [`c71325b`](https://github.com/stella/regex-set/commit/c71325b46553d0cbe330cf8a3515e9b834abf63c) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Update fancy-regex to 0.20 for patterns that need lookaround or backreferences. In Unicode mode, `\xHH` escapes above `0x7F` now match the code point, as they already did for the other patterns; case-insensitive prefilters no longer miss candidates for non-ASCII class ranges.
+
+- [#279](https://github.com/stella/regex-set/pull/279) [`b535407`](https://github.com/stella/regex-set/commit/b5354078b98635a75aa26ca624f905326ce52e66) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Validate single-thread WebAssembly replies before use.
+
+- [#291](https://github.com/stella/regex-set/pull/291) [`d9cceb5`](https://github.com/stella/regex-set/commit/d9cceb542d6e804e38ac346e310707b06f1e45c8) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Raise the Rust core crate's minimum supported Rust version to 1.100 and reject unused Cargo dependencies at build time.
+
+- [#289](https://github.com/stella/regex-set/pull/289) [`28e2535`](https://github.com/stella/regex-set/commit/28e2535cb7583525494624d04526e6531fdca5f9) Thanks [@jan-kubica](https://github.com/jan-kubica)! - Build the native bindings and WebAssembly with Rust 1.100.0.
+
 ## 1.1.0
 
 ### Minor Changes
